@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Enable_Record_Search__c</fullName>
+    <label>Enable Record Search</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>Master switch for the Record Search domain — off by default (ADR-0017). Reserved for the Search Engine sprint.</description>
+</CustomField>

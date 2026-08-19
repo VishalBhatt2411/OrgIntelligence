@@ -1,0 +1,27 @@
+<template>
+    <div class="oi-hierarchy-tree">
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading hierarchy tree" size="x-small"></lightning-spinner>
+        </template>
+        <template lwc:elseif={hasError}>
+            <p class="oi-hierarchy-tree-error" data-id="tree-error" role="alert">{errorMessage}</p>
+        </template>
+        <template lwc:elseif={hasRoot}>
+            <c-oi-hierarchy-tree-node
+                data-id="tree-root"
+                node-record-id={rootRecordId}
+                node-object-api-name={rootObjectApiName}
+                node-label={effectiveRootLabel}
+                children-by-parent-id={childrenByParentId}
+                depth={rootDepth}
+                is-root
+                onrecordselect={handleRootSelect}
+            ></c-oi-hierarchy-tree-node>
+            <template lwc:if={hasMore}>
+                <p class="oi-hierarchy-tree-note" data-id="tree-has-more-note">
+                    Additional descendants exist beyond what's shown here — bounded to keep this within governor limits.
+                </p>
+            </template>
+        </template>
+    </div>
+</template>

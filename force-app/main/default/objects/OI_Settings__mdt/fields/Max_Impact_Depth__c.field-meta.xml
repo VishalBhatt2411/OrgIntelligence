@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Impact_Depth__c</fullName>
+    <label>Max Impact Depth</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <description>Default/ceiling depth for forward/reverse Impact Analysis traversal (OI_DependencyEngineService) — dedicated and separate from Max_Hop_Depth__c because impact analysis needs a different default depth than ordinary UI browsing (Architecture.md §7 calls out "e.g., 3 hops").</description>
+</CustomField>

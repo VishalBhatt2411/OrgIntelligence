@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Source_Node_Key__c</fullName>
+    <label>Source Node Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <unique>false</unique>
+    <description>Points to OI_Graph_Node__c.Node_Key__c — the logical key, not a specific version. Text reference, not a standard Lookup (GraphEngine.md §3).</description>
+</CustomField>

@@ -1,0 +1,135 @@
+<template>
+    <div class="oi-graph-canvas-container">
+        <template lwc:if={isEmpty}>
+            <div class="oi-graph-canvas-empty" data-id="canvas-empty">Select a node to start exploring the graph.</div>
+        </template>
+        <template lwc:else>
+            <svg
+                data-id="canvas-svg"
+                class="oi-graph-canvas-svg"
+                viewBox={viewBox}
+                onwheel={handleWheel}
+                onpointerdown={handlePointerDown}
+                onpointermove={handlePointerMove}
+                onpointerup={handlePointerUp}
+                ondblclick={handleDoubleClick}
+            >
+                <defs>
+                    <pattern data-id="canvas-grid-pattern" id="oi-canvas-grid" width={gridTileSize} height={gridTileSize} patternUnits="userSpaceOnUse">
+                        <circle cx={gridDotCenter} cy={gridDotCenter} r={gridDotRadius} class="oi-graph-canvas-grid-dot"></circle>
+                    </pattern>
+                    <marker data-id="canvas-arrow-marker" id="oi-arrow" markerWidth="8" markerHeight="8" orient="auto">
+                        <path d="M0,0 L8,4 L0,8 Z" class="oi-graph-edge-arrow"></path>
+                    </marker>
+                </defs>
+                <rect data-id="canvas-grid-rect" x="-10000" y="-10000" width="20000" height="20000" fill="url(#oi-canvas-grid)"></rect>
+                <template for:each={renderableEdges} for:item="edge">
+                    <path key={edge.edgeKey} data-id="graph-edge-path" class={edge.cssClass} d={edge.pathD}>
+                        <title>{edge.displayLabel}</title>
+                    </path>
+                </template>
+                <template for:each={renderableNodes} for:item="node">
+                    <foreignObject
+                        key={node.nodeKey}
+                        x={node.x}
+                        y={node.y}
+                        width={node.width}
+                        height={node.height}
+                        data-node-key={node.nodeKey}
+                        class="oi-graph-node-draggable"
+                        onpointerdown={handleNodeDragStart}
+                    >
+                        <template lwc:if={node.showFieldList}>
+                            <c-oi-schema-object-card
+                                node-key={node.nodeKey}
+                                type-key={node.typeKey}
+                                label={node.label}
+                                secondary-key={node.secondaryKey}
+                                icon-name={node.iconName}
+                                color-token={node.colorToken}
+                                is-selected={node.isSelected}
+                                is-expanded={node.isExpanded}
+                                has-more-neighbors={node.hasMoreNeighbors}
+                                fields={node.fields}
+                                onselect={handleNodeSelect}
+                                onexpandtoggle={handleNodeExpandToggle}
+                            ></c-oi-schema-object-card>
+                        </template>
+                        <template lwc:else>
+                            <c-oi-graph-node
+                                node-key={node.nodeKey}
+                                type-key={node.typeKey}
+                                label={node.label}
+                                secondary-key={node.secondaryKey}
+                                state={node.state}
+                                icon-name={node.iconName}
+                                color-token={node.colorToken}
+                                is-selected={node.isSelected}
+                                is-expanded={node.isExpanded}
+                                has-more-neighbors={node.hasMoreNeighbors}
+                                is-cluster={node.isCluster}
+                                onselect={handleNodeSelect}
+                                onexpandtoggle={handleNodeExpandToggle}
+                            ></c-oi-graph-node>
+                        </template>
+                    </foreignObject>
+                </template>
+            </svg>
+
+            <div class="oi-graph-canvas-toolbar" data-id="canvas-toolbar">
+                <div class="oi-graph-canvas-zoom-controls" data-id="zoom-controls">
+                    <button type="button" data-id="zoom-in-button" class="oi-graph-canvas-zoom-button" disabled={disableZoomIn} title="Zoom in" aria-label="Zoom in" onclick={handleZoomInClick}>+</button>
+                    <div class="oi-graph-canvas-zoom-percent" data-id="zoom-percent">{zoomPercentDisplay}</div>
+                    <button type="button" data-id="zoom-out-button" class="oi-graph-canvas-zoom-button" disabled={disableZoomOut} title="Zoom out" aria-label="Zoom out" onclick={handleZoomOutClick}>−</button>
+                </div>
+                <div class="oi-graph-canvas-view-controls" data-id="view-controls">
+                    <button
+                        type="button"
+                        data-id="fit-to-screen-button"
+                        class="oi-graph-canvas-zoom-button"
+                        disabled={disableFitToScreen}
+                        title="Fit to screen"
+                        aria-label="Fit to screen"
+                        onclick={handleFitToScreenClick}
+                    >⛶</button>
+                    <button
+                        type="button"
+                        data-id="center-on-selected-button"
+                        class="oi-graph-canvas-zoom-button"
+                        disabled={disableCenterOnSelected}
+                        title="Center on selected node"
+                        aria-label="Center on selected node"
+                        onclick={handleCenterOnSelectedClick}
+                    >⌖</button>
+                    <button
+                        type="button"
+                        data-id="reset-layout-button"
+                        class="oi-graph-canvas-zoom-button"
+                        disabled={disableResetLayout}
+                        title="Reset layout"
+                        aria-label="Reset layout"
+                        onclick={handleResetLayoutClick}
+                    >↺</button>
+                    <button type="button" data-id="reset-view-button" class="oi-graph-canvas-zoom-button" title="Reset view" aria-label="Reset view" onclick={handleResetViewClick}>⤢</button>
+                </div>
+            </div>
+
+            <template lwc:if={hasMiniMap}>
+                <svg class="oi-graph-canvas-minimap" data-id="minimap" viewBox="0 0 150 100">
+                    <rect x="0" y="0" width="150" height="100" class="oi-graph-canvas-minimap-bg"></rect>
+                    <template for:each={miniMap.dots} for:item="dot">
+                        <circle key={dot.key} cx={dot.cx} cy={dot.cy} r="2.5" data-id="minimap-dot" class="oi-graph-canvas-minimap-dot"></circle>
+                    </template>
+                    <rect
+                        data-id="minimap-viewport-rect"
+                        x={miniMap.viewportRect.x}
+                        y={miniMap.viewportRect.y}
+                        width={miniMap.viewportRect.width}
+                        height={miniMap.viewportRect.height}
+                        class="oi-graph-canvas-minimap-viewport"
+                    ></rect>
+                </svg>
+            </template>
+        </template>
+    </div>
+</template>

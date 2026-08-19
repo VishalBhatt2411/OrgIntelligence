@@ -1,0 +1,23 @@
+<template>
+    <div class="oi-hierarchy-switcher">
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading hierarchies" size="x-small"></lightning-spinner>
+        </template>
+        <template lwc:elseif={hasError}>
+            <p class="oi-hierarchy-switcher-error" data-id="switcher-error" role="alert">{errorMessage}</p>
+        </template>
+        <template lwc:elseif={showEmptyState}>
+            <p class="oi-hierarchy-switcher-empty" data-id="switcher-empty">No hierarchies are configured for this object.</p>
+        </template>
+        <template lwc:else>
+            <lightning-combobox
+                data-id="switcher-combobox"
+                label="Hierarchy"
+                variant="label-hidden"
+                value={selectedDefinitionId}
+                options={comboboxOptions}
+                onchange={handleChange}
+            ></lightning-combobox>
+        </template>
+    </div>
+</template>

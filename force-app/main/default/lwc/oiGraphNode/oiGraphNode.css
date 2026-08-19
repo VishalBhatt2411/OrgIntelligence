@@ -1,0 +1,157 @@
+/**
+ * Every color below is an SLDS global styling hook (--slds-g-color-*) with the original
+ * literal hex as its fallback — var(--slds-g-color-X, #hex) — so the card adapts to Lightning
+ * Experience's SLDS 2 dark mode where available and renders exactly as before where it isn't.
+ * --oi-node-accent itself is normally overridden per-instance by oiGraphNode.js's nodeStyle
+ * (resolved from the registry's colorToken, which is itself now hook-backed — see that file),
+ * so the value here is only the pre-registry-resolution default.
+ */
+.oi-graph-node {
+    --oi-node-accent: var(--slds-g-color-border-2, #706e6b);
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    border-left: 4px solid var(--oi-node-accent);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: 0.75rem;
+    /**
+     * Was `hidden`. The label/secondary spans below already clip and ellipsize themselves
+     * (.oi-graph-node-label/.oi-graph-node-secondary) — this outer overflow was never required
+     * for that. Keeping it hidden would also clip the hover tooltip (.oi-graph-node-tooltip
+     * below), which must render outside this box's own bounds to be usable. The SVG
+     * <foreignObject> hosting this component defaults to overflow:hidden too (SVG's own UA
+     * stylesheet, not this file) — see oiGraphCanvas.css's .oi-graph-node-draggable rule for
+     * the matching override on that side.
+     */
+    overflow: visible;
+    box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08));
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    /** A node is dragged/panned far more often than its label text is deliberately selected — without this, a mouse-drag that starts on the label paints the browser's native blue selection box instead of moving the node. Inherited by the label span below; no separate rule needed there. */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+.oi-graph-node:hover {
+    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.1));
+    transform: translateY(-1px);
+}
+
+.oi-graph-node.is-selected {
+    box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+/** A stacked-card look (two faint shadow layers offset behind the card) — the visual cue that this one card represents a collapsed group of many, not a single real node (§26). */
+.oi-graph-node.is-cluster {
+    border-left-style: dashed;
+}
+
+.oi-graph-node.is-cluster::before,
+.oi-graph-node.is-cluster::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    border-radius: 0.5rem;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    z-index: -1;
+}
+
+.oi-graph-node.is-cluster::before {
+    transform: translate(3px, 3px);
+}
+
+.oi-graph-node.is-cluster::after {
+    transform: translate(6px, 6px);
+    opacity: 0.7;
+}
+
+.oi-graph-node-icon {
+    flex-shrink: 0;
+}
+
+.oi-graph-node-labels {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.oi-graph-node-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    color: var(--slds-g-color-on-surface-1, #181818);
+}
+
+/** The object/qualified-identity line (secondaryKey) — e.g. an Object API name for a record node, or "Account.OwnerId" for a field. Distinct, smaller styling keeps it a supporting caption under the primary label, never competing with it (§28: color/weight is never the only signal — size and position carry the hierarchy here too). */
+.oi-graph-node-secondary {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-graph-node-expand-toggle {
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    flex-shrink: 0;
+}
+
+.oi-graph-node-expand-toggle:hover {
+    text-decoration: underline;
+}
+
+/**
+ * Hover-reveal, full-text tooltip (the durable backstop behind the width heuristic in
+ * oiGraphCanvas.js — see oiGraphNode.js's tooltipText doc comment for why this can never be
+ * fully replaced by "just make the box wide enough"). Positioned above the card, centered,
+ * hidden by default and only opacity/transform-transitioned in on hover/focus so it never
+ * affects this component's own layout or the canvas's layout pass.
+ */
+.oi-graph-node-tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.4rem);
+    transform: translate(-50%, 4px);
+    background: var(--slds-g-color-neutral-base-10, #16171a);
+    color: var(--slds-g-color-neutral-base-100, #ffffff);
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: normal;
+    width: max-content;
+    max-width: 260px;
+    text-align: center;
+    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.25));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 20;
+}
+
+.oi-graph-node:hover .oi-graph-node-tooltip,
+.oi-graph-node:focus-within .oi-graph-node-tooltip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}

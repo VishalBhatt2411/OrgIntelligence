@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Default_Scan_Schedule_Cron__c</fullName>
+    <label>Default Scan Schedule Cron</label>
+    <type>Text</type>
+    <length>64</length>
+    <required>false</required>
+    <description>Optional; scans are opt-in, never auto-enabled on install.</description>
+</CustomField>

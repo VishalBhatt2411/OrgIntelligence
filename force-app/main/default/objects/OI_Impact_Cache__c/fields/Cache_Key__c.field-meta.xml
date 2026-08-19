@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Cache_Key__c</fullName>
+    <label>Cache Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <unique>true</unique>
+    <externalId>true</externalId>
+    <caseSensitive>true</caseSensitive>
+    <description>hash(nodeKey + direction + depth + rootVersionChecksum) — folding the root's current checksum into the key means a new version produces a natural cache miss even without an explicit eviction, mirroring OI_GraphCache's L1 key convention. Used for upsert-by-external-id writes.</description>
+</CustomField>

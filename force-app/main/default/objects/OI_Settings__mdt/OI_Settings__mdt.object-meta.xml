@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Settings</label>
+    <pluralLabel>OI Settings</pluralLabel>
+    <visibility>Public</visibility>
+    <description>Org-wide configuration for the platform (DataModel.md §4.3). Read via OI_SettingsService — the org-default record (DeveloperName "Default") is the single source of truth in v1; per-profile/permission-set-group override is a documented future extension, not implemented this sprint.</description>
+</CustomObject>

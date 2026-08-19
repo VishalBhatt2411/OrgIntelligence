@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Manage Hierarchy</label>
+    <description>Create/edit/delete Hierarchy Definitions and Levels — admin configuration, distinct from day-to-day relationship assignment (ADR-0022).</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

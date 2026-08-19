@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Edge_Version_Key__c</fullName>
+    <label>Edge Version Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <unique>true</unique>
+    <externalId>true</externalId>
+    <caseSensitive>true</caseSensitive>
+    <description>{Edge_Key__c}::v{Version_Number__c} — the actual unique identity of this row.</description>
+</CustomField>

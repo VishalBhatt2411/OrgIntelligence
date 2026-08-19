@@ -1,0 +1,38 @@
+<template>
+    <div class="oi-hierarchy-path">
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading path" size="x-small"></lightning-spinner>
+        </template>
+        <template lwc:elseif={hasError}>
+            <p class="oi-hierarchy-path-error" data-id="path-error" role="alert">{errorMessage}</p>
+        </template>
+        <template lwc:elseif={hasCrumbs}>
+            <ol class="oi-hierarchy-path-trail" data-id="path-trail">
+                <template for:each={crumbs} for:item="crumb">
+                    <li key={crumb.key} class="oi-hierarchy-path-crumb-item">
+                        <template lwc:if={crumb.isCurrent}>
+                            <span class="oi-hierarchy-path-current" data-id="path-crumb-current" title={crumb.label}>{crumb.label}</span>
+                        </template>
+                        <template lwc:else>
+                            <button
+                                type="button"
+                                class="oi-hierarchy-path-crumb"
+                                data-id="path-crumb"
+                                data-record-id={crumb.recordId}
+                                data-object-api-name={crumb.objectApiName}
+                                title={crumb.label}
+                                onclick={handleCrumbClick}
+                            >
+                                {crumb.label}
+                            </button>
+                            <span class="oi-hierarchy-path-separator" aria-hidden="true">›</span>
+                        </template>
+                    </li>
+                </template>
+            </ol>
+        </template>
+        <template lwc:elseif={showRootNote}>
+            <p class="oi-hierarchy-path-note" data-id="path-root-note">This record is a root in this hierarchy — it has no parent.</p>
+        </template>
+    </div>
+</template>

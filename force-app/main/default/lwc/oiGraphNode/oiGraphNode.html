@@ -1,0 +1,24 @@
+<template>
+    <div
+        class={nodeClass}
+        style={nodeStyle}
+        data-id="graph-node"
+        role="button"
+        tabindex="0"
+        aria-label={ariaLabel}
+        onclick={handleSelect}
+        onkeydown={handleKeydown}
+    >
+        <lightning-icon icon-name={iconName} size="x-small" class="oi-graph-node-icon"></lightning-icon>
+        <div class="oi-graph-node-labels">
+            <span class="oi-graph-node-label" title={label}>{label}</span>
+            <template lwc:if={hasSecondaryKey}>
+                <span class="oi-graph-node-secondary" data-id="node-secondary" title={secondaryKey}>{secondaryKey}</span>
+            </template>
+        </div>
+        <button data-id="expand-toggle-button" class="oi-graph-node-expand-toggle" title={expandToggleLabel} onclick={handleExpandToggle}>
+            {expandToggleLabel}
+        </button>
+        <div class="oi-graph-node-tooltip" data-id="node-tooltip">{tooltipText}</div>
+    </div>
+</template>

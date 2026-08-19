@@ -1,0 +1,283 @@
+<template>
+    <div class="oi-node-detail-panel">
+        <template lwc:if={isLoading}>
+            <div class="oi-node-detail-panel-loading" data-id="detail-loading">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:elseif={hasError}>
+            <div class="oi-node-detail-panel-error" data-id="detail-error" role="alert">{errorMessage}</div>
+        </template>
+        <template lwc:elseif={hasDetail}>
+            <div class="oi-node-detail-panel-content" data-id="detail-content">
+                <h2 class="oi-node-detail-panel-label">{detail.label}</h2>
+                <p class="oi-node-detail-panel-type">{typeDisplayLabel}</p>
+
+                <table class="oi-node-detail-panel-table">
+                    <tbody>
+                        <template lwc:if={isRecordDetail}>
+                            <tr>
+                                <th scope="row">Object</th>
+                                <td>{recordObjectApiName}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Record Id</th>
+                                <td>{recordId}</td>
+                            </tr>
+                        </template>
+                        <template lwc:else>
+                            <tr>
+                                <th scope="row">API Name</th>
+                                <td>{apiName}</td>
+                            </tr>
+                        </template>
+                        <template lwc:if={hasCustomFlag}>
+                            <tr>
+                                <th scope="row">Custom / Standard</th>
+                                <td>{customOrStandardLabel}</td>
+                            </tr>
+                        </template>
+                        <template lwc:if={isObject}>
+                            <tr>
+                                <th scope="row">Namespace</th>
+                                <td>{namespaceDisplay}</td>
+                            </tr>
+                        </template>
+                        <template lwc:if={isField}>
+                            <tr>
+                                <th scope="row">Data Type</th>
+                                <td>{dataTypeDisplay}</td>
+                            </tr>
+                            <template lwc:if={hasParentObject}>
+                                <tr>
+                                    <th scope="row">Parent Object</th>
+                                    <td>{parentObjectApiName}</td>
+                                </tr>
+                            </template>
+                            <template lwc:if={hasFieldRelationshipType}>
+                                <tr>
+                                    <th scope="row">Relationship Type</th>
+                                    <td>{fieldRelationshipTypeLabel}</td>
+                                </tr>
+                            </template>
+                            <template lwc:if={hasReferencedObjects}>
+                                <tr>
+                                    <th scope="row">Referenced Object(s)</th>
+                                    <td>{referencedObjectsDisplay}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Relationship Name</th>
+                                    <td>{relationshipName}</td>
+                                </tr>
+                            </template>
+                        </template>
+                    </tbody>
+                </table>
+
+                <template lwc:if={isObject}>
+                    <div class="oi-node-detail-panel-section" data-id="fields-section">
+                        <h3 class="oi-node-detail-panel-section-title">Fields ({fieldCount})</h3>
+                        <template lwc:if={fieldsVisible}>
+                            <div class="oi-node-detail-panel-fields-toolbar">
+                                <input
+                                    type="search"
+                                    class="oi-node-detail-panel-field-search"
+                                    data-id="field-search-input"
+                                    placeholder="Search fields..."
+                                    value={fieldSearchTerm}
+                                    oninput={handleFieldSearchInput}
+                                />
+                                <div class="oi-node-detail-panel-field-filter-group" role="tablist" aria-label="Field type">
+                                    <template for:each={fieldTypeFilterOptions} for:item="option">
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            class={option.buttonClass}
+                                            data-id="field-filter-button"
+                                            data-filter={option.value}
+                                            role="tab"
+                                            aria-selected={option.isActive}
+                                            onclick={handleFieldTypeFilterChange}
+                                        >{option.value}</button>
+                                    </template>
+                                </div>
+                            </div>
+                            <template lwc:if={hasFilteredFieldRows}>
+                                <table class="oi-node-detail-panel-table oi-node-detail-panel-fields-table" data-id="fields-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Field</th>
+                                            <th scope="col">API Name</th>
+                                            <th scope="col">Type</th>
+                                            <th scope="col"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={filteredFieldRows} for:item="row">
+                                            <tr key={row.nodeKey} class="oi-node-detail-panel-field-row" data-id="field-row" data-node-key={row.nodeKey} onclick={handleFieldRowClick}>
+                                                <td>{row.label}</td>
+                                                <td>{row.apiName}</td>
+                                                <td>{row.dataType}</td>
+                                                <td><span class={row.badgeClass} data-id="field-badge">{row.badgeLabel}</span></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </template>
+                            <template lwc:else>
+                                <p class="oi-node-detail-panel-section-note" data-id="fields-empty">No fields match your search.</p>
+                            </template>
+                            <button type="button" class="oi-node-detail-panel-hide-fields-button" data-id="hide-fields-button" onclick={handleHideFields}>Hide Fields</button>
+                        </template>
+                        <template lwc:elseif={isLoadingFields}>
+                            <lightning-spinner alternative-text="Loading fields" size="x-small"></lightning-spinner>
+                        </template>
+                        <template lwc:elseif={hasFieldsError}>
+                            <p class="oi-node-detail-panel-error" data-id="fields-error" role="alert">{fieldsErrorMessage}</p>
+                        </template>
+                        <template lwc:elseif={hasFieldsToShow}>
+                            <button type="button" class="oi-node-detail-panel-show-fields-button" data-id="show-fields-button" onclick={handleShowFields}>Show Fields</button>
+                        </template>
+                        <template lwc:else>
+                            <p class="oi-node-detail-panel-section-note">This object has no scanned fields.</p>
+                        </template>
+                    </div>
+                </template>
+
+                <template lwc:if={hasRelationshipCounts}>
+                    <div class="oi-node-detail-panel-section" data-id="structural-connections">
+                        <h3 class="oi-node-detail-panel-section-title">Structural Connections</h3>
+                        <p class="oi-node-detail-panel-section-note">
+                            {directConnectionCount} directly connected metadata component(s) — structural relationships only
+                            (Has Field / Lookup / Master-Detail). Apex, Flow, and Trigger dependency detection is not yet
+                            available.
+                        </p>
+                        <table class="oi-node-detail-panel-table">
+                            <tbody>
+                                <template for:each={relationshipCountRows} for:item="row">
+                                    <tr key={row.key}>
+                                        <th scope="row">{row.direction} — {row.label}</th>
+                                        <td>{row.count}</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+
+                <div class="oi-node-detail-panel-section" data-id="impact-analysis-section">
+                    <h3 class="oi-node-detail-panel-section-title">Impact Analysis</h3>
+                    <div class="oi-node-detail-panel-impact-actions">
+                        <button type="button" class="oi-node-detail-panel-impact-button" data-id="impact-forward-button" onclick={handleShowForwardImpact}>What does this depend on?</button>
+                        <button type="button" class="oi-node-detail-panel-impact-button" data-id="impact-reverse-button" onclick={handleShowReverseImpact}>What depends on this?</button>
+                    </div>
+                    <template lwc:if={isLoadingImpact}>
+                        <lightning-spinner alternative-text="Computing impact" size="x-small"></lightning-spinner>
+                    </template>
+                    <template lwc:elseif={hasImpactError}>
+                        <p class="oi-node-detail-panel-error" data-id="impact-error" role="alert">{impactErrorMessage}</p>
+                    </template>
+                    <template lwc:elseif={hasImpactResult}>
+                        <p class="oi-node-detail-panel-section-note" data-id="impact-coverage-caveat">{impactResult.coverageCaveat}</p>
+                        <template lwc:if={hasImpactAffectedRows}>
+                            <template lwc:if={hasImpactTypeBreakdown}>
+                                <p class="oi-node-detail-panel-impact-breakdown" data-id="impact-type-breakdown">
+                                    <template for:each={impactTypeBreakdown} for:item="group">
+                                        <span key={group.key} class="oi-node-detail-panel-impact-breakdown-chip">{group.text}</span>
+                                    </template>
+                                </p>
+                            </template>
+                            <table class="oi-node-detail-panel-table oi-node-detail-panel-fields-table" data-id="impact-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">{impactDirectionLabel}</th>
+                                        <th scope="col">Type</th>
+                                        <th scope="col">Hops</th>
+                                        <th scope="col"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={impactAffectedRows} for:item="row">
+                                        <tr key={row.nodeKey} class="oi-node-detail-panel-field-row" data-id="impact-row" data-node-key={row.nodeKey} onclick={handleImpactRowClick}>
+                                            <td>{row.label}</td>
+                                            <td>{row.typeLabel}</td>
+                                            <td>{row.hopDistance}</td>
+                                            <td>
+                                                <template lwc:if={row.cycleBadgeVisible}>
+                                                    <span class="oi-node-detail-panel-field-badge is-custom" data-id="impact-cycle-badge">Cycle</span>
+                                                </template>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            <button type="button" class="oi-node-detail-panel-show-fields-button" data-id="impact-highlight-button" onclick={handleHighlightOnGraph}>Highlight on Graph</button>
+                        </template>
+                        <template lwc:else>
+                            <p class="oi-node-detail-panel-section-note" data-id="impact-empty">No dependencies found in the currently-scanned data.</p>
+                        </template>
+                    </template>
+                </div>
+
+                <template lwc:if={hasRecordHierarchy}>
+                    <div class="oi-node-detail-panel-section" data-id="record-hierarchy">
+                        <h3 class="oi-node-detail-panel-section-title">Hierarchy</h3>
+                        <template lwc:if={hasRecordParents}>
+                            <p class="oi-node-detail-panel-section-note" data-id="record-parents-label">Parent records</p>
+                            <table class="oi-node-detail-panel-table">
+                                <tbody>
+                                    <template for:each={recordParentRows} for:item="row">
+                                        <tr key={row.nodeKey}>
+                                            <th scope="row">{row.typeLabel}</th>
+                                            <td>{row.label}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        <template lwc:if={hasRecordChildren}>
+                            <p class="oi-node-detail-panel-section-note" data-id="record-children-label">Child records (by relationship)</p>
+                            <table class="oi-node-detail-panel-table">
+                                <tbody>
+                                    <template for:each={recordChildRows} for:item="row">
+                                        <tr key={row.key}>
+                                            <th scope="row">{row.typeLabel}</th>
+                                            <td>{row.count}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        <template lwc:if={recordHasMoreNote}>
+                            <p class="oi-node-detail-panel-section-note" data-id="record-has-more-note">
+                                Additional parent lookups, relationship types, or child records exist beyond what's shown here — bounded to keep this within governor limits.
+                            </p>
+                        </template>
+                    </div>
+                </template>
+
+                <template lwc:if={hasOtherAttributes}>
+                    <div class="oi-node-detail-panel-section" data-id="other-attributes">
+                        <h3 class="oi-node-detail-panel-section-title">Other Attributes</h3>
+                        <table class="oi-node-detail-panel-table">
+                            <tbody>
+                                <template for:each={attributeRows} for:item="row">
+                                    <tr key={row.key}>
+                                        <th scope="row">{row.key}</th>
+                                        <td>{row.value}</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+            </div>
+        </template>
+        <template lwc:elseif={hasSelection}>
+            <div class="oi-node-detail-panel-empty" data-id="detail-not-found">No detail found for this node.</div>
+        </template>
+        <template lwc:else>
+            <div class="oi-node-detail-panel-empty" data-id="detail-placeholder">Select a node to see its details.</div>
+        </template>
+    </div>
+</template>

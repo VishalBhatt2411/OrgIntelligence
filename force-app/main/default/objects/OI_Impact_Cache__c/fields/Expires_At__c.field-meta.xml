@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Expires_At__c</fullName>
+    <label>Expires At</label>
+    <type>DateTime</type>
+    <required>true</required>
+    <description>TTL boundary (OI_Settings__mdt-configured, default kept short — recommend 30 minutes or less) — a row past this timestamp is treated as a miss and recomputed, never served stale.</description>
+</CustomField>

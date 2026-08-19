@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Parent_Record_Id__c</fullName>
+    <label>Parent Record Id</label>
+    <type>Text</type>
+    <length>18</length>
+    <description>Polymorphic parent record Id (ADR-0022's Text-pair design, paired with Parent_Object_Api_Name__c). Blank for a root-level relationship. No native referential integrity — enforced at the app layer (OI_HierarchyValidationService), the same accepted trade-off Source_Node_Key__c/Target_Node_Key__c already carry for the metadata graph.</description>
+</CustomField>

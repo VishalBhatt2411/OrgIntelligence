@@ -1,0 +1,56 @@
+<template>
+    <div class="oi-filter-panel" data-id="filter-panel">
+        <template lwc:if={hasEdgeTypeOptions}>
+            <div class="oi-filter-panel-section" data-id="edge-type-section">
+                <h3 class="oi-filter-panel-section-title">Relationship Types</h3>
+                <ul class="oi-filter-panel-checklist">
+                    <template for:each={edgeTypeOptions} for:item="option">
+                        <li key={option.typeKey} class="oi-filter-panel-checkitem">
+                            <label class="oi-filter-panel-checklabel">
+                                <input
+                                    type="checkbox"
+                                    data-id="edge-type-checkbox"
+                                    data-type-key={option.typeKey}
+                                    checked={option.isChecked}
+                                    onchange={handleEdgeTypeToggle}
+                                />
+                                <span class={option.swatchClass} data-id="edge-type-swatch"></span>
+                                {option.displayLabel}
+                            </label>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+            <div class="oi-filter-panel-section" data-id="direction-section">
+                <h3 class="oi-filter-panel-section-title">Direction</h3>
+                <ul class="oi-filter-panel-checklist">
+                    <li class="oi-filter-panel-checkitem">
+                        <label class="oi-filter-panel-checklabel">
+                            <input type="checkbox" data-id="direction-parents-checkbox" checked={showParents} onchange={handleParentsToggle} />
+                            Parent Objects (outgoing)
+                        </label>
+                    </li>
+                    <li class="oi-filter-panel-checkitem">
+                        <label class="oi-filter-panel-checklabel">
+                            <input type="checkbox" data-id="direction-children-checkbox" checked={showChildren} onchange={handleChildrenToggle} />
+                            Child Objects (incoming)
+                        </label>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="oi-filter-panel-section" data-id="depth-section">
+                <h3 class="oi-filter-panel-section-title">Depth</h3>
+                <ul class="oi-filter-panel-checklist">
+                    <li class="oi-filter-panel-checkitem">
+                        <label class="oi-filter-panel-checklabel">
+                            <input type="checkbox" data-id="depth-direct-only-checkbox" checked={restrictToDirectOnly} onchange={handleDepthToggle} />
+                            Direct relationships only (hide grandparent/grandchild)
+                        </label>
+                    </li>
+                </ul>
+            </div>
+        </template>
+    </div>
+</template>

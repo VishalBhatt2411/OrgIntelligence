@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Computed_At__c</fullName>
+    <label>Computed At</label>
+    <type>DateTime</type>
+    <required>true</required>
+    <description>When this result was computed — informational, not itself the TTL check (see Expires_At__c).</description>
+</CustomField>

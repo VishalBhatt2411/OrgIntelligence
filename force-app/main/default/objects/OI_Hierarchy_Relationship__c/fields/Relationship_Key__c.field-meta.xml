@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Relationship_Key__c</fullName>
+    <label>Relationship Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <unique>true</unique>
+    <externalId>true</externalId>
+    <caseSensitive>true</caseSensitive>
+    <description>Computed by OI_HierarchyRelationshipService as hierarchyDefinitionId::parentRecordId::childRecordId (parentRecordId is the literal string "root" when blank) — enforces "duplicate parent-child relationships within the same hierarchy are prohibited" (FRD Business Rule 10) at the database level via a Unique/External ID constraint, while still allowing a child to have multiple DIFFERENT parents when Allow_Multiple_Parents__c is true (the key includes the parent, so only an exact duplicate pair collides).</description>
+</CustomField>

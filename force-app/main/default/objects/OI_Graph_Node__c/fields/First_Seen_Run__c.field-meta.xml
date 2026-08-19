@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>First_Seen_Run__c</fullName>
+    <label>First Seen Run</label>
+    <type>Lookup</type>
+    <referenceTo>OI_Scan_Run__c</referenceTo>
+    <relationshipName>OI_First_Seen_Nodes</relationshipName>
+    <relationshipLabel>OI Graph Nodes (First Seen)</relationshipLabel>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
+</CustomField>

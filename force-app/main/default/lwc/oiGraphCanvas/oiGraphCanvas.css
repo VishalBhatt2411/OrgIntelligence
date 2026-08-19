@@ -1,0 +1,224 @@
+.oi-graph-canvas-container {
+    width: 100%;
+    height: 100%;
+    min-height: 24rem;
+    position: relative;
+}
+
+/**
+ * Every color below is an SLDS global styling hook (--slds-g-color-*) with the prior literal
+ * hex as its fallback value: var(--slds-g-color-X, #hex). When Lightning Experience's SLDS 2 /
+ * Cosmos tokens are present (including its dark-mode toggle), the hook supplies the color and
+ * the canvas adapts automatically with zero conditional logic here — GraphUI.md §28's "dark
+ * mode falls out of the registry/token design, not a separate effort" applied to the canvas's
+ * own chrome, not just registry-resolved node colors (see oiGraphNode.js/oiSchemaObjectCard.js
+ * for that half). When the hooks are absent (an older org, a context without SLDS 2) the
+ * fallback renders pixel-identical to this component's original appearance — never a broken
+ * or unstyled canvas, regardless of the subscriber org's configuration.
+ */
+/**
+ * user-select: none across the canvas surface and its floating chrome (toolbar/mini-map) fixes
+ * the native browser text-selection highlight a mouse-drag over any of this text would otherwise
+ * trigger — touch-action: none above only ever suppressed touch-gesture scrolling, never desktop
+ * mouse-drag text selection, so panning/dragging over the zoom-percent readout or a toolbar
+ * button's label was free to paint the browser's own blue selection box. Scoped to the canvas/
+ * toolbar/mini-map only — genuinely copyable text elsewhere in the app (Detail Panel field
+ * values, API names, the search input) is deliberately left selectable.
+ */
+.oi-graph-canvas-svg {
+    width: 100%;
+    height: 100%;
+    min-height: 24rem;
+    background: var(--slds-g-color-surface-1, #f6f7f9);
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+.oi-graph-canvas-svg:active {
+    cursor: grabbing;
+}
+
+/** Deliberately low-contrast — opacity on top of an already-light fallback guarantees the grid stays a quiet backdrop texture (Figma/Miro/tldraw convention) regardless of how saturated an org's own SLDS 2 border token happens to resolve to. */
+.oi-graph-canvas-grid-dot {
+    fill: var(--slds-g-color-border-1, #d8dbe0);
+    opacity: 0.55;
+}
+
+.oi-graph-canvas-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 24rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/**
+ * stroke-width/color were previously 1.5 against --slds-g-color-border-1's light fallback
+ * (#9a9d9f on an #f6f7f9 canvas — well under the contrast a relationship line needs to read at
+ * a glance). Widened and darkened to --slds-g-color-border-2 (already this codebase's "neutral
+ * accent" token, oiGraphNode.css) so edges are unmistakably visible without introducing a new
+ * color into the palette.
+ */
+.oi-graph-edge {
+    stroke: var(--slds-g-color-border-2, #6b6d70);
+    stroke-width: 2.5;
+    fill: none;
+    transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+/** Edge hover-highlight (GraphUI.md §6's "a label, a direction arrowhead, a hover-highlight" — previously unimplemented). Reuses the same accent-1 blue already used for node/minimap selection, so "this is interactive/selected" reads consistently across the whole canvas. */
+.oi-graph-edge:hover {
+    stroke: var(--slds-g-color-border-accent-1, #0176d3);
+    stroke-width: 3;
+    cursor: pointer;
+}
+
+.oi-graph-edge-dashed {
+    stroke-dasharray: 6 4;
+}
+
+.oi-graph-edge-dotted {
+    stroke-dasharray: 1.5 3;
+    stroke-linecap: round;
+}
+
+.oi-graph-edge-solid {
+    stroke-dasharray: none;
+}
+
+.oi-graph-edge-arrow {
+    fill: var(--slds-g-color-border-2, #6b6d70);
+}
+
+.oi-graph-edge-cluster {
+    stroke-dasharray: 3 5;
+    opacity: 0.7;
+}
+
+/** A real edge outside the BFS tree that produced the current layout — e.g. a second lookup
+ * reaching an already-placed node from a different branch (GraphUI.md §18's hub-node case,
+ * oiGraphCanvas.js's barycenter relaxation). Recedes so the primary radial structure reads
+ * clearly first; the relationship is still fully drawn, never hidden (ADR-0019). */
+.oi-graph-edge-secondary {
+    opacity: 0.45;
+}
+
+.oi-graph-edge-secondary:hover {
+    opacity: 1;
+}
+
+/**
+ * SVG's own UA stylesheet defaults <foreignObject> to overflow:hidden — invisible here in any
+ * markup/attribute, but the reason a node's hover tooltip (oiGraphNode.css/oiSchemaObjectCard.css
+ * .oi-*-tooltip) would otherwise be clipped to exactly the node's own box no matter what overflow
+ * value the child component sets on itself. Overriding it here, once, at the actual foreignObject
+ * element, is what lets that tooltip render above the node instead of being invisibly cut off.
+ */
+.oi-graph-node-draggable {
+    cursor: grab;
+    overflow: visible;
+}
+
+.oi-graph-node-draggable:active {
+    cursor: grabbing;
+}
+
+/** A floating, Google-Maps-style toolbar — bottom-right, always on top of the canvas. Two visually distinct groups (zoom vs. view controls) rather than one long undifferentiated button strip, so the toolbar reads as organized chrome instead of "random buttons scattered across the canvas." */
+.oi-graph-canvas-toolbar {
+    position: absolute;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    z-index: 5;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+.oi-graph-canvas-zoom-controls,
+.oi-graph-canvas-view-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    border-radius: 0.5rem;
+    box-shadow: var(--slds-g-shadow-2, 0 2px 6px rgba(0, 0, 0, 0.2));
+    overflow: hidden;
+}
+
+.oi-graph-canvas-zoom-button {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: none;
+    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    color: var(--slds-g-color-on-surface-1, #444);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.oi-graph-canvas-zoom-controls .oi-graph-canvas-zoom-button:last-child,
+.oi-graph-canvas-view-controls .oi-graph-canvas-zoom-button:last-child {
+    border-bottom: none;
+}
+
+.oi-graph-canvas-view-controls .oi-graph-canvas-zoom-button {
+    font-size: 1rem;
+}
+
+.oi-graph-canvas-zoom-button:hover:not(:disabled) {
+    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+.oi-graph-canvas-zoom-button:disabled {
+    color: var(--slds-g-color-disabled-1, #c9c7c5);
+    cursor: not-allowed;
+}
+
+.oi-graph-canvas-zoom-percent {
+    width: 2.25rem;
+    padding: 0.3rem 0;
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    background: var(--slds-g-color-surface-container-2, #fafaf9);
+}
+
+/** The passive Viewport Mini-map (GraphUI.md §24) — a cheap overview thumbnail, pure client geometry. */
+.oi-graph-canvas-minimap {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    width: 150px;
+    height: 100px;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    border-radius: 0.4rem;
+    box-shadow: var(--slds-g-shadow-2, 0 2px 6px rgba(0, 0, 0, 0.2));
+    z-index: 5;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+.oi-graph-canvas-minimap-bg {
+    fill: var(--slds-g-color-surface-1, #f6f7f9);
+}
+
+.oi-graph-canvas-minimap-dot {
+    fill: var(--slds-g-color-border-1, #9a9d9f);
+}
+
+.oi-graph-canvas-minimap-viewport {
+    fill: var(--slds-g-color-accent-container-1, rgba(1, 118, 211, 0.12));
+    stroke: var(--slds-g-color-border-accent-1, #0176d3);
+    stroke-width: 1.5;
+}

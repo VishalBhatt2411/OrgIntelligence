@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI View Records</label>
+    <description>Read live record hierarchy data (Record Analysis, ADR-0021) — separate from OI_View_Graph since this reads arbitrary customer records, not scanned metadata.</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

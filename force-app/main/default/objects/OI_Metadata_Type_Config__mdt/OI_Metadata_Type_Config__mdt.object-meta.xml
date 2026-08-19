@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Metadata Type Config</label>
+    <pluralLabel>OI Metadata Type Configs</pluralLabel>
+    <visibility>Public</visibility>
+    <description>The Scanner Registry — drives the Metadata Scanner's Strategy registry (DataModel.md §4.2, MetadataScanner.md §7). Deliberately distinct from the Domain Type Registry (OI_Node_Type_Descriptor__mdt/OI_Edge_Type_Descriptor__mdt). No records are shipped in this sprint — populated when concrete OI_*Scanner classes are built (Roadmap Phase 1).</description>
+</CustomObject>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Relationship_Type__c</fullName>
+    <label>Relationship Type</label>
+    <type>Text</type>
+    <length>80</length>
+    <description>Free-form, admin-defined relationship label for this specific link (FR-005) — may override or refine the Definition's own default Relationship_Type__c.</description>
+</CustomField>

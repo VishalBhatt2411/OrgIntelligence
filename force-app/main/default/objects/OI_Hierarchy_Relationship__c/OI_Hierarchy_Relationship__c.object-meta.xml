@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Hierarchy Relationship</label>
+    <pluralLabel>OI Hierarchy Relationships</pluralLabel>
+    <nameField>
+        <label>Hierarchy Relationship Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>HREL-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description>One parent-child link between two business records within a Hierarchy Definition (FR-005) — a plain, mutable "current relationship" row, deliberately not ADR-0014's immutable-version-ladder pattern (ADR-0022): every change is a discrete, user-driven move, and native Reports (FR-026) need to query this table directly without an Is_Current__c-style predicate. Lookup, not Master-Detail, to Definition so deactivating a definition never cascade-deletes relationships (FRD Business Rule 7).</description>
+</CustomObject>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Depth__c</fullName>
+    <label>Depth</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>true</required>
+    <description>The traversal depth this cached result was computed at — part of the cache key's identity (a shallower cached result is never reused to answer a deeper request).</description>
+</CustomField>

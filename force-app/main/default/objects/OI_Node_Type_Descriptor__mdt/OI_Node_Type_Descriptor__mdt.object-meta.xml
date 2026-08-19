@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Node Type Descriptor</label>
+    <pluralLabel>OI Node Type Descriptors</pluralLabel>
+    <visibility>Public</visibility>
+    <description>The Domain Type Registry for nodes, consumed by both the Metadata Scanner (Type_Key__c) and the Presentation layer (Icon_Name__c/Color_Token__c) — GraphEngine.md §17, DataModel.md §4.1, ADR-0011. No records shipped this sprint — populated alongside the concrete Scanner classes (Roadmap Phase 1) and read at runtime via OI_SettingsController.getPresentationRegistry() (Roadmap Phase 2).</description>
+</CustomObject>

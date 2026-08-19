@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Full_Snapshot__c</fullName>
+    <label>Is Full Snapshot</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>Mirrors OI_DiscoveryBatch.isFullSnapshot — must only be true if every chunk of this type's fetch succeeded; gates retire-detection.</description>
+</CustomField>

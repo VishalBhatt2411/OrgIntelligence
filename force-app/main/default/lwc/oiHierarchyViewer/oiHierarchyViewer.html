@@ -1,0 +1,29 @@
+<template>
+    <div class="oi-hierarchy-viewer">
+        <div class="oi-hierarchy-viewer-header">
+            <h3 class="oi-hierarchy-viewer-title">Hierarchy</h3>
+            <c-oi-hierarchy-switcher object-api-name={objectApiName} ondefinitionchange={handleDefinitionChange}></c-oi-hierarchy-switcher>
+        </div>
+        <template lwc:if={hasDefinition}>
+            <div class="oi-hierarchy-viewer-path">
+                <c-oi-hierarchy-path
+                    definition-id={definitionId}
+                    object-api-name={objectApiName}
+                    record-id={recordId}
+                    current-record-label={currentRecordLabel}
+                    onrecordselect={handleRecordSelect}
+                    oncurrentrecordlabel={handleCurrentRecordLabel}
+                ></c-oi-hierarchy-path>
+            </div>
+            <div class="oi-hierarchy-viewer-tree">
+                <c-oi-hierarchy-tree
+                    definition-id={definitionId}
+                    root-object-api-name={objectApiName}
+                    root-record-id={recordId}
+                    root-label={currentRecordLabel}
+                    onrecordselect={handleRecordSelect}
+                ></c-oi-hierarchy-tree>
+            </div>
+        </template>
+    </div>
+</template>

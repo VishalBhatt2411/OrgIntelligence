@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Effective_End_Date__c</fullName>
+    <label>Effective End Date</label>
+    <type>Date</type>
+    <description>Optional effective dating (FR-018), paired with Effective_Start_Date__c.</description>
+</CustomField>

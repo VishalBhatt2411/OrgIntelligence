@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Last_Seen_Run__c</fullName>
+    <label>Last Seen Run</label>
+    <type>Lookup</type>
+    <referenceTo>OI_Scan_Run__c</referenceTo>
+    <relationshipName>OI_Last_Seen_Nodes</relationshipName>
+    <relationshipLabel>OI Graph Nodes (Last Seen)</relationshipLabel>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
+    <description>Updated in place, only on the current row, on a liveness touch — the other narrow exception to immutability.</description>
+</CustomField>

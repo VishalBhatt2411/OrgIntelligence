@@ -1,0 +1,185 @@
+.oi-hierarchy-manager {
+    display: flex;
+    gap: 1rem;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.oi-hierarchy-manager-sidebar {
+    width: 16rem;
+    flex-shrink: 0;
+    border-right: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    padding-right: 1rem;
+}
+
+.oi-hierarchy-manager-detail {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+.oi-hierarchy-manager-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.oi-hierarchy-manager-title,
+.oi-hierarchy-manager-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--slds-g-color-on-surface-1, #181818);
+    margin: 0;
+}
+
+.oi-hierarchy-manager-new-button {
+    border: 1px solid var(--slds-g-color-accent-1, #0176d3);
+    background: var(--slds-g-color-accent-1, #0176d3);
+    color: var(--slds-g-color-on-accent-1, #ffffff);
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.oi-hierarchy-manager-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.oi-hierarchy-manager-list-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 0.5rem 0.4rem;
+    cursor: pointer;
+    border-radius: 0.25rem;
+}
+
+.oi-hierarchy-manager-list-item:hover {
+    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.oi-hierarchy-manager-list-item-name {
+    font-weight: 600;
+    color: var(--slds-g-color-on-surface-1, #181818);
+}
+
+.oi-hierarchy-manager-list-item-meta {
+    font-size: 0.7rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-hierarchy-manager-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 30rem;
+    margin-bottom: 1.5rem;
+}
+
+.oi-hierarchy-manager-save-button {
+    align-self: flex-start;
+    border: 1px solid var(--slds-g-color-accent-1, #0176d3);
+    background: var(--slds-g-color-accent-1, #0176d3);
+    color: var(--slds-g-color-on-accent-1, #ffffff);
+    border-radius: 0.25rem;
+    padding: 0.4rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.oi-hierarchy-manager-form-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.oi-hierarchy-manager-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.oi-hierarchy-manager-table th {
+    text-align: left;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-weight: 600;
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+}
+
+.oi-hierarchy-manager-table td {
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+}
+
+.oi-hierarchy-manager-row-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.oi-hierarchy-manager-link-button {
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    padding: 0;
+    font-size: 0.75rem;
+}
+
+.oi-hierarchy-manager-link-button:hover {
+    text-decoration: underline;
+}
+
+.oi-hierarchy-manager-error {
+    color: var(--slds-g-color-error-1, #ba0517);
+}
+
+.oi-hierarchy-manager-empty {
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-style: italic;
+}
+
+.oi-hierarchy-manager-picker-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.oi-hierarchy-manager-picker-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-hierarchy-manager-picker-selected {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    border-radius: 0.25rem;
+    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.oi-hierarchy-manager-history {
+    padding: 0.5rem;
+    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
+    border-radius: 0.25rem;
+}
+
+.oi-hierarchy-manager-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}

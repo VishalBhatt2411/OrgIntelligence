@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Parent_Key__c</fullName>
+    <label>Parent Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <unique>false</unique>
+    <description>Opaque reference to another row's Node_Key__c, for component kinds with exactly one natural structural parent. Filter-only — never a FIND-clause target (ADR-0018).</description>
+</CustomField>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Log</label>
+    <pluralLabel>OI Logs</pluralLabel>
+    <nameField>
+        <label>Log Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>LOG-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>false</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description>Structured log sink, written asynchronously via OI_Log_Event__e subscriber (Architecture §13). Application-internal (ADR-0006).</description>
+</CustomObject>

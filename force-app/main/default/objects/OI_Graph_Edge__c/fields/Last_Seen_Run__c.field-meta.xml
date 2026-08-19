@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Last_Seen_Run__c</fullName>
+    <label>Last Seen Run</label>
+    <type>Lookup</type>
+    <referenceTo>OI_Scan_Run__c</referenceTo>
+    <relationshipName>OI_Last_Seen_Edges</relationshipName>
+    <relationshipLabel>OI Graph Edges (Last Seen)</relationshipLabel>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
+</CustomField>

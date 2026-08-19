@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Field_Membership__c</fullName>
+    <label>Is Field Membership</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>Whether an edge of this type represents an owning-object-to-its-own-field relationship (e.g. HAS_FIELD) rather than a real cross-entity relationship. The Graph Canvas uses this flag — never a hardcoded edge typeKey check — to absorb the target field into the source object's Schema-Builder-style card (GraphUI.md §20 addendum) instead of rendering it as a separate node/line, and to re-anchor any other edge touching that field onto its owning object so relationship lines always connect object to object.</description>
+</CustomField>

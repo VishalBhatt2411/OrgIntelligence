@@ -1,0 +1,30 @@
+.oi-hierarchy-viewer {
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.oi-hierarchy-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.oi-hierarchy-viewer-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--slds-g-color-on-surface-1, #181818);
+    margin: 0;
+}
+
+.oi-hierarchy-viewer-path {
+    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    padding-bottom: 0.5rem;
+}
+
+.oi-hierarchy-viewer-tree {
+    max-height: 22rem;
+    overflow-y: auto;
+}

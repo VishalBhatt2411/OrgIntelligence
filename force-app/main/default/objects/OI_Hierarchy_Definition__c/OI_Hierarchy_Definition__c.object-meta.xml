@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Hierarchy Definition</label>
+    <pluralLabel>OI Hierarchy Definitions</pluralLabel>
+    <nameField>
+        <label>Hierarchy Definition Name</label>
+        <type>Text</type>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description>A configured hierarchy type (e.g. Corporate, Territory, Dealer) — Hierarchy Accelerator epic (ADR-0022). Structurally separate from the metadata graph's OI_Graph_Node__c/Edge__c: real Salesforce sharing applies (ReadWrite OWD, tightenable via standard sharing rules), not the Apex-boundary model ADR-0006 defines for application-internal objects.</description>
+</CustomObject>

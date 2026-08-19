@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Hierarchy_Definition__c</fullName>
+    <label>Hierarchy Definition</label>
+    <type>Lookup</type>
+    <referenceTo>OI_Hierarchy_Definition__c</referenceTo>
+    <relationshipName>OI_Hierarchy_Relationships</relationshipName>
+    <relationshipLabel>OI Hierarchy Relationships</relationshipLabel>
+    <required>true</required>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <description>Lookup, not Master-Detail (ADR-0022) — a definition in use cannot be hard-deleted (Restrict), forcing Status__c = Inactive instead, so relationships/history are never cascade-deleted (FRD Business Rule 7).</description>
+</CustomField>

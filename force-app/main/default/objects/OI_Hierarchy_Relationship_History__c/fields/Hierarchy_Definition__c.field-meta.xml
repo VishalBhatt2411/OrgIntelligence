@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Hierarchy_Definition__c</fullName>
+    <label>Hierarchy Definition</label>
+    <type>Lookup</type>
+    <referenceTo>OI_Hierarchy_Definition__c</referenceTo>
+    <relationshipName>OI_Hierarchy_Relationship_Histories</relationshipName>
+    <relationshipLabel>OI Hierarchy Relationship Histories</relationshipLabel>
+    <required>true</required>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <description>Denormalized reference, not Master-Detail — history must survive independently of its definition (ADR-0022). Restrict (not SetNull, incompatible with required=true): a definition with history cannot be hard-deleted.</description>
+</CustomField>

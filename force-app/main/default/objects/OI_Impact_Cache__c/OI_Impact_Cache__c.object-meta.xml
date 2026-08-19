@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Impact Cache</label>
+    <pluralLabel>OI Impact Caches</pluralLabel>
+    <nameField>
+        <label>Impact Cache Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>IMPACT-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description>Durable cache of computed Impact Analysis results, keyed by (nodeKey, direction, depth, rootVersionChecksum) — a Custom Object rather than Platform Cache because DE-7's invalidation needs "find cached rows referencing node X," which Platform Cache cannot answer without a hand-built side index. Owned exclusively by OI_ImpactCacheRepository. Application-internal (ADR-0006), same posture as OI_Graph_Node__c/OI_Graph_Edge__c. Recreated under this name (originally OI_Impact_Analysis_Cache__c) after every field added to the original object post-creation stayed permanently invisible to SOQL/DML despite deploying and describing correctly — an entTrial-specific platform propagation issue tied to that object's own describe cache, not this app's metadata; see Backlog.md's Dependency Engine epic notes.</description>
+</CustomObject>

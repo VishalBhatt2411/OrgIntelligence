@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Allow_Multiple_Parents__c</fullName>
+    <label>Allow Multiple Parents</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>Whether a child record may have more than one active parent relationship at once within this hierarchy (FR-004). Off by default — most configured hierarchies are genuine single-parent trees (ADR-0022's rationale for the literal-tree UI, oiHierarchyTree, rather than the radial oiGraphCanvas).</description>
+</CustomField>

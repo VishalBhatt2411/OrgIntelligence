@@ -1,0 +1,35 @@
+<template>
+    <div class="oi-record-picker">
+        <div class="oi-record-picker-row">
+            <lightning-input
+                class="oi-record-picker-input"
+                type="search"
+                label="Search records"
+                variant="label-hidden"
+                placeholder={placeholderText}
+                value={queryTerm}
+                onchange={handleInputChange}
+            ></lightning-input>
+            <button type="button" data-id="search-button" class="oi-record-picker-button" onclick={handleSearchButtonClick}>Search</button>
+        </div>
+        <template lwc:if={isSearching}>
+            <div class="oi-record-picker-status" data-id="search-loading">
+                <lightning-spinner alternative-text="Searching" size="x-small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:elseif={hasError}>
+            <div class="oi-record-picker-status oi-record-picker-error" data-id="search-error" role="alert">{errorMessage}</div>
+        </template>
+        <template lwc:elseif={hasResults}>
+            <ul class="oi-record-picker-results" data-id="search-results">
+                <template for:each={results} for:item="result">
+                    <li key={result.recordId}>
+                        <button data-id="search-result-item" data-record-id={result.recordId} class="oi-record-picker-result" onclick={handleResultClick}>
+                            {result.label}
+                        </button>
+                    </li>
+                </template>
+            </ul>
+        </template>
+    </div>
+</template>

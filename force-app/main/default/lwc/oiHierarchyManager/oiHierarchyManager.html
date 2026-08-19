@@ -1,0 +1,285 @@
+<template>
+    <div class="oi-hierarchy-manager">
+        <div class="oi-hierarchy-manager-sidebar">
+            <div class="oi-hierarchy-manager-sidebar-header">
+                <h2 class="oi-hierarchy-manager-title">Hierarchies</h2>
+                <button type="button" class="oi-hierarchy-manager-new-button" data-id="new-definition-button" onclick={handleNewDefinitionClick}>New</button>
+            </div>
+            <template lwc:if={isLoadingDefinitions}>
+                <lightning-spinner alternative-text="Loading hierarchies" size="x-small"></lightning-spinner>
+            </template>
+            <template lwc:elseif={hasDefinitionsError}>
+                <p class="oi-hierarchy-manager-error" data-id="definitions-error" role="alert">{definitionsError}</p>
+            </template>
+            <ul class="oi-hierarchy-manager-list" data-id="definitions-list">
+                <template for:each={definitions} for:item="definition">
+                    <li key={definition.definitionId}>
+                        <button
+                            type="button"
+                            class="oi-hierarchy-manager-list-item"
+                            data-id="definition-row"
+                            data-definition-id={definition.definitionId}
+                            onclick={handleDefinitionRowClick}
+                        >
+                            <span class="oi-hierarchy-manager-list-item-name">{definition.name}</span>
+                            <span class="oi-hierarchy-manager-list-item-meta">{definition.objectApiName} · {definition.status}</span>
+                        </button>
+                    </li>
+                </template>
+            </ul>
+        </div>
+
+        <div class="oi-hierarchy-manager-detail">
+            <h3 class="oi-hierarchy-manager-section-title">{definitionFormTitle}</h3>
+            <template lwc:if={hasDefinitionFormError}>
+                <p class="oi-hierarchy-manager-error" data-id="definition-form-error" role="alert">{definitionFormError}</p>
+            </template>
+            <div class="oi-hierarchy-manager-form" data-id="definition-form">
+                <lightning-input label="Name" data-field="name" data-id="definition-name-input" value={definitionDraft.name} onchange={handleDefinitionFieldChange}></lightning-input>
+                <lightning-textarea label="Description" data-field="description" value={definitionDraft.description} onchange={handleDefinitionFieldChange}></lightning-textarea>
+                <lightning-input label="Object API Name" data-field="objectApiName" data-id="definition-object-input" value={definitionDraft.objectApiName} onchange={handleDefinitionFieldChange}></lightning-input>
+                <lightning-combobox label="Status" data-field="status" value={definitionDraft.status} options={statusOptions} onchange={handleDefinitionFieldChange}></lightning-combobox>
+                <lightning-input type="number" label="Max Levels" data-field="maxLevels" value={definitionDraft.maxLevels} onchange={handleDefinitionFieldChange}></lightning-input>
+                <lightning-input label="Relationship Type" data-field="relationshipType" value={definitionDraft.relationshipType} onchange={handleDefinitionFieldChange}></lightning-input>
+                <lightning-input type="checkbox" label="Allow Multiple Parents" checked={definitionDraft.allowMultipleParents} onchange={handleAllowMultipleParentsChange}></lightning-input>
+                <lightning-input type="checkbox" label="Allow Multiple Hierarchies" checked={definitionDraft.allowMultipleHierarchies} onchange={handleAllowMultipleHierarchiesChange}></lightning-input>
+                <button type="button" class="oi-hierarchy-manager-save-button" data-id="save-definition-button" disabled={isSavingDefinition} onclick={handleSaveDefinition}>
+                    Save Hierarchy
+                </button>
+            </div>
+
+            <template lwc:if={showLevelsSection}>
+                <div class="oi-hierarchy-manager-levels">
+                    <div class="oi-hierarchy-manager-sidebar-header">
+                        <h3 class="oi-hierarchy-manager-section-title">Levels</h3>
+                        <button type="button" class="oi-hierarchy-manager-new-button" data-id="add-level-button" onclick={handleAddLevelClick}>Add Level</button>
+                    </div>
+                    <template lwc:if={isLoadingLevels}>
+                        <lightning-spinner alternative-text="Loading levels" size="x-small"></lightning-spinner>
+                    </template>
+                    <template lwc:elseif={hasLevelsError}>
+                        <p class="oi-hierarchy-manager-error" data-id="levels-error" role="alert">{levelsError}</p>
+                    </template>
+                    <template lwc:elseif={hasLevels}>
+                        <table class="oi-hierarchy-manager-table" data-id="levels-table">
+                            <thead>
+                                <tr>
+                                    <th>Level</th>
+                                    <th>Name</th>
+                                    <th>Object</th>
+                                    <th>Required</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={levelRows} for:item="level">
+                                    <tr key={level.levelId}>
+                                        <td>{level.levelNumber}</td>
+                                        <td>{level.levelName}</td>
+                                        <td>{level.objectApiName}</td>
+                                        <td>{level.requiredLabel}</td>
+                                        <td class="oi-hierarchy-manager-row-actions">
+                                            <button type="button" class="oi-hierarchy-manager-link-button" data-id="edit-level-button" data-level-id={level.levelId} onclick={handleEditLevelClick}>
+                                                Edit
+                                            </button>
+                                            <button type="button" class="oi-hierarchy-manager-link-button" data-id="delete-level-button" data-level-id={level.levelId} onclick={handleDeleteLevel}>
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else>
+                        <p class="oi-hierarchy-manager-empty" data-id="levels-empty">No levels defined yet.</p>
+                    </template>
+
+                    <template lwc:if={levelDraft}>
+                        <div class="oi-hierarchy-manager-form" data-id="level-form">
+                            <template lwc:if={hasLevelFormError}>
+                                <p class="oi-hierarchy-manager-error" data-id="level-form-error" role="alert">{levelFormError}</p>
+                            </template>
+                            <lightning-input label="Level Name" data-field="levelName" data-id="level-name-input" value={levelDraft.levelName} onchange={handleLevelFieldChange}></lightning-input>
+                            <lightning-input type="number" label="Level Number" data-field="levelNumber" value={levelDraft.levelNumber} onchange={handleLevelFieldChange}></lightning-input>
+                            <lightning-input label="Object API Name" data-field="objectApiName" value={levelDraft.objectApiName} onchange={handleLevelFieldChange}></lightning-input>
+                            <lightning-input
+                                label="Relationship Field API Name"
+                                data-field="relationshipFieldApiName"
+                                value={levelDraft.relationshipFieldApiName}
+                                onchange={handleLevelFieldChange}
+                            ></lightning-input>
+                            <lightning-input type="checkbox" label="Required" checked={levelDraft.isRequired} onchange={handleLevelRequiredChange}></lightning-input>
+                            <div class="oi-hierarchy-manager-form-actions">
+                                <button type="button" data-id="save-level-button" disabled={isSavingLevel} onclick={handleSaveLevel}>Save Level</button>
+                                <button type="button" data-id="cancel-level-button" onclick={handleCancelLevelForm}>Cancel</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <template lwc:if={showRelationshipsSection}>
+                <div class="oi-hierarchy-manager-relationships">
+                    <div class="oi-hierarchy-manager-sidebar-header">
+                        <h3 class="oi-hierarchy-manager-section-title">Relationships</h3>
+                        <button type="button" class="oi-hierarchy-manager-new-button" data-id="add-relationship-button" onclick={handleNewRelationshipClick}>Assign Relationship</button>
+                    </div>
+                    <template lwc:if={isLoadingRelationships}>
+                        <lightning-spinner alternative-text="Loading relationships" size="x-small"></lightning-spinner>
+                    </template>
+                    <template lwc:elseif={hasRelationshipsError}>
+                        <p class="oi-hierarchy-manager-error" data-id="relationships-error" role="alert">{relationshipsError}</p>
+                    </template>
+                    <template lwc:elseif={hasRelationships}>
+                        <table class="oi-hierarchy-manager-table" data-id="relationships-table">
+                            <thead>
+                                <tr>
+                                    <th>Parent</th>
+                                    <th>Child</th>
+                                    <th>Status</th>
+                                    <th>Type</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={relationshipRows} for:item="relationship">
+                                    <tr key={relationship.relationshipId}>
+                                        <td>{relationship.parentDisplay}</td>
+                                        <td>{relationship.childDisplay}</td>
+                                        <td>{relationship.statusLabel}</td>
+                                        <td>{relationship.relationshipType}</td>
+                                        <td class="oi-hierarchy-manager-row-actions">
+                                            <button
+                                                type="button"
+                                                class="oi-hierarchy-manager-link-button"
+                                                data-id="deactivate-relationship-button"
+                                                data-relationship-id={relationship.relationshipId}
+                                                onclick={handleDeactivateRelationship}
+                                            >
+                                                Deactivate
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="oi-hierarchy-manager-link-button"
+                                                data-id="view-history-button"
+                                                data-relationship-id={relationship.relationshipId}
+                                                data-child-object-api-name={relationship.childObjectApiName}
+                                                data-child-record-id={relationship.childRecordId}
+                                                onclick={handleViewHistoryClick}
+                                            >
+                                                History
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <template lwc:if={relationship.isHistoryOpenForThisRow}>
+                                        <tr key={relationship.historyRowKey}>
+                                            <td colspan="5">
+                                                <div class="oi-hierarchy-manager-history" data-id="history-panel">
+                                                    <template lwc:if={isLoadingHistory}>
+                                                        <lightning-spinner alternative-text="Loading history" size="x-small"></lightning-spinner>
+                                                    </template>
+                                                    <template lwc:elseif={hasHistoryError}>
+                                                        <p class="oi-hierarchy-manager-error" data-id="history-error" role="alert">{historyError}</p>
+                                                    </template>
+                                                    <template lwc:elseif={hasHistoryRows}>
+                                                        <ul class="oi-hierarchy-manager-history-list" data-id="history-list">
+                                                            <template for:each={historyRows} for:item="entry">
+                                                                <li key={entry.historyId}>
+                                                                    <strong>{entry.changeType}</strong> — {entry.previousParentLabel} to {entry.newParentLabel} ({entry.changedByName}, {entry.changedDate})
+                                                                </li>
+                                                            </template>
+                                                        </ul>
+                                                    </template>
+                                                    <template lwc:else>
+                                                        <p class="oi-hierarchy-manager-empty" data-id="history-empty">No history yet.</p>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else>
+                        <p class="oi-hierarchy-manager-empty" data-id="relationships-empty">No relationships defined yet.</p>
+                    </template>
+
+                    <template lwc:if={relationshipDraft}>
+                        <div class="oi-hierarchy-manager-form" data-id="relationship-form">
+                            <template lwc:if={hasRelationshipFormError}>
+                                <p class="oi-hierarchy-manager-error" data-id="relationship-form-error" role="alert">{relationshipFormError}</p>
+                            </template>
+
+                            <div class="oi-hierarchy-manager-picker-field">
+                                <span class="oi-hierarchy-manager-picker-label">Child Record (required)</span>
+                                <template lwc:if={hasSelectedChild}>
+                                    <div class="oi-hierarchy-manager-picker-selected" data-id="selected-child">
+                                        <span>{relationshipDraft.childLabel}</span>
+                                        <button type="button" class="oi-hierarchy-manager-link-button" data-id="clear-child-button" onclick={handleClearChild}>Change</button>
+                                    </div>
+                                </template>
+                                <template lwc:else>
+                                    <c-oi-record-picker
+                                        data-id="child-record-picker"
+                                        object-api-name={definitionDraft.objectApiName}
+                                        placeholder-text="Search for the child record..."
+                                        onselect={handleChildSelect}
+                                    ></c-oi-record-picker>
+                                </template>
+                            </div>
+
+                            <div class="oi-hierarchy-manager-picker-field">
+                                <span class="oi-hierarchy-manager-picker-label">Parent Record (blank = root level)</span>
+                                <template lwc:if={hasSelectedParent}>
+                                    <div class="oi-hierarchy-manager-picker-selected" data-id="selected-parent">
+                                        <span>{relationshipDraft.parentLabel}</span>
+                                        <button type="button" class="oi-hierarchy-manager-link-button" data-id="clear-parent-button" onclick={handleClearParent}>Change</button>
+                                    </div>
+                                </template>
+                                <template lwc:else>
+                                    <c-oi-record-picker
+                                        data-id="parent-record-picker"
+                                        object-api-name={definitionDraft.objectApiName}
+                                        placeholder-text="Search for the parent record..."
+                                        onselect={handleParentSelect}
+                                    ></c-oi-record-picker>
+                                </template>
+                            </div>
+
+                            <lightning-combobox
+                                label="Hierarchy Level"
+                                data-field="hierarchyLevelId"
+                                data-id="relationship-level-select"
+                                value={relationshipDraft.hierarchyLevelId}
+                                options={levelOptions}
+                                onchange={handleRelationshipFieldChange}
+                            ></lightning-combobox>
+                            <lightning-input label="Relationship Type" data-field="relationshipType" value={relationshipDraft.relationshipType} onchange={handleRelationshipFieldChange}></lightning-input>
+                            <lightning-input
+                                type="date"
+                                label="Effective Start Date"
+                                data-field="effectiveStartDate"
+                                value={relationshipDraft.effectiveStartDate}
+                                onchange={handleRelationshipFieldChange}
+                            ></lightning-input>
+                            <lightning-input
+                                type="date"
+                                label="Effective End Date"
+                                data-field="effectiveEndDate"
+                                value={relationshipDraft.effectiveEndDate}
+                                onchange={handleRelationshipFieldChange}
+                            ></lightning-input>
+
+                            <div class="oi-hierarchy-manager-form-actions">
+                                <button type="button" data-id="save-relationship-button" disabled={isSavingRelationship} onclick={handleSaveRelationship}>Save Relationship</button>
+                                <button type="button" data-id="cancel-relationship-button" onclick={handleCancelRelationshipForm}>Cancel</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>

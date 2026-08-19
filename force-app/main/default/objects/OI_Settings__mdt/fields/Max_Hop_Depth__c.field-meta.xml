@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Hop_Depth__c</fullName>
+    <label>Max Hop Depth</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <description>Default/ceiling for ordinary UI graph expansion (browsing). Impact Analysis traversal uses its own dedicated Max_Impact_Depth__c instead, since it needs a different default (Architecture.md §7).</description>
+</CustomField>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Levels__c</fullName>
+    <label>Max Levels</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>true</required>
+    <defaultValue>10</defaultValue>
+    <description>Hard ceiling for ancestor/descendant/path traversal and circular-relationship detection depth (OI_HierarchyValidationService, OI_HierarchyQueryService) — mirrors Max_Hop_Depth__c's role in the Graph Engine, scoped per hierarchy definition instead of globally.</description>
+</CustomField>

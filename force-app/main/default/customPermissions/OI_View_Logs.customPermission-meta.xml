@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI View Logs</label>
+    <description>Read OI_Log__c via the admin console (DataModel.md §6).</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

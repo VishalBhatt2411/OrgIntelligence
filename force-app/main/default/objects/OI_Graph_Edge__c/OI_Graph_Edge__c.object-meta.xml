@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Graph Edge</label>
+    <pluralLabel>OI Graph Edges</pluralLabel>
+    <nameField>
+        <label>Graph Edge Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>EDGE-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>false</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description>Canonical edge version table (Architecture §5) — same one-row-per-version structure as OI_Graph_Node__c, for the identical reason (ADR-0014). Application-internal (ADR-0006).</description>
+</CustomObject>

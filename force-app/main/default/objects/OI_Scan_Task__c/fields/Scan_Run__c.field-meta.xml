@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Scan_Run__c</fullName>
+    <label>Scan Run</label>
+    <type>MasterDetail</type>
+    <referenceTo>OI_Scan_Run__c</referenceTo>
+    <relationshipName>OI_Scan_Tasks</relationshipName>
+    <relationshipLabel>OI Scan Tasks</relationshipLabel>
+    <reparentableMasterDetail>false</reparentableMasterDetail>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>

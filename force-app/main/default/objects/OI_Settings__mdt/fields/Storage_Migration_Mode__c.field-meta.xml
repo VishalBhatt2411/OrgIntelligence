@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Storage_Migration_Mode__c</fullName>
+    <label>Storage Migration Mode</label>
+    <type>Picklist</type>
+    <required>false</required>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Off</fullName><default>true</default><label>Off</label></value>
+            <value><fullName>DualWrite</fullName><default>false</default><label>Dual Write</label></value>
+            <value><fullName>ReadNew</fullName><default>false</default><label>Read New</label></value>
+            <value><fullName>NewOnly</fullName><default>false</default><label>New Only</label></value>
+        </valueSetDefinition>
+    </valueSet>
+    <description>Gates the dual-write/verify/cutover/decommission storage migration pattern (GraphRepository.md §22). Not exercised in v1.</description>
+</CustomField>

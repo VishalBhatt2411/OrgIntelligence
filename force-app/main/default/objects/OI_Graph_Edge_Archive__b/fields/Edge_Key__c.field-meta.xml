@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Edge_Key__c</fullName>
+    <label>Edge Key</label>
+    <type>Text</type>
+    <length>60</length>
+    <required>true</required>
+    <description>Logical edge identity. Capped at 80 chars (vs. 255 on the live table) — same Big Object 100-character index-length ceiling as OI_Graph_Node_Archive__b.Node_Key__c (see Sprint 7 deliverables report).</description>
+</CustomField>

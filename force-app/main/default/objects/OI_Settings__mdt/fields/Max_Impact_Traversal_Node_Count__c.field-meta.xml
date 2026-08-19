@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Impact_Traversal_Node_Count__c</fullName>
+    <label>Max Impact Traversal Node Count</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <description>Node-count ceiling for Impact Analysis traversal — dedicated and tighter than Max_Traversal_Node_Count__c (ordinary UI browsing) because a reverse-impact walk on a widely-referenced hub node (e.g. a shared utility class) needs a stricter CPU/heap safety margin than a user paging through the graph one hop at a time.</description>
+</CustomField>

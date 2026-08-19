@@ -1,0 +1,36 @@
+<template>
+    <div class="oi-search-bar">
+        <div class="oi-search-bar-row">
+            <lightning-input
+                class="oi-search-bar-input"
+                type="search"
+                label="Search graph"
+                variant="label-hidden"
+                placeholder={placeholderText}
+                value={queryTerm}
+                onchange={handleInputChange}
+            ></lightning-input>
+            <button type="button" data-id="search-button" class="oi-search-bar-button" onclick={handleSearchButtonClick}>Search</button>
+        </div>
+        <template lwc:if={isSearching}>
+            <div class="oi-search-bar-status" data-id="search-loading">
+                <lightning-spinner alternative-text="Searching" size="x-small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:elseif={hasError}>
+            <div class="oi-search-bar-status oi-search-bar-error" data-id="search-error" role="alert">{errorMessage}</div>
+        </template>
+        <template lwc:elseif={hasResults}>
+            <ul class="oi-search-bar-results" data-id="search-results">
+                <template for:each={displayResults} for:item="result">
+                    <li key={result.nodeKey}>
+                        <button data-id="search-result-item" data-node-key={result.nodeKey} class="oi-search-bar-result" onclick={handleResultClick}>
+                            <span class="oi-search-bar-result-label">{result.label}</span>
+                            <span class="oi-search-bar-result-type">{result.typeLabel}</span>
+                        </button>
+                    </li>
+                </template>
+            </ul>
+        </template>
+    </div>
+</template>

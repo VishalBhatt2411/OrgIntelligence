@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Level_Number__c</fullName>
+    <label>Level Number</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>true</required>
+    <description>1-based position within the hierarchy (FR-002) — used to order levels for path display (FR-012) and to validate a relationship's Hierarchy_Level__c is consistent with its position.</description>
+</CustomField>

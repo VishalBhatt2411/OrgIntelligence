@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Relationship_Type__c</fullName>
+    <label>Relationship Type</label>
+    <type>Text</type>
+    <length>80</length>
+    <description>Free-form, admin-defined label for what a parent-child link means in this hierarchy (e.g. "Reports To", "Distributes For") — a Text field, not a closed picklist, since the set of relationship types is unknowable across arbitrary industries/objects (FR-001).</description>
+</CustomField>

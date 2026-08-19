@@ -1,0 +1,177 @@
+/** Colors reference SLDS global styling hooks with the original literal hex as a fallback, matching oiGraphCanvas.css/oiFilterPanel.css's own established convention. */
+.oi-graph-explorer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 0.6rem;
+}
+
+.oi-graph-explorer-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/** A segmented-control treatment (shared border, no gaps between buttons) reads as one cohesive mode switcher rather than three loose buttons. */
+.oi-analyze-mode-group {
+    display: inline-flex;
+    border: 1px solid var(--slds-g-color-border-1, #dddbda);
+    border-radius: 0.3rem;
+    overflow: hidden;
+    width: fit-content;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.oi-analyze-mode-button {
+    border: none;
+    border-right: 1px solid var(--slds-g-color-border-1, #dddbda);
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    color: var(--slds-g-color-on-surface-1, #444);
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+    transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.oi-analyze-mode-button:last-child {
+    border-right: none;
+}
+
+.oi-analyze-mode-button:hover:not(.is-active):not([aria-disabled='true']) {
+    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+.oi-analyze-mode-button.is-active {
+    background: var(--slds-g-color-accent-1, #0176d3);
+    color: var(--slds-g-color-on-accent-1, #ffffff);
+}
+
+.oi-analyze-mode-button[aria-disabled='true'] {
+    cursor: not-allowed;
+    color: var(--slds-g-color-disabled-1, #aaa);
+    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+.oi-graph-explorer-body {
+    display: flex;
+    gap: 0.6rem;
+    flex: 1;
+    min-height: 24rem;
+}
+
+.oi-graph-explorer-canvas-column {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border: 1px solid var(--slds-g-color-border-1, #dddbda);
+    border-radius: 0.4rem;
+    overflow: hidden;
+    box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+/** The canvas takes whatever height the filter panel (natural height, below) doesn't need — min-height: 0 is required for a flex child to actually shrink below its content's own intrinsic size instead of overflowing the column. */
+.oi-graph-explorer-canvas-column c-oi-graph-canvas {
+    flex: 1;
+    min-height: 0;
+}
+
+.oi-graph-explorer-canvas-column c-oi-filter-panel {
+    flex-shrink: 0;
+}
+
+.oi-graph-explorer-detail-column {
+    flex: 1;
+    min-width: 18rem;
+    border: 1px solid var(--slds-g-color-border-1, #dddbda);
+    border-radius: 0.4rem;
+    overflow-y: auto;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+.oi-graph-explorer-placeholder,
+.oi-graph-explorer-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 24rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-graph-explorer-error,
+.oi-graph-explorer-ceiling-banner {
+    border-radius: 0.3rem;
+    padding: 0.5rem 0.75rem;
+    border-left-width: 3px;
+    border-left-style: solid;
+    font-size: 0.85rem;
+}
+
+.oi-graph-explorer-error {
+    background: var(--slds-g-color-error-container-1, #fef0ee);
+    color: var(--slds-g-color-error-1, #c23934);
+    border-left-color: var(--slds-g-color-error-1, #c23934);
+}
+
+.oi-graph-explorer-ceiling-banner {
+    background: var(--slds-g-color-warning-container-1, #fdf5e6);
+    color: var(--slds-g-color-warning-1, #8c6b00);
+    border-left-color: var(--slds-g-color-warning-1, #ffb75d);
+}
+
+.oi-field-mode-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.oi-field-mode-object-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--slds-g-color-on-surface-1, #444);
+}
+
+.oi-field-mode-change-object {
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+}
+
+.oi-field-mode-no-fields {
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-size: 0.8rem;
+}
+
+.oi-record-mode-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    position: relative;
+}
+
+.oi-record-mode-object-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--slds-g-color-on-surface-1, #444);
+}
+
+.oi-record-mode-change-object {
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+}
+

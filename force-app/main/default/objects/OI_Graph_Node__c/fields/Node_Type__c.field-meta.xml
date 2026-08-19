@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Node_Type__c</fullName>
+    <label>Node Type</label>
+    <type>Text</type>
+    <length>80</length>
+    <required>true</required>
+    <unique>false</unique>
+    <description>Opaque type key (e.g. SalesforceMetadata.Flow), validated against OI_Node_Type_Descriptor__mdt at the Scanner boundary — deliberately Text, not a Picklist (ADR-0011).</description>
+</CustomField>

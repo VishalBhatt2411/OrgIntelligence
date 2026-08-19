@@ -1,0 +1,155 @@
+<template>
+    <div class="oi-graph-explorer">
+        <div class="oi-graph-explorer-header">
+            <div class="oi-analyze-mode-group" role="tablist" aria-label="Analyze">
+                <button
+                    type="button"
+                    data-id="analyze-mode-object"
+                    data-mode="Object"
+                    class={objectModeButtonClass}
+                    role="tab"
+                    aria-selected={isObjectMode}
+                    onclick={handleAnalyzeModeChange}
+                >
+                    Object
+                </button>
+                <button
+                    type="button"
+                    data-id="analyze-mode-field"
+                    data-mode="Field"
+                    class={fieldModeButtonClass}
+                    role="tab"
+                    aria-selected={isFieldMode}
+                    onclick={handleAnalyzeModeChange}
+                >
+                    Field
+                </button>
+                <button
+                    type="button"
+                    data-id="analyze-mode-record"
+                    data-mode="Record"
+                    class={recordModeButtonClass}
+                    role="tab"
+                    aria-selected={isRecordMode}
+                    onclick={handleAnalyzeModeChange}
+                >
+                    Record
+                </button>
+            </div>
+            <template lwc:if={isFieldMode}>
+                <template lwc:if={hasFieldModeObject}>
+                    <div class="oi-field-mode-picker">
+                        <div class="oi-field-mode-object-banner" data-id="field-mode-object-banner">
+                            Object: <strong>{fieldModeObjectLabel}</strong>
+                            <button type="button" class="oi-field-mode-change-object" data-id="field-mode-change-object" onclick={handleChangeFieldModeObject}>Change object</button>
+                        </div>
+                        <template lwc:if={isLoadingFieldOptions}>
+                            <lightning-spinner alternative-text="Loading fields" size="x-small"></lightning-spinner>
+                        </template>
+                        <template lwc:elseif={hasFieldModeOptions}>
+                            <lightning-combobox
+                                data-id="field-mode-field-picker"
+                                label="Field"
+                                variant="label-hidden"
+                                placeholder="Select a field..."
+                                options={fieldModeFieldOptions}
+                                onchange={handleFieldPicked}
+                            ></lightning-combobox>
+                        </template>
+                        <template lwc:else>
+                            <div class="oi-field-mode-no-fields" data-id="field-mode-no-fields">This object has no scanned fields yet.</div>
+                        </template>
+                    </div>
+                </template>
+                <template lwc:else>
+                    <c-oi-search-bar
+                        placeholder-text={searchPlaceholder}
+                        type-key-filter={searchTypeKeyFilter}
+                        registry={registry}
+                        onselect={handleFieldModeObjectSelect}
+                    ></c-oi-search-bar>
+                </template>
+            </template>
+            <template lwc:elseif={isRecordMode}>
+                <template lwc:if={hasRecordModeObject}>
+                    <div class="oi-record-mode-picker">
+                        <div class="oi-record-mode-object-banner" data-id="record-mode-object-banner">
+                            Object: <strong>{recordModeObjectLabel}</strong>
+                            <button type="button" class="oi-record-mode-change-object" data-id="record-mode-change-object" onclick={handleChangeRecordModeObject}>Change object</button>
+                        </div>
+                        <c-oi-record-picker object-api-name={recordModeObjectApiName} placeholder-text={recordSearchPlaceholder} onselect={handleRecordPicked}></c-oi-record-picker>
+                    </div>
+                </template>
+                <template lwc:elseif={isLoadingRecordModeObject}>
+                    <lightning-spinner alternative-text="Loading object" size="x-small"></lightning-spinner>
+                </template>
+                <template lwc:else>
+                    <c-oi-search-bar
+                        placeholder-text="First, search for the object this record belongs to (e.g. Account)..."
+                        type-key-filter={searchTypeKeyFilter}
+                        registry={registry}
+                        onselect={handleRecordModeObjectSelect}
+                    ></c-oi-search-bar>
+                </template>
+            </template>
+            <template lwc:else>
+                <c-oi-search-bar
+                    placeholder-text={searchPlaceholder}
+                    type-key-filter={searchTypeKeyFilter}
+                    registry={registry}
+                    onselect={handleSearchSelect}
+                ></c-oi-search-bar>
+            </template>
+        </div>
+
+        <template lwc:if={hasError}>
+            <div class="oi-graph-explorer-error" data-id="explorer-error" role="alert">{errorMessage}</div>
+        </template>
+
+        <template lwc:if={workingSetCeilingHit}>
+            <div class="oi-graph-explorer-ceiling-banner" data-id="ceiling-banner">
+                Your graph has gotten large — collapse a branch you're done exploring to continue.
+            </div>
+        </template>
+
+        <div class="oi-graph-explorer-body">
+            <div class="oi-graph-explorer-canvas-column">
+                <template lwc:if={isLoadingFragment}>
+                    <div class="oi-graph-explorer-loading" data-id="explorer-loading">
+                        <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                    </div>
+                </template>
+                <template lwc:if={hasCenterNode}>
+                    <c-oi-graph-canvas
+                        center-node-key={viewState.centerNodeKey}
+                        nodes={canvasNodes}
+                        edges={canvasEdges}
+                        selected-node-key={selectedNodeKey}
+                        onselect={handleCanvasSelect}
+                        onexpand={handleExpand}
+                        oncollapse={handleCollapse}
+                    ></c-oi-graph-canvas>
+                    <template lwc:if={hasFilterPanel}>
+                        <c-oi-filter-panel
+                            data-id="filter-panel"
+                            edge-type-options={edgeTypeFilterOptions}
+                            direction={relationshipDirection}
+                            restrict-to-direct-only={restrictToDirectOnly}
+                            onedgetypetoggle={handleEdgeTypeToggle}
+                            ondirectiontoggle={handleDirectionToggle}
+                            ondepthtoggle={handleDepthToggle}
+                        ></c-oi-filter-panel>
+                    </template>
+                </template>
+                <template lwc:else>
+                    <div class="oi-graph-explorer-placeholder" data-id="explorer-placeholder">
+                        Search for an object, field, or record above to start exploring its hierarchy.
+                    </div>
+                </template>
+            </div>
+            <div class="oi-graph-explorer-detail-column">
+                <c-oi-node-detail-panel node-key={selectedNodeKey} registry={registry} onselect={handleDetailPanelSelect} onhighlightimpact={handleHighlightImpact}></c-oi-node-detail-panel>
+            </div>
+        </div>
+    </div>
+</template>

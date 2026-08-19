@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Root_Node_Key__c</fullName>
+    <label>Root Node Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <unique>false</unique>
+    <description>The impact-analysis root node this cache row was computed for — queried (never as the record's unique identity, see Cache_Key__c) so a scan delta touching this key, or a node with a current 1-hop edge to a delta node, can be evicted (DE-7).</description>
+</CustomField>

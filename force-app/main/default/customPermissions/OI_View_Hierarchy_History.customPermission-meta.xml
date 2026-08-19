@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI View Hierarchy History</label>
+    <description>Read hierarchy relationship change history (FR-017, ADR-0022).</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

@@ -1,0 +1,40 @@
+<template>
+    <div class="oi-hierarchy-tree-node">
+        <div class="oi-hierarchy-tree-node-row" style={nodeStyle}>
+            <template lwc:if={hasChildren}>
+                <button type="button" class="oi-hierarchy-tree-node-toggle" data-id="tree-node-toggle" title={toggleLabel} onclick={handleToggle}>
+                    {toggleLabel}
+                </button>
+            </template>
+            <template lwc:else>
+                <span class="oi-hierarchy-tree-node-toggle-spacer"></span>
+            </template>
+            <lightning-icon icon-name="standard:hierarchy" size="xx-small" class="oi-hierarchy-tree-node-icon"></lightning-icon>
+            <div class="oi-hierarchy-tree-node-labels">
+                <template lwc:if={isLabelClickable}>
+                    <button type="button" class="oi-hierarchy-tree-node-label" data-id="tree-node-label" title={nodeLabel} onclick={handleLabelClick}>{nodeLabel}</button>
+                </template>
+                <template lwc:else>
+                    <span class="oi-hierarchy-tree-node-label oi-hierarchy-tree-node-label-current" data-id="tree-node-label-current" title={nodeLabel}>{nodeLabel}</span>
+                </template>
+                <span class="oi-hierarchy-tree-node-secondary" data-id="tree-node-secondary">{nodeObjectApiName}</span>
+            </div>
+        </div>
+        <template lwc:if={showChildren}>
+            <ul class="oi-hierarchy-tree-node-children" data-id="tree-node-children" style={childrenStyle}>
+                <template for:each={children} for:item="child">
+                    <li key={child.recordId}>
+                        <c-oi-hierarchy-tree-node
+                            node-record-id={child.recordId}
+                            node-object-api-name={child.objectApiName}
+                            node-label={child.label}
+                            children-by-parent-id={childrenByParentId}
+                            depth={childDepth}
+                            onrecordselect={handleChildSelect}
+                        ></c-oi-hierarchy-tree-node>
+                    </li>
+                </template>
+            </ul>
+        </template>
+    </div>
+</template>

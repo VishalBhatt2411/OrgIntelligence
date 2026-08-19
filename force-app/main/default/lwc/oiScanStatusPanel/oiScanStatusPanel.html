@@ -1,0 +1,20 @@
+<template>
+    <lightning-card title="Scan Status" icon-name="standard:metrics">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="slds-text-heading_small">
+                Status: <strong>{statusLabel}</strong>
+            </p>
+            <template if:true={message}>
+                <p class="slds-text-body_small slds-text-color_weak">{message}</p>
+            </template>
+            <div class="slds-m-top_small">
+                <template if:false={isRunning}>
+                    <lightning-button data-id="start-scan-button" variant="brand" label="Start Scan" onclick={handleStartScan} disabled={isLoading}></lightning-button>
+                </template>
+                <template if:true={isRunning}>
+                    <lightning-button data-id="cancel-scan-button" variant="destructive" label="Cancel Scan" onclick={handleCancelScan} disabled={isLoading}></lightning-button>
+                </template>
+            </div>
+        </div>
+    </lightning-card>
+</template>

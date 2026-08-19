@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Relationship_Field_Api_Name__c</fullName>
+    <label>Relationship Field API Name</label>
+    <type>Text</type>
+    <length>255</length>
+    <description>Informational only (FR-002) — the accelerator's actual parent/child linkage always lives in OI_Hierarchy_Relationship__c, never a native lookup field, so this documents which native field (if any) the admin considers this level conceptually tied to.</description>
+</CustomField>

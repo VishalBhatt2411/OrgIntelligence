@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI View Hierarchy</label>
+    <description>Read hierarchy definitions, relationships, ancestors/descendants/path (ADR-0022).</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

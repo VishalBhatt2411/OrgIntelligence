@@ -1,0 +1,33 @@
+# ADR-0021: Record Analysis Deferred, and Kept Architecturally Outside the Metadata Graph When Built
+
+## Status
+Proposed — a forward-looking assessment, not yet implemented. **Amended by [ADR-0022](0022-hierarchy-accelerator-separate-persistence-lane.md) for the Hierarchy Accelerator epic only**: this ADR's live-query-only Decision stands unchanged for ad hoc Record Analysis (RA-1/RA-2/RA-3 below, already built); ADR-0022 builds the "structurally separate persistence lane" this ADR names as Alternative #2 below, for a different, larger, admin-configured multi-hierarchy use case with a concrete driving need this ADR did not yet have.
+
+## Context
+The Hierarchy Visualizer's product requirement (PRD "Priority 4 — Record Analysis") asks for a mode where a user picks an Object, selects a real record, and visualizes that record's parent/child and related-record relationships alongside the existing Object/Field metadata hierarchy. Before implementing any part of this, the requirement itself demands an architecture assessment of whether the current Graph Engine's Domain Type Registry and node/edge model can support runtime Record nodes without corrupting the metadata graph ([ADR-0011](0011-generic-node-edge-typing-via-domain-registry.md), [ADR-0014](0014-immutable-node-edge-versioning.md)).
+
+The Graph Engine's storage and versioning model ([ADR-0002](0002-hybrid-custom-object-big-object-graph-persistence.md), [ADR-0014](0014-immutable-node-edge-versioning.md), [ADR-0016](0016-repository-atomic-commit-and-optimistic-concurrency.md)) was sized and designed for **metadata cardinality**: hundreds to low tens-of-thousands of Objects/Fields/Apex classes/etc. per org, changing infrequently (a deploy, a config change), with every content change producing a new immutable version row so history is fully reconstructable. `OI_GraphTraversal`'s governor-limit defaults (`Max_Traversal_Node_Count__c` = 500, `Max_Hop_Depth__c` = 3 in this org) and `OI_GraphRepository.commitVersion`'s one-Savepoint-per-key cost (documented as non-bulkable across keys, [GraphRepository.md] §11) both assume this scale.
+
+Records are a fundamentally different cardinality and change-rate: a single custom object can hold millions of rows, and those rows change continuously (every user edit, every automation run) — not on a scan cadence. Additionally, `OI_MetadataSearchProvider`/Record Search were already explicitly sequenced as **opt-in, off-by-default, Post-GA** work in [ADR-0017](0017-search-provider-abstraction-record-search-outside-graph.md) and [SearchEngine.md](../SearchEngine.md) §0/§12/§29, for closely related reasons (security/sharing sensitivity, volume, and staying out of the metadata search experience until it is solid).
+
+## Decision
+Do not implement Record Analysis in this iteration. If and when it is built, it must **not** persist record rows as `OI_Graph_Node__c`/`OI_Graph_Edge__c` rows through the existing `OI_GraphBuilder`/`OI_GraphRepository` versioning path. The two viable shapes, in order of preference, are:
+
+1. **Live-query renderer, no persistence.** A new, narrow read path (e.g. `OI_RecordHierarchyService`) that, given a record Id, issues bounded, `WITH USER_MODE`/`with sharing` SOQL to fetch parent lookups and detected child relationships (via `Schema.DescribeSObjectResult.getChildRelationships()`), and hands the LWC layer a fragment shaped like `OI_GraphFragmentDTO` but never written to `OI_Graph_Node__c`. The existing `oiGraphCanvas`/`oiGraphNode` components can render it unchanged, since they only require the summary shape (`nodeKey`, `typeKey`, `label`, `secondaryKey`) — a synthetic, non-persisted `nodeKey` (e.g. the record Id itself, prefixed) is sufficient for one render pass and is never written back to the metadata graph's key space.
+2. **A structurally separate persistence lane** (a distinct object/Big Object, its own retention policy, never sharing `Is_Current__c`/version-history semantics with metadata) — only if a caching/history requirement for record relationships emerges later. Materially more expensive; not justified without a concrete driving need.
+
+Rejected outright: extending `OI_Node_Type_Descriptor__mdt` with a `Record` typeKey that flows through the existing scanner → `OI_MutationGenerator` → `OI_GraphBuilder` → `OI_Graph_Node__c` path used for metadata today.
+
+## Consequences
+- **Positive**: the metadata graph's volume, versioning, and governor-limit assumptions stay intact — Record Analysis, whenever built, cannot silently degrade Object/Field hierarchy performance or blow up `OI_Graph_Node__c` row counts.
+- **Positive**: record data naturally inherits CRUD/FLS/sharing at read time (`WITH USER_MODE`, `with sharing`) rather than needing a parallel security model bolted onto the graph's own Apex-boundary model ([ADR-0006](0006-apex-boundary-security-model-for-app-internal-data.md), which is explicitly scoped to *application-internal* data, not end-user records).
+- **Negative**: no expand/collapse reference-counting, caching, or offline history for record relationships — every view is a fresh live read. Acceptable, since record data is exactly the kind of thing that goes stale fastest.
+- **Negative**: `oiGraphExplorer`'s Analyze mode ships today with Record visibly present but disabled (a deliberate, honest UI state — see `oiGraphExplorer.js`/`.html`) rather than silently absent, so the roadmap gap is discoverable in the product itself, not just in documentation.
+
+## Alternatives Considered
+- **Reuse the metadata graph path directly** (rejected in the Decision above) — the cardinality/change-rate mismatch this ADR describes.
+- **Do nothing, mention it nowhere in the UI** — rejected: contradicts the product's own "do not pretend record-level graph analysis already exists" requirement; a visibly-disabled mode with an explanatory tooltip is more honest than silence.
+- **Build the full live-query renderer now** — not done this iteration: correctly scoping Priority 1/2 (Object/Field hierarchy) first, per the PRD's own explicit sequencing ("if it would require a large architectural change, do not derail the project — fully complete Object + Field visualization").
+
+## Related
+[Backlog.md](../Backlog.md) Epic: Record Search; [SearchEngine.md](../SearchEngine.md) §0, §12, §23, §29; [ADR-0002](0002-hybrid-custom-object-big-object-graph-persistence.md); [ADR-0006](0006-apex-boundary-security-model-for-app-internal-data.md); [ADR-0011](0011-generic-node-edge-typing-via-domain-registry.md); [ADR-0014](0014-immutable-node-edge-versioning.md); [ADR-0016](0016-repository-atomic-commit-and-optimistic-concurrency.md); [ADR-0017](0017-search-provider-abstraction-record-search-outside-graph.md).

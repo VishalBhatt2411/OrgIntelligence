@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Weight__c</fullName>
+    <label>Weight</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>4</scale>
+    <required>false</required>
+    <description>Reserved for future ranking/impact-scoring use.</description>
+</CustomField>

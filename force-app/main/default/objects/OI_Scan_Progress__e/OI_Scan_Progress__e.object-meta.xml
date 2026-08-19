@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <label>OI Scan Progress</label>
+    <pluralLabel>OI Scan Progress</pluralLabel>
+    <eventType>StandardVolume</eventType>
+    <publishBehavior>PublishAfterCommit</publishBehavior>
+    <description>Live scan-progress push for oiScanStatusPanel (Roadmap Phase 1 exit criteria — "visible progress", Backlog MS-4/UI-7). Minimal payload by design (Sprint 9) — this is a UI progress signal, not an audit log (OI_Log_Event__e/OI_Log__c already cover that).</description>
+</CustomObject>

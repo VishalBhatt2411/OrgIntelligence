@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <label>OI Graph Node Archive</label>
+    <pluralLabel>OI Graph Node Archives</pluralLabel>
+    <description>Append-only archive for node versions superseded by later scans or purged after soft-deletion (DataModel.md §3.1, ADR-0014). Written exclusively by OI_GraphRepository's OI_BigObjectStorageProvider. Index deliberately limited to Node_Key__c + Version_Number__c + Archived_At__c — a Big Object index caps combined text-field length at 100 characters, which the full five-field index this schema originally specified could not fit; Node_Version_Key__c and Scan_Run_Id__c remain queryable fields, just not part of this index (documented platform-limitation deviation, see Sprint 7 deliverables report).</description>
+    <indexes>
+        <fullName>OI_Graph_Node_Archive_Idx</fullName>
+        <label>OI Graph Node Archive Idx</label>
+        <fields>
+            <name>Node_Key__c</name>
+            <sortDirection>ASC</sortDirection>
+        </fields>
+        <fields>
+            <name>Version_Number__c</name>
+            <sortDirection>ASC</sortDirection>
+        </fields>
+        <fields>
+            <name>Archived_At__c</name>
+            <sortDirection>ASC</sortDirection>
+        </fields>
+    </indexes>
+</CustomObject>

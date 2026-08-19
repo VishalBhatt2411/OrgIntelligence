@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Hierarchy Relationship History</label>
+    <pluralLabel>OI Hierarchy Relationship Histories</pluralLabel>
+    <nameField>
+        <label>Hierarchy History Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>HHIST-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description>Append-only audit trail of hierarchy relationship changes (FR-017) — deliberately denormalized, not Master-Detail to OI_Hierarchy_Relationship__c, so history outlives the specific relationship row it describes (ADR-0022).</description>
+</CustomObject>

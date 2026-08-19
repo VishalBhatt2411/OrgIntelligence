@@ -1,0 +1,18 @@
+.oi-hierarchy-switcher {
+    display: flex;
+    align-items: center;
+    min-width: 12rem;
+}
+
+.oi-hierarchy-switcher-error {
+    color: var(--slds-g-color-error-1, #ba0517);
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.oi-hierarchy-switcher-empty {
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-size: 0.8rem;
+    font-style: italic;
+    margin: 0;
+}

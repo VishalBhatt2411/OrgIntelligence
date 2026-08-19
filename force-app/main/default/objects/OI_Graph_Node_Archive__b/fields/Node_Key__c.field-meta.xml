@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Node_Key__c</fullName>
+    <label>Node Key</label>
+    <type>Text</type>
+    <length>60</length>
+    <required>true</required>
+    <description>Logical node identity — the field a future history feature queries by. Capped at 80 chars (vs. 255 on the live OI_Graph_Node__c table) because this field participates in OI_Graph_Node_Archive_Idx, and Big Object indexes cap combined text-field length at 100 characters total — a platform limitation documented in the Sprint 7 deliverables report, not an oversight. Node keys longer than 80 characters remain stored in full on the live table; only this archive copy is length-constrained.</description>
+</CustomField>

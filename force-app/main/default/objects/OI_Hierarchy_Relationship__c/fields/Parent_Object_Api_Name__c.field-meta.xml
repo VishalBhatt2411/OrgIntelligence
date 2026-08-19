@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Parent_Object_Api_Name__c</fullName>
+    <label>Parent Object API Name</label>
+    <type>Text</type>
+    <length>255</length>
+    <description>Polymorphic parent reference, Text not Lookup (ADR-0022 — dynamically-typed Lookup fields per hierarchy type would require runtime metadata deployment, impossible for 2GP). Blank for a root-level relationship with no parent.</description>
+</CustomField>

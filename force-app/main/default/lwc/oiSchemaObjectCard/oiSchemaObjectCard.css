@@ -1,0 +1,125 @@
+/**
+ * Every color below is an SLDS global styling hook (--slds-g-color-*) with the original
+ * literal hex as its fallback — var(--slds-g-color-X, #hex) — so this card adapts to Lightning
+ * Experience's SLDS 2 dark mode where available and renders exactly as before where it isn't.
+ * See oiGraphNode.css's own doc comment for the same rationale applied to the plain-pill node.
+ */
+.oi-schema-card {
+    --oi-node-accent: var(--slds-g-color-accent-1, #0176d3);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    border-top: 4px solid var(--oi-node-accent);
+    border-radius: 0.5rem;
+    box-sizing: border-box;
+    /** Was `hidden` — see oiGraphNode.css's identical change for the full rationale: the title/subheader already self-clip, and the outer box must stay open for the hover tooltip (.oi-schema-card-tooltip) to render outside its bounds. */
+    overflow: visible;
+    box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08));
+    transition: box-shadow 0.15s ease;
+    font-size: 0.72rem;
+    /** Matches oiGraphNode.css's rationale — a drag starting on the card's title/subheader text should move the card, not paint the browser's native text-selection highlight. */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+.oi-schema-card:hover {
+    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.oi-schema-card.is-selected {
+    box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+.oi-schema-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.55rem;
+    cursor: pointer;
+    background: var(--slds-g-color-surface-container-2, #fafaf9);
+    border-bottom: 1px solid var(--slds-g-color-border-1, #f0efed);
+    /** Now that the card no longer clips its own overflow (see .oi-schema-card), this flush top section's own opaque background needs its own matching corner radius — it used to get rounded off "for free" by the parent's overflow:hidden. */
+    border-radius: 0.5rem 0.5rem 0 0;
+    flex-shrink: 0;
+}
+
+.oi-schema-card-icon {
+    flex-shrink: 0;
+}
+
+.oi-schema-card-title {
+    flex: 1;
+    font-weight: 700;
+    color: var(--slds-g-color-on-surface-1, #181818);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.oi-schema-card-expand-toggle {
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0 0.15rem;
+    flex-shrink: 0;
+}
+
+.oi-schema-card-expand-toggle:hover {
+    text-decoration: underline;
+}
+
+.oi-schema-card-subheader {
+    padding: 0.15rem 0.55rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-size: 0.62rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/** Replaces the old inline field list — see the class doc comment: fields are browsed in the Detail Panel now, this is just a count. */
+.oi-schema-card-field-count {
+    padding: 0.2rem 0.55rem 0.35rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-size: 0.65rem;
+    flex: 1;
+}
+
+/** Hover-reveal, full-text tooltip — identical pattern and rationale to oiGraphNode.css's .oi-graph-node-tooltip. */
+.oi-schema-card-tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.4rem);
+    transform: translate(-50%, 4px);
+    background: var(--slds-g-color-neutral-base-10, #16171a);
+    color: var(--slds-g-color-neutral-base-100, #ffffff);
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: normal;
+    width: max-content;
+    max-width: 260px;
+    text-align: center;
+    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.25));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 20;
+}
+
+.oi-schema-card:hover .oi-schema-card-tooltip,
+.oi-schema-card:focus-within .oi-schema-card-tooltip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}

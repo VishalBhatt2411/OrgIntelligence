@@ -1,0 +1,21 @@
+<template>
+    <div class={cardClass} style={cardStyle} data-id="schema-card">
+        <div
+            class="oi-schema-card-header"
+            role="button"
+            tabindex="0"
+            aria-label={ariaLabel}
+            onclick={handleHeaderClick}
+            onkeydown={handleHeaderKeydown}
+        >
+            <lightning-icon icon-name={iconName} size="x-small" class="oi-schema-card-icon"></lightning-icon>
+            <span class="oi-schema-card-title" title={label}>{label}</span>
+            <button data-id="expand-toggle-button" class="oi-schema-card-expand-toggle" title={expandToggleLabel} onclick={handleExpandToggle}>
+                {expandToggleLabel}
+            </button>
+        </div>
+        <div class="oi-schema-card-subheader" title={secondaryKey}>{secondaryKey}</div>
+        <div class="oi-schema-card-field-count" data-id="field-count">{fieldCountLabel}</div>
+        <div class="oi-schema-card-tooltip" data-id="card-tooltip">{tooltipText}</div>
+    </div>
+</template>

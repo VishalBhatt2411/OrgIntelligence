@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>SalesforceMetadata.HAS_FIELD</label>
+    <protected>false</protected>
+    <values>
+        <field>Type_Key__c</field>
+        <value xsi:type="xsd:string">SalesforceMetadata.HAS_FIELD</value>
+    </values>
+    <values>
+        <field>Display_Label__c</field>
+        <value xsi:type="xsd:string">Has Field</value>
+    </values>
+    <values>
+        <field>Line_Style__c</field>
+        <value xsi:type="xsd:string">solid</value>
+    </values>
+    <values>
+        <field>Is_Field_Membership__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+</CustomMetadata>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Direction__c</fullName>
+    <label>Direction</label>
+    <type>Picklist</type>
+    <required>true</required>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Forward</fullName><default>true</default><label>Forward</label></value>
+            <value><fullName>Reverse</fullName><default>false</default><label>Reverse</label></value>
+        </valueSetDefinition>
+    </valueSet>
+    <description>Which question this cached result answers — "what does this depend on" (Forward) or "what depends on this" (Reverse), GraphUI.md §19. Part of the cache key's identity alongside Cache_Key__c, never a single ambiguous "impact" row.</description>
+</CustomField>

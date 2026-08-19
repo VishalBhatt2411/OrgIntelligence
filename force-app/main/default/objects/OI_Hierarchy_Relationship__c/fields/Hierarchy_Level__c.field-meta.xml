@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Hierarchy_Level__c</fullName>
+    <label>Hierarchy Level</label>
+    <type>Lookup</type>
+    <referenceTo>OI_Hierarchy_Level__c</referenceTo>
+    <relationshipName>OI_Level_Relationships</relationshipName>
+    <relationshipLabel>OI Level Relationships</relationshipLabel>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Which configured level this relationship's child record sits at (FR-005) — optional, since not every hierarchy configures explicit levels.</description>
+</CustomField>

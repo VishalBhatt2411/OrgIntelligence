@@ -1,0 +1,65 @@
+/**
+ * Colors reference SLDS global styling hooks with the original literal hex as a fallback —
+ * see oiGraphCanvas.css's own doc comment for the full dark-mode rationale; the same pattern
+ * applies here.
+ */
+.oi-filter-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    border: 1px solid var(--slds-g-color-border-1, #dddbda);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.oi-filter-panel-section-title {
+    margin: 0 0 0.3rem 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-filter-panel-checklist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.oi-filter-panel-checkitem {
+    display: flex;
+    align-items: center;
+}
+
+.oi-filter-panel-checklabel {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    color: var(--slds-g-color-on-surface-1, #444);
+}
+
+.oi-filter-panel-checklabel input[type='checkbox'] {
+    cursor: pointer;
+}
+
+.oi-filter-panel-swatch {
+    display: inline-block;
+    width: 1.25rem;
+    height: 0;
+    border-top: 2px solid var(--slds-g-color-border-1, #706e6b);
+}
+
+.oi-filter-panel-swatch-dashed {
+    border-top-style: dashed;
+}
+
+.oi-filter-panel-swatch-solid {
+    border-top-style: solid;
+}

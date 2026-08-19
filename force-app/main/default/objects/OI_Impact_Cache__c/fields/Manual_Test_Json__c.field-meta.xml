@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Manual_Test_Json__c</fullName>
+    <label>Cached Result Json</label>
+    <length>32768</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>10</visibleLines>
+    <description>Compact serialized OI_ImpactResultDTO — a JSON string, never a live object graph (GraphEngine.md &#167;8's L1 caching convention applied here). The API name is a holdover from a live debugging session: two prior attempts at this field (Result_Json__c on the original OI_Impact_Analysis_Cache__c object, then a renamed Cached_Result_Json__c on this object) both deployed successfully via Metadata API but stayed permanently invisible to SOQL/Apex in this org — confirmed via anonymous Apex (bypasses FLS) to be a genuine platform-side issue with Metadata-API-created fields specifically, not a permissions or code problem. Creating the field through Setup UI instead worked immediately. Renaming a field's API name after creation isn't possible in Salesforce, so this name stays; if a future org doesn't hit this issue, there's no need to carry the workaround forward.</description>
+</CustomField>

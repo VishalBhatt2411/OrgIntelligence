@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Current__c</fullName>
+    <label>Is Current</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>True on exactly one row per Node_Key__c at any time. One of the two narrow exceptions to immutability (GraphEngine.md §2) — flipped in place only by OI_GraphRepository.commitVersion.</description>
+</CustomField>
