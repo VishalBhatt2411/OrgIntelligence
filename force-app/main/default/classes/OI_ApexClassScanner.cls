@@ -22,12 +22,14 @@
  *              TABLE — a deliberate, documented trade-off (see Impact Analysis's
  *              coverageCaveat, surfaced in the UI, not just here): it will (a) miss dynamic
  *              Apex (Type.forName, reflection), (b) miss interface-based indirection where
- *              the concrete implementing class is never named in the calling code, (c)
- *              occasionally false-positive when a comment or string literal happens to
- *              contain another class's exact name, and (d) can misattribute a namespaced
+ *              the concrete implementing class is never named in the calling code, and (c) can
+ *              misattribute a namespaced
  *              external reference (NS.ClassName) to an unrelated local class that happens to
  *              share the same unqualified name, since this pass matches bare identifiers,
- *              not fully-qualified dotted paths. This is a floor, not a ceiling — a true
+ *              not fully-qualified dotted paths. Comments and string literals are stripped
+ *              before tokenizing (stripNonCodeRegions), so a class name appearing only in prose
+ *              or in a message string no longer produces a phantom edge — previously listed
+ *              here as an accepted weakness, now fixed. This is a floor, not a ceiling — a true
  *              Tooling API dependency integration remains a named future item (roadmap-
  *              adjacent to MS-9), not attempted here. Flow/Trigger/PermissionSet dependency
  *              edges are out of scope for this scanner entirely (separate, larger scanner
@@ -39,6 +41,19 @@ public inherited sharing class OI_ApexClassScanner implements OI_IMetadataScanne
     private static final String COMPONENT_KIND = 'ApexClass';
     private static final String REFERENCES_RELATIONSHIP_KIND = 'REFERENCES';
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile('[A-Za-z_][A-Za-z0-9_]*');
+    /**
+     * Non-code regions stripped before identifier tokenizing, in one alternation so a single
+     * pass consumes whichever construct opens FIRST — the ordering property that makes this
+     * correct rather than merely approximate (see stripNonCodeRegions).
+     *   /\*...*\/   block comment, DOTALL so it spans lines
+     *   //...       line comment, to end of line
+     *   '...'       Apex string literal, honoring \' escapes
+     * Apex has no character literal, no raw/multiline string, and no regex literal, so these
+     * three cases are exhaustive for this language — a claim worth stating explicitly, since it
+     * is exactly what makes a regex approach sufficient here where it would not be in, say,
+     * JavaScript.
+     */
+    private static final Pattern NON_CODE_REGION_PATTERN = Pattern.compile('(?s)/\\*.*?\\*/|//[^\\n]*|\'(?:\\\\.|[^\'\\\\])*\'');
 
     public OI_DiscoveryBatch scan(OI_ScanContext context) {
         Boolean bodyAccessible = true;
@@ -85,7 +100,7 @@ public inherited sharing class OI_ApexClassScanner implements OI_IMetadataScanne
         }
         String fromComponentKey = componentKeyByClassName.get(apexClass.Name);
         Set<String> referencedClassNames = new Set<String>();
-        Matcher tokenMatcher = IDENTIFIER_PATTERN.matcher(apexClass.Body);
+        Matcher tokenMatcher = IDENTIFIER_PATTERN.matcher(stripNonCodeRegions(apexClass.Body));
         while (tokenMatcher.find()) {
             String token = tokenMatcher.group();
             if (token != apexClass.Name && componentKeyByClassName.containsKey(token)) {
@@ -105,6 +120,40 @@ public inherited sharing class OI_ApexClassScanner implements OI_IMetadataScanne
             );
         }
         return found;
+    }
+
+    /**
+     * Blanks out comments and string literals before identifier tokenizing, so a class name
+     * that appears only in prose or in a message string cannot masquerade as a dependency.
+     *
+     * Why this matters more than it might look: this codebase's own convention is heavy
+     * doc-comment headers that name collaborating classes explicitly ("Dependencies:
+     * OI_ComponentKeyUtil, OI_ChecksumUtil"), and error messages that embed a class name for
+     * diagnostics. Tokenizing the raw Body therefore manufactured edges from documentation —
+     * meaning the more carefully a class was documented, the more phantom dependencies it
+     * appeared to have. Impact Analysis then reported components that genuinely could not break.
+     *
+     * The single-alternation pass is what keeps this correct at the boundaries, and both
+     * directions matter: a `//` sequence inside a string literal ("http://x") must NOT start a
+     * comment, and an apostrophe inside a comment ("don't") must NOT open a string literal.
+     * A regex that removed comments first and strings second (or vice versa) gets one of those
+     * two cases wrong; matching whichever construct opens first gets both right, because the
+     * alternation always consumes the opener nearest the current scan position.
+     *
+     * Replaces each region with a single space rather than deleting it, so two identifiers
+     * separated only by a comment (`foo/*x*\/bar`) cannot be fused into one spurious token.
+     *
+     * Remaining limitation, unchanged: this addresses false positives from non-code regions
+     * only. The other documented heuristic weaknesses — dynamic Apex, interface indirection,
+     * and namespaced-name collisions — are properties of matching bare identifiers at all, and
+     * still require a real Tooling API dependency integration to fix.
+     */
+    @TestVisible
+    private static String stripNonCodeRegions(String body) {
+        if (String.isBlank(body)) {
+            return body;
+        }
+        return NON_CODE_REGION_PATTERN.matcher(body).replaceAll(' ');
     }
 
     private OI_DiscoveredComponent toComponent(ApexClass apexClass) {

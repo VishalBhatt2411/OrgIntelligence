@@ -128,27 +128,24 @@ public with sharing class OI_DependencyEngineService {
     }
 
     /**
-     * DE-7's mechanism, callable today: evicts every cached impact result rooted at a node in
-     * changedNodeKeys, plus any cached result rooted at a node with a current 1-hop edge
-     * (either direction, any type) to one — the documented 1-hop invalidation rule. Reads
-     * exclusively through OI_GraphEngine.getImpactSubgraph (no direct OI_EdgeSelector use),
+     * DE-7: evicts every cached impact result rooted at a node in changedNodeKeys, plus any
+     * cached result rooted at a node with a current 1-hop edge (either direction, any type) to
+     * one — the documented 1-hop invalidation rule. Reads exclusively through OI_GraphEngine,
      * honoring this service's own "reads the graph exclusively through OI_GraphEngine" rule.
+     *
+     * Bulk by construction (corrected 2026-08-19, when this was first wired into the live scan
+     * pipeline): the 1-hop expansion is ONE call over the whole changed set, costing 2 SOQL
+     * queries regardless of set size. The previous implementation looped per changed key at 2
+     * queries each — correct in a unit test with 2 keys, but guaranteed to exceed the
+     * 100-query transaction limit on any real scan chunk (60 changed keys would have issued
+     * 120 queries). It was never exercised at scale because nothing called it; wiring it up is
+     * exactly what surfaced this.
      */
     public void invalidateForScanDelta(Set<String> changedNodeKeys) {
         if (changedNodeKeys == null || changedNodeKeys.isEmpty()) {
             return;
         }
-        Set<String> keysToEvict = new Set<String>(changedNodeKeys);
-        Integer neighborFanout = boundedNodeCount();
-        for (String changedKey : changedNodeKeys) {
-            for (OI_NodeSummary summary : graphEngine.getImpactSubgraph(changedKey, FORWARD, null, 1, neighborFanout).nodes) {
-                keysToEvict.add(summary.nodeKey);
-            }
-            for (OI_NodeSummary summary : graphEngine.getImpactSubgraph(changedKey, REVERSE, null, 1, neighborFanout).nodes) {
-                keysToEvict.add(summary.nodeKey);
-            }
-        }
-        cacheRepository.evictByRootNodeKeys(keysToEvict);
+        cacheRepository.evictByRootNodeKeys(graphEngine.getOneHopNeighborKeys(changedNodeKeys));
     }
 
     /** BFS over the already-bounded subgraph's own edges (never a new SOQL round-trip) — hop distance from the root, in the same direction the subgraph was traversed. */

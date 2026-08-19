@@ -34,6 +34,30 @@ describe('c-oi-hierarchy-tree-node', () => {
         expect(element.shadowRoot.querySelector('[data-id="tree-node-children"]')).toBeNull();
     });
 
+    /**
+     * The root auto-expands on first render (oiHierarchyTreeNode.js's isRoot setter) so the
+     * hierarchy communicates its structure immediately instead of presenting an apparently-empty
+     * tree the user must click before seeing anything. Descendants stay collapsed for
+     * progressive disclosure — the two halves of that rule are asserted together here so
+     * neither can be changed without the other being reconsidered.
+     */
+    it('auto-expands the root on first render while leaving descendants collapsed', async () => {
+        const element = createElement('c-oi-hierarchy-tree-node', { is: OiHierarchyTreeNode });
+        element.nodeRecordId = 'root1';
+        element.nodeObjectApiName = 'Account';
+        element.nodeLabel = 'Global Enterprise';
+        element.childrenByParentId = buildChildrenMap();
+        element.isRoot = true;
+        document.body.appendChild(element);
+        await flushPromises();
+
+        expect(element.shadowRoot.querySelector('[data-id="tree-node-children"]')).not.toBeNull();
+        expect(element.shadowRoot.querySelectorAll('c-oi-hierarchy-tree-node')).toHaveLength(2);
+
+        const firstChild = element.shadowRoot.querySelector('c-oi-hierarchy-tree-node');
+        expect(firstChild.shadowRoot.querySelector('[data-id="tree-node-children"]')).toBeNull();
+    });
+
     it('starts collapsed and reveals children only after the toggle is clicked', async () => {
         const element = createElement('c-oi-hierarchy-tree-node', { is: OiHierarchyTreeNode });
         element.nodeRecordId = 'root1';
@@ -91,10 +115,9 @@ describe('c-oi-hierarchy-tree-node', () => {
         const handler = jest.fn();
         element.addEventListener('recordselect', handler);
         document.body.appendChild(element);
-
-        element.shadowRoot.querySelector('[data-id="tree-node-toggle"]').click();
         await flushPromises();
 
+        /** No toggle click on the root — it auto-expands (see the auto-expand test above). Clicking here would COLLAPSE it and leave no children to descend into. */
         const firstChildNode = element.shadowRoot.querySelector('c-oi-hierarchy-tree-node');
         firstChildNode.shadowRoot.querySelector('[data-id="tree-node-toggle"]').click();
         await flushPromises();

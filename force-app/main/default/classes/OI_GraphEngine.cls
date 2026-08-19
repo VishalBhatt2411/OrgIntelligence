@@ -52,6 +52,11 @@ public class OI_GraphEngine {
         return builder.ingest(mutations);
     }
 
+    /** Bulk 1-hop neighborhood of a whole key set (both directions, keys only) — delegates entirely to OI_GraphTraversal. Used by scan-delta cache invalidation, which must not degrade into per-key traversal; see that method's own doc comment for the limit arithmetic. */
+    public Set<String> getOneHopNeighborKeys(Set<String> nodeKeys) {
+        return traversal.getOneHopNeighborKeys(nodeKeys);
+    }
+
     /** Fetches a bounded graph fragment. Delegates entirely to OI_GraphTraversal (GraphEngine.md §12). */
     public OI_GraphFragment getGraphFragment(String nodeKey, Integer hopDepth, Map<String, String> knownChecksums) {
         return traversal.expand(nodeKey, hopDepth, knownChecksums);

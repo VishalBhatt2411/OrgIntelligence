@@ -55,7 +55,10 @@ public without sharing class OI_ScanRetireDetectionBatchable implements Database
             return;
         }
         try {
-            new OI_MutationGenerator().retireKeys(scope, scanRunId);
+            OI_MutationGenerator generator = new OI_MutationGenerator();
+            generator.retireKeys(scope, scanRunId);
+            /** DE-7: a retired node is a change like any other — anything whose cached impact result referenced it is now wrong, so it must be evicted rather than left to expire on TTL. */
+            OI_ScanOrchestratorQueueable.invalidateImpactCacheFor(generator.consumeIngestDelta());
         } catch (Exception e) {
             hadFailure = true;
             failure = e;

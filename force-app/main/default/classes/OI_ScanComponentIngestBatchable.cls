@@ -58,7 +58,10 @@ public without sharing class OI_ScanComponentIngestBatchable implements Database
         }
         try {
             OI_DiscoveryBatch chunkBatch = new OI_DiscoveryBatch(scanTaskId, metadataTypeApiName, scope, new List<OI_DiscoveredRelationship>(), false, 0);
-            observedNodeKeys.addAll(new OI_MutationGenerator().translateAndIngest(chunkBatch));
+            OI_MutationGenerator generator = new OI_MutationGenerator();
+            observedNodeKeys.addAll(generator.translateAndIngest(chunkBatch));
+            /** DE-7: evict impact results this chunk's genuinely-changed components made stale — never the unchanged majority a full rescan also observes. */
+            OI_ScanOrchestratorQueueable.invalidateImpactCacheFor(generator.consumeIngestDelta());
         } catch (Exception e) {
             hadFailure = true;
             failure = e;

@@ -5,6 +5,55 @@
  */
 @isTest
 private class OI_ApexClassScannerTest {
+    /**
+     * Comment/string stripping (2026-08-19). Asserted against stripNonCodeRegions directly with
+     * synthetic bodies, because the real scanner can only read Apex actually deployed to the
+     * org — a test cannot deploy a class containing a controlled phantom reference, so the unit
+     * boundary is where this behavior is genuinely testable.
+     */
+    @isTest
+    static void testStripsBlockCommentsLineCommentsAndStringLiteralsBeforeTokenizing() {
+        String body =
+            'public class A {\n' +
+            '    /** Dependencies: OI_ChecksumUtil, OI_ComponentKeyUtil */\n' +
+            '    // see OI_LoggerService for details\n' +
+            '    void go() { throw new OI_ValidationException(\'OI_SecurityService rejected it\'); }\n' +
+            '}';
+
+        String stripped = OI_ApexClassScanner.stripNonCodeRegions(body);
+
+        System.assert(!stripped.contains('OI_ChecksumUtil'), 'A class named only in a block comment must not survive stripping.');
+        System.assert(!stripped.contains('OI_ComponentKeyUtil'), 'A class named only in a block comment must not survive stripping.');
+        System.assert(!stripped.contains('OI_LoggerService'), 'A class named only in a line comment must not survive stripping.');
+        System.assert(!stripped.contains('OI_SecurityService'), 'A class named only inside a string literal must not survive stripping.');
+        System.assert(stripped.contains('OI_ValidationException'), 'A genuine reference in real code must survive stripping — this is the whole point of the edge data.');
+    }
+
+    /**
+     * The boundary case that makes the single-alternation pass correct rather than merely
+     * approximate, verified in BOTH directions: `//` inside a string must not start a comment,
+     * and an apostrophe inside a comment must not open a string. A naive two-pass implementation
+     * (strip comments, then strings, or the reverse) gets exactly one of these wrong and would
+     * then swallow real code as if it were a comment or literal.
+     */
+    @isTest
+    static void testDoesNotMisreadCommentMarkersInsideStringsOrApostrophesInsideComments() {
+        String urlInString = 'String u = \'http://example.com\'; OI_RealClass x;';
+        String stripped = OI_ApexClassScanner.stripNonCodeRegions(urlInString);
+        System.assert(stripped.contains('OI_RealClass'), 'A // inside a string literal must not be treated as a comment start, or all following real code would be discarded.');
+
+        String apostropheInComment = '// don\'t remove this\nOI_RealClass y;';
+        String strippedApostrophe = OI_ApexClassScanner.stripNonCodeRegions(apostropheInComment);
+        System.assert(strippedApostrophe.contains('OI_RealClass'), 'An apostrophe inside a comment must not open a string literal that swallows the following real code.');
+    }
+
+    /** Regions collapse to a space, never to nothing — otherwise two identifiers separated only by a comment would fuse into one token that matches no real class. */
+    @isTest
+    static void testReplacesStrippedRegionsWithASeparatorSoAdjacentIdentifiersNeverFuse() {
+        String stripped = OI_ApexClassScanner.stripNonCodeRegions('foo/*comment*/bar');
+        System.assert(!stripped.contains('foobar'), 'A stripped region must leave a separator behind; fusing identifiers would silently corrupt tokenizing.');
+    }
+
     @isTest
     static void testScanDiscoversAClassFromThisPackage() {
         OI_ApexClassScanner scanner = new OI_ApexClassScanner();

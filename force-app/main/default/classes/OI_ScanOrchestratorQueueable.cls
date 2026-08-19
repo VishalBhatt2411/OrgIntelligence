@@ -284,8 +284,40 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable {
     /** The single-hop-inline path: ingest, then attempt retire-detection's first page inline before deciding whether another hop is needed. */
     private void ingestSmallBatchThenAdvance(String metadataTypeApiName, Id scanTaskId, OI_DiscoveryBatch batch, List<String> remainingTypesAfterThis) {
         OI_DiscoveryBatch noAutoRetireBatch = new OI_DiscoveryBatch(batch.scanTaskId, batch.componentKind, batch.components, batch.relationships, false, batch.apiCallsConsumed);
-        Set<String> observed = new OI_MutationGenerator().translateAndIngest(noAutoRetireBatch);
+        OI_MutationGenerator generator = new OI_MutationGenerator();
+        Set<String> observed = generator.translateAndIngest(noAutoRetireBatch);
+        invalidateImpactCacheFor(generator.consumeIngestDelta());
         finalizeTypeAfterIngest(scanRunId, scanTaskId, metadataTypeApiName, observed, batch.isFullSnapshot, remainingTypesAfterThis);
+    }
+
+    /**
+     * DE-7: drops cached Impact Analysis results that this ingest just made stale.
+     *
+     * Called at each ingest site rather than threaded through to the shared completion tail,
+     * because the Batch Apex paths construct a fresh OI_MutationGenerator per execute() scope —
+     * an instance-accumulated delta cannot survive to finish(), and per-scope invalidation is
+     * both correct and idempotent anyway.
+     *
+     * Deliberately best-effort: a failure to evict cache rows must never fail the scan that
+     * produced the data. The cost of a swallowed failure here is a stale cached impact row that
+     * still expires on its own TTL; the cost of propagating would be a failed scan task and lost
+     * metadata. Logged rather than silently discarded, so the degradation is observable — this
+     * is the one place in this class where swallowing is the correct call, and it is narrow.
+     */
+    public static void invalidateImpactCacheFor(OI_IngestDelta delta) {
+        if (delta == null || delta.impactedNodeKeys.isEmpty()) {
+            return;
+        }
+        try {
+            new OI_DependencyEngineService().invalidateForScanDelta(delta.impactedNodeKeys);
+        } catch (Exception e) {
+            new OI_LoggerService().error(
+                'Impact Analysis cache invalidation failed for ' + delta.impactedNodeKeys.size() + ' changed node(s): ' + e.getMessage(),
+                'OI_ScanOrchestratorQueueable',
+                null,
+                e.getStackTraceString()
+            );
+        }
     }
 
     /**

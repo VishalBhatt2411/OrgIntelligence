@@ -54,7 +54,10 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
         }
         try {
             OI_DiscoveryBatch chunkBatch = new OI_DiscoveryBatch(scanTaskId, metadataTypeApiName, new List<OI_DiscoveredComponent>(), scope, false, 0);
-            new OI_MutationGenerator().translateAndIngest(chunkBatch);
+            OI_MutationGenerator generator = new OI_MutationGenerator();
+            generator.translateAndIngest(chunkBatch);
+            /** DE-7: this is the phase that matters most for Impact Analysis staleness — an edge change alters impact answers for nodes whose own content never changed (OI_IngestDelta explains the case). */
+            OI_ScanOrchestratorQueueable.invalidateImpactCacheFor(generator.consumeIngestDelta());
         } catch (Exception e) {
             hadFailure = true;
             failure = e;

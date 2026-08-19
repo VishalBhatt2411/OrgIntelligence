@@ -187,6 +187,36 @@ public class OI_GraphTraversal {
         return new OI_GraphFragment(nodeKey, nodes, edges, new List<String>(revealedKeySet), truncated, null);
     }
 
+    /**
+     * Every node within one hop of ANY key in nodeKeys, either direction, as a single bulk
+     * pair of reads — the input set itself is included in the result.
+     *
+     * Exists specifically for scan-delta cache invalidation (DE-7), which needs the 1-hop
+     * neighborhood of a whole changed-key SET at once. The obvious alternative — calling a
+     * single-node traversal once per changed key — costs 2 SOQL queries PER KEY and blows the
+     * per-transaction query limit well before a normal scan chunk's worth of changes (60 keys
+     * would issue 120 queries against a ceiling of 100). This costs exactly 2 queries no matter
+     * how many keys are passed, which is the same bulk discipline collectRing already uses for
+     * an ordinary BFS ring.
+     *
+     * Deliberately returns only KEYS, not hydrated nodes: the caller evicts cache rows by key
+     * and never needs node content, so fetching it would be pure waste.
+     */
+    public Set<String> getOneHopNeighborKeys(Set<String> nodeKeys) {
+        Set<String> neighborKeys = new Set<String>();
+        if (nodeKeys == null || nodeKeys.isEmpty()) {
+            return neighborKeys;
+        }
+        neighborKeys.addAll(nodeKeys);
+        for (OI_Graph_Edge__c edge : edgeSelector.selectCurrentBySourceKeys(nodeKeys)) {
+            neighborKeys.add(edge.Target_Node_Key__c);
+        }
+        for (OI_Graph_Edge__c edge : edgeSelector.selectCurrentByTargetKeys(nodeKeys)) {
+            neighborKeys.add(edge.Source_Node_Key__c);
+        }
+        return neighborKeys;
+    }
+
     /** One BFS ring: every edge touching currentRing, bulk-selected both directions. */
     private void collectRing(Set<String> currentRing, Map<String, OI_Graph_Edge__c> edgesByKey, Set<String> revealedKeys, Set<String> visited, Set<String> nextRing) {
         for (OI_Graph_Edge__c edge : edgeSelector.selectCurrentBySourceKeys(currentRing)) {
