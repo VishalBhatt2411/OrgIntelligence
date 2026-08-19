@@ -148,9 +148,9 @@
                     <div class="oi-node-detail-panel-section" data-id="structural-connections">
                         <h3 class="oi-node-detail-panel-section-title">Structural Connections</h3>
                         <p class="oi-node-detail-panel-section-note">
-                            {directConnectionCount} directly connected metadata component(s) — structural relationships only
-                            (Has Field / Lookup / Master-Detail). Apex, Flow, and Trigger dependency detection is not yet
-                            available.
+                            {directConnectionCount} directly connected metadata component(s) — schema relationships only
+                            (Has Field / Lookup / Master-Detail). Automation, code, and security dependencies are shown in
+                            their own sections below.
                         </p>
                         <table class="oi-node-detail-panel-table">
                             <tbody>
@@ -163,6 +163,37 @@
                             </tbody>
                         </table>
                     </div>
+                </template>
+
+                <template lwc:if={hasIntelligenceError}>
+                    <p class="oi-node-detail-panel-error" data-id="intelligence-error" role="alert">{intelligenceErrorMessage}</p>
+                </template>
+                <template lwc:if={hasIntelligenceSections}>
+                    <template for:each={intelligenceSections} for:item="section">
+                        <div key={section.key} class="oi-node-detail-panel-section" data-id="intelligence-section" data-category={section.key}>
+                            <h3 class="oi-node-detail-panel-section-title">{section.title} ({section.countLabel})</h3>
+                            <template lwc:if={section.hasItems}>
+                                <table class="oi-node-detail-panel-table oi-node-detail-panel-fields-table">
+                                    <tbody>
+                                        <template for:each={section.items} for:item="item">
+                                            <tr key={item.nodeKey} class="oi-node-detail-panel-field-row" data-id="intelligence-row" data-node-key={item.nodeKey} onclick={handleIntelligenceRowClick}>
+                                                <td>{item.label}</td>
+                                                <td>{item.typeLabel}</td>
+                                                <td>{item.directionLabel}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                                <template lwc:if={section.truncated}>
+                                    <p class="oi-node-detail-panel-section-note" data-id="intelligence-truncated">Showing the first results only — more exist than are listed here.</p>
+                                </template>
+                            </template>
+                            <template lwc:else>
+                                <p class="oi-node-detail-panel-section-note" data-id="intelligence-empty">Nothing found in the scanned data.</p>
+                            </template>
+                            <p class="oi-node-detail-panel-section-note" data-id="intelligence-coverage">{section.coverageNote}</p>
+                        </div>
+                    </template>
                 </template>
 
                 <div class="oi-node-detail-panel-section" data-id="impact-analysis-section">
@@ -257,19 +288,37 @@
                 </template>
 
                 <template lwc:if={hasOtherAttributes}>
-                    <div class="oi-node-detail-panel-section" data-id="other-attributes">
-                        <h3 class="oi-node-detail-panel-section-title">Other Attributes</h3>
-                        <table class="oi-node-detail-panel-table">
-                            <tbody>
-                                <template for:each={attributeRows} for:item="row">
-                                    <tr key={row.key}>
-                                        <th scope="row">{row.key}</th>
-                                        <td>{row.value}</td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
+                    <div class="oi-node-detail-panel-section" data-id="technical-details">
+                        <h3 class="oi-node-detail-panel-section-title">Technical Details</h3>
+                        <button
+                            type="button"
+                            class="oi-node-detail-panel-show-fields-button"
+                            data-id="technical-details-toggle"
+                            aria-expanded={technicalDetailsVisible}
+                            onclick={handleToggleTechnicalDetails}
+                        >{technicalDetailsToggleLabel}</button>
+                        <template lwc:if={technicalDetailsVisible}>
+                            <table class="oi-node-detail-panel-table" data-id="technical-details-table">
+                                <tbody>
+                                    <template for:each={attributeRows} for:item="row">
+                                        <tr key={row.key}>
+                                            <th scope="row">{row.key}</th>
+                                            <td>{row.value}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
                     </div>
+                </template>
+
+                <template lwc:if={hasScanFreshness}>
+                    <p class="oi-node-detail-panel-freshness" data-id="scan-freshness">
+                        {scanFreshnessLabel}
+                        <template lwc:if={hasCoverageLimitations}>
+                            <span class="oi-node-detail-panel-freshness-warning" data-id="coverage-limitations"> · Some dependency types were not fully scanned</span>
+                        </template>
+                    </p>
                 </template>
             </div>
         </template>

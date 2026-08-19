@@ -83,7 +83,30 @@ public inherited sharing class OI_ApexClassScanner implements OI_IMetadataScanne
             }
         }
 
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1);
+        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1, buildCoverage(bodyAccessible, relationships.size()));
+    }
+
+    /**
+     * DEGRADED when Body was unreadable — the one case where this Scanner should have produced
+     * references and could not, and the exact silent failure that let a real org report 122
+     * scanned classes with zero dependency edges and no warning anywhere (see OI_ScanCoverage).
+     * Otherwise PARTIAL, never COMPLETE: even with full Body access this remains a bare-
+     * identifier heuristic that cannot see dynamic Apex or interface indirection, so claiming
+     * COMPLETE would overstate what the data supports.
+     */
+    private OI_ScanCoverage buildCoverage(Boolean bodyAccessible, Integer relationshipsDiscovered) {
+        if (bodyAccessible != true) {
+            return OI_ScanCoverage.degraded(
+                relationshipsDiscovered,
+                'Apex source (ApexClass.Body) was not readable by the scanning user, so no class-to-class references could be extracted. ' +
+                'Grant the "Author Apex" system permission to the user running scans, then rescan.'
+            );
+        }
+        return OI_ScanCoverage.partial(
+            relationshipsDiscovered,
+            'Class-to-class references are matched by name against Apex source. Dynamic Apex (Type.forName), ' +
+            'interface indirection, and namespaced names that collide with local class names are not detected.'
+        );
     }
 
     /**

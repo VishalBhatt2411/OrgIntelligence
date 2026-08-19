@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Coverage_Detail__c</fullName>
+    <description>Plain-language explanation of why this task's dependency extraction was Partial or Degraded, written for an administrator rather than a developer. Blank when coverage is Complete, since there is nothing to explain.</description>
+    <externalId>false</externalId>
+    <label>Coverage Detail</label>
+    <length>1000</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>4</visibleLines>
+</CustomField>

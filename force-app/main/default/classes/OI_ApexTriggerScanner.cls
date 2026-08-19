@@ -100,7 +100,30 @@ public inherited sharing class OI_ApexTriggerScanner implements OI_IMetadataScan
             }
         }
 
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1);
+        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1, buildCoverage(bodyAccessible, relationships.size()));
+    }
+
+    /**
+     * DEGRADED only when trigger source was unreadable, which costs the class-reference half of
+     * this Scanner's output. The EXECUTES_ON half never degrades — it comes from declared
+     * configuration, not source parsing — so a body failure is a genuine partial loss rather
+     * than a total one, and the reason says so.
+     */
+    private OI_ScanCoverage buildCoverage(Boolean bodyAccessible, Integer relationshipsDiscovered) {
+        if (bodyAccessible != true) {
+            return OI_ScanCoverage.degraded(
+                relationshipsDiscovered,
+                'Trigger source (ApexTrigger.Body) was not readable by the scanning user, so trigger-to-class references ' +
+                'could not be extracted. The object each trigger fires on is still detected exactly. ' +
+                'Grant the "Author Apex" system permission to the user running scans, then rescan.'
+            );
+        }
+        return OI_ScanCoverage.partial(
+            relationshipsDiscovered,
+            'The object each trigger fires on is detected exactly. Trigger-to-class references are matched by name ' +
+            'against trigger source and will not detect dynamic Apex or interface indirection. Triggers on Platform Events ' +
+            'and other object types this platform does not model produce no object relationship, by design.'
+        );
     }
 
     /**

@@ -64,6 +64,26 @@ public with sharing class OI_GraphController {
     }
 
     /**
+     * The Intelligence panel's Automation / Code / Security sections for one node, plus scan
+     * freshness (OI_NodeIntelligenceService owns all derivation; this is a thin gated boundary).
+     *
+     * Deliberately NOT cacheable, unlike getNodeDetail above: this payload's whole purpose is to
+     * report the current state of scanned intelligence INCLUDING when it was last scanned, and a
+     * platform-cached response would let the panel confidently display a stale "last scanned"
+     * timestamp immediately after a fresh scan — precisely the trust failure this sprint exists
+     * to remove.
+     */
+    @AuraEnabled
+    public static OI_NodeIntelligenceDTO getNodeIntelligence(String nodeKey) {
+        try {
+            OI_SecurityService.assertPermission('OI_View_Graph');
+            return new OI_NodeIntelligenceService().getIntelligence(nodeKey);
+        } catch (Exception e) {
+            throw translate(e);
+        }
+    }
+
+    /**
      * Bulk field metadata for one object's own fields (never another object's fields that
      * merely reference it) — backs oiNodeDetailPanel's field browser (Show All/Custom/
      * Standard, field type). One query for the membership edges, one bulk query for the

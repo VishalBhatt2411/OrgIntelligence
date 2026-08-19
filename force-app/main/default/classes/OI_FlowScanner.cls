@@ -70,7 +70,22 @@ public inherited sharing class OI_FlowScanner implements OI_IMetadataScanner {
             }
         }
 
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1);
+        return new OI_DiscoveryBatch(
+            context.scanTaskId,
+            COMPONENT_KIND,
+            components,
+            relationships,
+            true,
+            1,
+            /** PARTIAL by design, not DEGRADED: the trigger-object edge this Scanner does emit is exact, and the internals it cannot see are a permanent boundary of FlowDefinitionView rather than a failure a retry or a permission change would fix. Stating that distinction matters — an admin should not go hunting for a misconfiguration that does not exist. */
+            OI_ScanCoverage.partial(
+                relationships.size(),
+                'Only the object a record-triggered Flow fires on is detected. What a Flow reads or updates internally — ' +
+                'its field references, Apex invocations, and subflow calls — requires the Flow metadata definition, which is not ' +
+                'reachable without Tooling API access. Screen, scheduled, and autolaunched Flows have no trigger object and ' +
+                'correctly produce no relationship.'
+            )
+        );
     }
 
     private OI_DiscoveredComponent toComponent(FlowDefinitionView flow) {

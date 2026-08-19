@@ -93,6 +93,27 @@
  * scrolls — a result spanning many metadata types should grow downward in a narrow side panel,
  * not hide its own tail behind a horizontal scroll the user has no reason to expect here.
  */
+/**
+ * Scan provenance, pinned as the panel's closing line. Styled as quiet metadata rather than a
+ * banner: it must be findable whenever a user questions a number, without competing with the
+ * intelligence it qualifies. Top border separates it from content as a footer rather than
+ * another section.
+ */
+.oi-node-detail-panel-freshness {
+    margin: 0.75rem 0 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/** A known-incomplete scan is a real caveat on every number above it, so it gets warning colour — but stays inline, since it qualifies the freshness line rather than being an error in its own right. */
+.oi-node-detail-panel-freshness-warning {
+    color: var(--slds-g-color-warning-base-40, #a86403);
+    font-weight: 600;
+}
+
 .oi-node-detail-panel-impact-breakdown {
     display: flex;
     flex-wrap: wrap;

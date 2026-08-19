@@ -4,11 +4,13 @@ import getNodeDetail from '@salesforce/apex/OI_GraphController.getNodeDetail';
 import getFieldSummaries from '@salesforce/apex/OI_GraphController.getFieldSummaries';
 import getRecordFragment from '@salesforce/apex/OI_RecordHierarchyController.getRecordFragment';
 import getImpact from '@salesforce/apex/OI_DependencyController.getImpact';
+import getNodeIntelligence from '@salesforce/apex/OI_GraphController.getNodeIntelligence';
 
 jest.mock('@salesforce/apex/OI_GraphController.getNodeDetail', () => ({ default: jest.fn() }), { virtual: true });
 jest.mock('@salesforce/apex/OI_GraphController.getFieldSummaries', () => ({ default: jest.fn() }), { virtual: true });
 jest.mock('@salesforce/apex/OI_RecordHierarchyController.getRecordFragment', () => ({ default: jest.fn() }), { virtual: true });
 jest.mock('@salesforce/apex/OI_DependencyController.getImpact', () => ({ default: jest.fn() }), { virtual: true });
+jest.mock('@salesforce/apex/OI_GraphController.getNodeIntelligence', () => ({ default: jest.fn() }), { virtual: true });
 
 function flushPromises() {
     return new Promise((resolve) => setTimeout(resolve, 0));
@@ -29,6 +31,16 @@ function objectDetail(overrides) {
 }
 
 describe('c-oi-node-detail-panel', () => {
+    beforeEach(() => {
+        /** Intelligence loads automatically on selection, so every test needs it stubbed or the panel logs an unhandled rejection. Defaults to an empty-but-valid payload; tests that assert on sections override it. */
+        getNodeIntelligence.mockResolvedValue({
+            nodeKey: 'n1',
+            categories: [],
+            lastScannedAt: null,
+            hasCoverageLimitations: false
+        });
+    });
+
     afterEach(() => {
         while (document.body.firstChild) {
             document.body.removeChild(document.body.firstChild);
@@ -37,6 +49,203 @@ describe('c-oi-node-detail-panel', () => {
         getFieldSummaries.mockReset();
         getRecordFragment.mockReset();
         getImpact.mockReset();
+        getNodeIntelligence.mockReset();
+    });
+
+    describe('Intelligence sections (Automation / Code / Security) and scan provenance', () => {
+        function intelligence(overrides) {
+            return {
+                nodeKey: 'account',
+                categories: [
+                    {
+                        category: 'Automation',
+                        items: [{ nodeKey: 'trg1', label: 'AccountTrigger', typeKey: 'SalesforceMetadata.ApexTrigger', typeLabel: 'Apex Trigger', direction: 'incoming' }],
+                        truncated: false,
+                        coverageNote: 'Detected: the object each Apex trigger fires on.'
+                    },
+                    {
+                        category: 'Code',
+                        items: [],
+                        truncated: false,
+                        coverageNote: 'Detected: Apex references matched by name. Not detected: dynamic Apex.'
+                    },
+                    {
+                        category: 'Security',
+                        items: [{ nodeKey: 'ps1', label: 'Sales_Access', typeKey: 'SalesforceMetadata.PermissionSet', typeLabel: 'Permission Set', direction: 'incoming' }],
+                        truncated: false,
+                        coverageNote: 'Detected: object-level grants. Not detected: field-level grants.'
+                    }
+                ],
+                lastScannedAt: '2026-08-19T12:22:11.000Z',
+                hasCoverageLimitations: false,
+                ...overrides
+            };
+        }
+
+        it('renders Automation, Code and Security sections with real named components and their direction', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const sections = element.shadowRoot.querySelectorAll('[data-id="intelligence-section"]');
+            expect(sections).toHaveLength(3);
+            expect(sections[0].textContent).toContain('Automation');
+            expect(sections[0].textContent).toContain('AccountTrigger');
+            expect(sections[0].textContent).toContain('Apex Trigger');
+            /** 'incoming' is internal vocabulary; the user must see what it MEANS. */
+            expect(sections[0].textContent).toContain('uses this');
+            expect(sections[2].textContent).toContain('Sales_Access');
+        });
+
+        /** An empty section must still render, with its coverage note — otherwise a user cannot tell "no triggers exist" from "triggers are not detected". */
+        it('renders an empty section with an honest empty state and its coverage note', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
+            expect(codeSection).not.toBeNull();
+            expect(codeSection.querySelector('[data-id="intelligence-empty"]').textContent).toContain('Nothing found in the scanned data');
+            expect(codeSection.querySelector('[data-id="intelligence-coverage"]').textContent).toContain('Not detected: dynamic Apex');
+        });
+
+        it('never exposes a raw SalesforceMetadata.* typeKey as a user-facing label', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const sectionText = [...element.shadowRoot.querySelectorAll('[data-id="intelligence-section"]')].map((s) => s.textContent).join(' ');
+            expect(sectionText).not.toContain('SalesforceMetadata.');
+        });
+
+        it('shows when the intelligence was last scanned, since every number here comes from the persisted scan graph', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const freshness = element.shadowRoot.querySelector('[data-id="scan-freshness"]');
+            expect(freshness).not.toBeNull();
+            expect(freshness.textContent).toContain('last scanned');
+            expect(element.shadowRoot.querySelector('[data-id="coverage-limitations"]')).toBeNull();
+        });
+
+        /** Never-scanned must be stated explicitly — omitting the line would read as freshness. */
+        it('states explicitly when the org has never been scanned rather than implying fresh data', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence({ lastScannedAt: null }));
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('[data-id="scan-freshness"]').textContent).toContain('Never scanned');
+        });
+
+        it('warns when the last scan left dependency coverage incomplete', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence({ hasCoverageLimitations: true }));
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('[data-id="coverage-limitations"]').textContent).toContain('not fully scanned');
+        });
+
+        it('surfaces a truncation notice rather than silently showing a partial list', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            const payload = intelligence();
+            payload.categories[0].truncated = true;
+            getNodeIntelligence.mockResolvedValue(payload);
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('[data-id="intelligence-truncated"]')).not.toBeNull();
+        });
+
+        it('selecting a related component dispatches select so the user can navigate to it', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+            const handler = jest.fn();
+            element.addEventListener('select', handler);
+
+            element.shadowRoot.querySelector('[data-id="intelligence-row"]').click();
+
+            expect(handler).toHaveBeenCalledTimes(1);
+            expect(handler.mock.calls[0][0].detail.nodeKey).toBe('trg1');
+        });
+
+        it('renders a sanitized error when intelligence fails, without breaking the rest of the panel', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockRejectedValue({ body: { message: 'You do not have permission to view org graph data.' } });
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('[data-id="intelligence-error"]').textContent).toContain('permission');
+            /** The rest of the panel must survive an intelligence failure — a failed section is not a failed panel. */
+            expect(element.shadowRoot.querySelector('[data-id="detail-content"]')).not.toBeNull();
+        });
+    });
+
+    describe('Technical Details (raw attributes moved out of the default experience)', () => {
+        /** The exact raw keys that used to be dumped at users unprompted — the concrete thing this change moves out of the default view. */
+        function detailWithRawAttributes() {
+            return objectDetail({
+                attributes: { custom: false, keyPrefix: '001', queryable: true, feedEnabled: false }
+            });
+        }
+
+        it('collapses raw technical attributes by default so they no longer dominate the panel', async () => {
+            getNodeDetail.mockResolvedValue(detailWithRawAttributes());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('[data-id="technical-details"]')).not.toBeNull();
+            expect(element.shadowRoot.querySelector('[data-id="technical-details-table"]')).toBeNull();
+            expect(element.shadowRoot.querySelector('[data-id="technical-details-toggle"]').textContent).toContain('Show technical details');
+            /** The raw keys must not be visible anywhere in the panel until asked for. */
+            expect(element.shadowRoot.textContent).not.toContain('keyPrefix');
+        });
+
+        /** The data must still be reachable — this was a presentation fix, never a deletion. */
+        it('reveals the raw attributes on demand without losing any of them', async () => {
+            getNodeDetail.mockResolvedValue(detailWithRawAttributes());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            element.shadowRoot.querySelector('[data-id="technical-details-toggle"]').click();
+            await flushPromises();
+
+            const table = element.shadowRoot.querySelector('[data-id="technical-details-table"]');
+            expect(table).not.toBeNull();
+            expect(table.textContent).toContain('keyPrefix');
+            expect(table.textContent).toContain('queryable');
+            expect(element.shadowRoot.querySelector('[data-id="technical-details-toggle"]').textContent).toContain('Hide technical details');
+        });
     });
 
     it('shows the placeholder state when no node is selected', () => {
@@ -155,7 +364,7 @@ describe('c-oi-node-detail-panel', () => {
         expect(errorEl.textContent).toContain('No record found');
     });
 
-    it('renders curated Object fields — Namespace, Custom/Standard — and the honest structural-connections summary, never claiming Apex/Flow/Trigger impact (G6/G7)', async () => {
+    it('renders curated Object fields — Namespace, Custom/Standard — and keeps the structural-connections summary scoped to schema relationships only (G6/G7)', async () => {
         getNodeDetail.mockResolvedValue({
             nodeKey: 'acct',
             typeKey: 'SalesforceMetadata.CustomObject',
@@ -190,12 +399,28 @@ describe('c-oi-node-detail-panel', () => {
         expect(structural.textContent).toContain('Has Field');
         expect(structural.textContent).toContain('Lookup To');
         expect(structural.textContent).not.toContain('Impact Analysis');
-        expect(structural.textContent).toContain('Apex');
-        expect(structural.textContent).toContain('not yet available');
+        /**
+         * The original intent of this assertion — the structural section must not overclaim what
+         * it covers — still holds, but its wording had to change: automation, code and security
+         * dependencies ARE now detected and shown in their own sections, so the old "not yet
+         * available" copy became false. What must remain true is that THIS section stays scoped
+         * to schema relationships and points elsewhere for the rest, rather than implying it
+         * covers everything.
+         */
+        expect(structural.textContent).toContain('schema relationships only');
+        expect(structural.textContent).not.toContain('not yet available');
 
-        const otherAttributes = element.shadowRoot.querySelector('[data-id="other-attributes"]');
-        expect(otherAttributes.textContent).toContain('pluralLabel');
-        expect(otherAttributes.textContent).not.toContain('custom');
+        /** Raw attributes now live behind Technical Details, collapsed by default — the data is preserved, only its prominence changed. */
+        const technicalDetails = element.shadowRoot.querySelector('[data-id="technical-details"]');
+        expect(technicalDetails).not.toBeNull();
+        expect(element.shadowRoot.querySelector('[data-id="technical-details-table"]')).toBeNull();
+
+        element.shadowRoot.querySelector('[data-id="technical-details-toggle"]').click();
+        await flushPromises();
+
+        const revealed = element.shadowRoot.querySelector('[data-id="technical-details-table"]');
+        expect(revealed.textContent).toContain('pluralLabel');
+        expect(revealed.textContent).not.toContain('custom');
     });
 
     it('renders curated Field fields — Data Type, Parent Object, Relationship Type derived from real outgoing edges — never guessed from attributes (G6)', async () => {

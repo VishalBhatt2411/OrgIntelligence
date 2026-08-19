@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Intelligence_Category__c</fullName>
+    <description>Which section of the Intelligence panel a neighbour of this node type belongs under: Structure, Automation, Code, Security, or Data. Registry-driven rather than hardcoded in Apex or LWC, so introducing a new metadata type places it in the right section with no code change (ADR-0011). Left blank means the type is only summarised generically and never gets its own section.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Structure, Automation, Code, Security, or Data. Controls which Intelligence panel section this node type appears under.</inlineHelpText>
+    <label>Intelligence Category</label>
+    <length>40</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

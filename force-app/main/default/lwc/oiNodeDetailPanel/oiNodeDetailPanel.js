@@ -54,6 +54,7 @@ import getNodeDetail from '@salesforce/apex/OI_GraphController.getNodeDetail';
 import getFieldSummaries from '@salesforce/apex/OI_GraphController.getFieldSummaries';
 import getRecordFragment from '@salesforce/apex/OI_RecordHierarchyController.getRecordFragment';
 import getImpact from '@salesforce/apex/OI_DependencyController.getImpact';
+import getNodeIntelligence from '@salesforce/apex/OI_GraphController.getNodeIntelligence';
 import { resolveNodeStyle, resolveEdgeStyle } from 'c/presentationRegistry';
 import { parseRecordNodeKey } from 'c/recordNodeKey';
 
@@ -84,6 +85,11 @@ export default class OiNodeDetailPanel extends LightningElement {
     impactDirection = null;
     isLoadingImpact = false;
     impactErrorMessage = null;
+    intelligence = null;
+    isLoadingIntelligence = false;
+    intelligenceErrorMessage = null;
+    technicalDetailsVisible = false;
+    intelligenceRequestId = 0;
     _nodeKey;
     detailRequestId = 0;
     fieldRequestId = 0;
@@ -98,7 +104,123 @@ export default class OiNodeDetailPanel extends LightningElement {
         this._nodeKey = value;
         this.resetFieldBrowser();
         this.resetImpactAnalysis();
+        this.resetIntelligence();
         this.loadDetail();
+        /**
+         * Loaded automatically on selection, unlike Impact Analysis which stays an explicit
+         * action. The difference is cost and intent: this is a bounded 1-hop read answering
+         * "what directly touches this?", which is the question a user has simply by selecting
+         * something — making them click for it is what made the old panel feel like a debug
+         * view. Impact Analysis is a multi-hop traversal answering a deliberate question, so it
+         * stays opt-in.
+         */
+        this.loadIntelligence();
+    }
+
+    resetIntelligence() {
+        this.intelligenceRequestId++;
+        this.intelligence = null;
+        this.isLoadingIntelligence = false;
+        this.intelligenceErrorMessage = null;
+        this.technicalDetailsVisible = false;
+    }
+
+    async loadIntelligence() {
+        const requestId = ++this.intelligenceRequestId;
+        if (!this._nodeKey) {
+            return;
+        }
+        this.isLoadingIntelligence = true;
+        this.intelligenceErrorMessage = null;
+        try {
+            const result = await getNodeIntelligence({ nodeKey: this._nodeKey });
+            /** Same stale-response guard the other loaders use — a slower earlier request must never overwrite a newer selection's data. */
+            if (requestId !== this.intelligenceRequestId) {
+                return;
+            }
+            this.intelligence = result;
+        } catch (error) {
+            if (requestId !== this.intelligenceRequestId) {
+                return;
+            }
+            this.intelligence = null;
+            this.intelligenceErrorMessage = (error && error.body && error.body.message) || 'Something went wrong loading intelligence for this component.';
+        } finally {
+            if (requestId === this.intelligenceRequestId) {
+                this.isLoadingIntelligence = false;
+            }
+        }
+    }
+
+    /**
+     * The Automation / Code / Security sections, each always rendered once intelligence has
+     * loaded — including when empty. An empty section that states its own coverage is
+     * informative ("no triggers found, and here is what we can detect"); omitting it entirely
+     * leaves the user unable to tell "nothing found" from "not looked for", which is the exact
+     * ambiguity this sprint exists to remove.
+     */
+    get intelligenceSections() {
+        if (!this.intelligence || !this.intelligence.categories) {
+            return [];
+        }
+        return this.intelligence.categories.map((category) => ({
+            key: category.category,
+            title: category.category,
+            items: (category.items || []).map((item) => ({
+                ...item,
+                directionLabel: item.direction === 'incoming' ? 'uses this' : 'used by this'
+            })),
+            hasItems: (category.items || []).length > 0,
+            countLabel: `${(category.items || []).length}`,
+            truncated: !!category.truncated,
+            coverageNote: category.coverageNote
+        }));
+    }
+
+    get hasIntelligenceSections() {
+        return this.intelligenceSections.length > 0;
+    }
+
+    get hasIntelligenceError() {
+        return !!this.intelligenceErrorMessage;
+    }
+
+    /**
+     * "Last scanned" provenance. Every number in this panel comes from the persisted scan graph,
+     * never a live org read, so stating when it was scanned is what separates trustworthy
+     * intelligence from a confident-looking guess. Renders an explicit never-scanned state
+     * rather than silently omitting the line, which would read as freshness.
+     */
+    get scanFreshnessLabel() {
+        if (!this.intelligence) {
+            return null;
+        }
+        if (!this.intelligence.lastScannedAt) {
+            return 'Never scanned — run a scan to build metadata intelligence.';
+        }
+        const scannedAt = new Date(this.intelligence.lastScannedAt);
+        return `Metadata intelligence last scanned ${scannedAt.toLocaleString()}`;
+    }
+
+    get hasScanFreshness() {
+        return !!this.scanFreshnessLabel;
+    }
+
+    get hasCoverageLimitations() {
+        return !!(this.intelligence && this.intelligence.hasCoverageLimitations);
+    }
+
+    get technicalDetailsToggleLabel() {
+        return this.technicalDetailsVisible ? 'Hide technical details' : 'Show technical details';
+    }
+
+    handleToggleTechnicalDetails() {
+        this.technicalDetailsVisible = !this.technicalDetailsVisible;
+    }
+
+    handleIntelligenceRowClick(event) {
+        const nodeKey = event.currentTarget.dataset.nodeKey;
+        this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey } }));
     }
 
     /** A fresh node selection is a fresh Impact Analysis section too — a previous selection's forward/reverse result must never bleed into the newly-selected node's panel. */
