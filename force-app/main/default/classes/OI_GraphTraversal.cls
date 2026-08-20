@@ -110,7 +110,9 @@ public class OI_GraphTraversal {
         List<OI_EdgeSummary> edges = new List<OI_EdgeSummary>();
         for (OI_Graph_Edge__c edge : edgesByKey.values()) {
             if (visibleKeys.contains(edge.Source_Node_Key__c) && visibleKeys.contains(edge.Target_Node_Key__c)) {
-                edges.add(new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c));
+                edges.add(
+                    new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c, extractViaFieldApiName(edge))
+                );
             }
         }
 
@@ -178,13 +180,36 @@ public class OI_GraphTraversal {
         List<OI_EdgeSummary> edges = new List<OI_EdgeSummary>();
         for (OI_Graph_Edge__c edge : edgesByKey.values()) {
             if (versions.containsKey(edge.Source_Node_Key__c) && versions.containsKey(edge.Target_Node_Key__c)) {
-                edges.add(new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c));
+                edges.add(
+                    new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c, extractViaFieldApiName(edge))
+                );
             }
         }
 
         Set<String> revealedKeySet = new Set<String>(visited);
         revealedKeySet.remove(nodeKey);
         return new OI_GraphFragment(nodeKey, nodes, edges, new List<String>(revealedKeySet), truncated, null);
+    }
+
+    /**
+     * The relationship field an edge travels through, e.g. "AccountId" for a lookup — read from
+     * the edge's own stored attributes (`relationshipName`, set by OI_FieldScanner) rather than
+     * derived or guessed. Null for every edge kind that carries no such attribute (HAS_FIELD,
+     * REFERENCES, EXECUTES_ON, GRANTS_ACCESS_TO) — the graph explorer's "why is this here?" chip
+     * must never invent a field name that was not actually scanned.
+     */
+    private String extractViaFieldApiName(OI_Graph_Edge__c edge) {
+        if (String.isBlank(edge.Attributes_Json__c)) {
+            return null;
+        }
+        try {
+            Map<String, Object> attributes = (Map<String, Object>) JSON.deserializeUntyped(edge.Attributes_Json__c);
+            Object relationshipName = attributes.get('relationshipName');
+            return relationshipName == null ? null : String.valueOf(relationshipName);
+        } catch (Exception malformedAttributes) {
+            /** Malformed stored attributes must never break graph traversal — the edge still renders, just without its optional "via field" context. */
+            return null;
+        }
     }
 
     /**

@@ -41,9 +41,37 @@ export default class OiSchemaObjectCard extends LightningElement {
     @api isExpanded = false;
     @api hasMoreNeighbors = false;
     @api fields = [];
+    /** Why this object is on screen — mirrors oiGraphNode's relationship chip (e.g. "References Account via AccountId"). See that component for the full rationale. */
+    @api relationshipRole;
+    @api relationshipContext;
+    @api relationshipVia;
+    @api hopDistance;
+    @api isOnActivePath = false;
+    @api isDimmed = false;
+
+    get relationshipChipText() {
+        if (!this.relationshipRole) {
+            return null;
+        }
+        const context = this.relationshipContext ? ` ${this.relationshipContext}` : '';
+        const via = this.relationshipVia ? ` via ${this.relationshipVia}` : '';
+        return `${this.relationshipRole}${context}${via}`;
+    }
+
+    get hasRelationshipChip() {
+        return !!this.relationshipChipText;
+    }
+
+    get hopLabel() {
+        return this.hopDistance > 1 ? `${this.hopDistance} relationships away` : null;
+    }
+
+    get hasHopLabel() {
+        return !!this.hopLabel;
+    }
 
     get cardClass() {
-        return 'oi-schema-card' + (this.isSelected ? ' is-selected' : '');
+        return 'oi-schema-card' + (this.isSelected ? ' is-selected' : '') + (this.isOnActivePath ? ' is-on-path' : '') + (this.isDimmed ? ' is-dimmed' : '');
     }
 
     get resolvedColor() {
@@ -75,7 +103,9 @@ export default class OiSchemaObjectCard extends LightningElement {
     get ariaLabel() {
         const expandState = this.isExpanded ? 'expanded' : 'collapsed';
         const more = this.hasMoreNeighbors ? ', more relationships available' : '';
-        return `${this.label}, Object, ${this.totalFieldCount} fields, ${expandState}${more}`;
+        const relationship = this.relationshipChipText ? `, ${this.relationshipChipText}` : '';
+        const hops = this.hopLabel ? `, ${this.hopLabel}` : '';
+        return `${this.label}, Object, ${this.totalFieldCount} fields${relationship}${hops}, ${expandState}${more}`;
     }
 
     handleHeaderClick() {

@@ -14,4 +14,16 @@
         <field>Line_Style__c</field>
         <value xsi:type="xsd:string">dashed</value>
     </values>
+    <values>
+        <field>Source_Role_Label__c</field>
+        <value xsi:type="xsd:string">Grants Access To</value>
+    </values>
+    <values>
+        <field>Target_Role_Label__c</field>
+        <value xsi:type="xsd:string">Access Granted</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value xsi:type="xsd:string">A permission set that grants access to this component.</value>
+    </values>
 </CustomMetadata>

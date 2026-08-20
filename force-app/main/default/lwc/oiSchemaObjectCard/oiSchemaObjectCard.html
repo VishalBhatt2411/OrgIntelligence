@@ -16,6 +16,12 @@
         </div>
         <div class="oi-schema-card-subheader" title={secondaryKey}>{secondaryKey}</div>
         <div class="oi-schema-card-field-count" data-id="field-count">{fieldCountLabel}</div>
+        <template lwc:if={hasRelationshipChip}>
+            <div class="oi-schema-card-relationship-chip" data-id="card-relationship-chip">{relationshipChipText}</div>
+        </template>
+        <template lwc:if={hasHopLabel}>
+            <div class="oi-schema-card-hop-label" data-id="card-hop-label">{hopLabel}</div>
+        </template>
         <div class="oi-schema-card-tooltip" data-id="card-tooltip">{tooltipText}</div>
     </div>
 </template>

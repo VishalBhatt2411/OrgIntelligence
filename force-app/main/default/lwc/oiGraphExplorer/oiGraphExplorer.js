@@ -109,10 +109,27 @@ export default class OiGraphExplorer extends LightningElement {
     }
 
     /** Every currently-loaded edge, styled — the filter panel's checkbox list is built from this unfiltered set so a hidden type's own checkbox never disappears (a filter that hides its own control could never be turned back on). */
+    /**
+     * sourceRoleLabel/targetRoleLabel travel through here too, unlike lineStyle/displayLabel
+     * which fully REPLACE the registry-blind edge shape: the Canvas needs both role labels (it
+     * decides per-edge, per-node which one applies depending on which side is the BFS parent) so
+     * it can answer "why is this node here?" without importing the registry itself
+     * (container/presentational split, GraphUI.md §3). edge.viaFieldApiName already survives
+     * the spread unchanged — it travels with the edge summary from the server and needs no
+     * registry resolution.
+     */
     get allCanvasEdges() {
         return snapshotEdges(this.viewState).map((edge) => {
             const style = resolveEdgeStyle(this.registry, edge.typeKey);
-            return { ...edge, lineStyle: style.lineStyle, displayLabel: style.displayLabel || edge.typeKey, isFieldMembership: style.isFieldMembership };
+            return {
+                ...edge,
+                lineStyle: style.lineStyle,
+                displayLabel: style.displayLabel || edge.typeKey,
+                isFieldMembership: style.isFieldMembership,
+                sourceRoleLabel: style.sourceRoleLabel,
+                targetRoleLabel: style.targetRoleLabel,
+                description: style.description
+            };
         });
     }
 
@@ -176,7 +193,12 @@ export default class OiGraphExplorer extends LightningElement {
         return this.filteredView.edges;
     }
 
-    /** The distinct edge types currently loaded, in oiFilterPanel's expected shape — each a togglable checkbox, so a viewer can read/narrow the graph without knowing raw typeKey strings. */
+    /**
+     * The distinct edge types currently loaded, in oiFilterPanel's expected shape — each a
+     * togglable checkbox with a one-line description, so the filter panel doubles as the graph's
+     * relationship legend (this sprint's requirement) rather than a bare list of raw names a
+     * viewer has to already know the meaning of.
+     */
     get edgeTypeFilterOptions() {
         const seen = new Map();
         for (const edge of this.allCanvasEdges) {
@@ -184,6 +206,7 @@ export default class OiGraphExplorer extends LightningElement {
                 seen.set(edge.typeKey, {
                     typeKey: edge.typeKey,
                     displayLabel: edge.displayLabel,
+                    description: edge.description,
                     isChecked: !this.hiddenEdgeTypes.has(edge.typeKey),
                     swatchClass: 'oi-filter-panel-swatch oi-filter-panel-swatch-' + edge.lineStyle
                 });

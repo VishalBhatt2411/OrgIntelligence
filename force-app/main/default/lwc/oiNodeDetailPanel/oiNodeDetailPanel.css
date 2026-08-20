@@ -114,6 +114,26 @@
     font-weight: 600;
 }
 
+/**
+ * A summary count rendered as the control that opens its own detail — the product rule that every
+ * number must be explainable, expressed in the smallest possible affordance. Styled as a link
+ * rather than a button so a column of them reads as data, not as a toolbar.
+ */
+.oi-node-detail-panel-count-button {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+}
+
+.oi-node-detail-panel-count-button:hover,
+.oi-node-detail-panel-count-button:focus {
+    text-decoration: underline;
+}
+
 .oi-node-detail-panel-impact-breakdown {
     display: flex;
     flex-wrap: wrap;

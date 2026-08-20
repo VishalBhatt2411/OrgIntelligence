@@ -12,8 +12,18 @@
         <lightning-icon icon-name={iconName} size="x-small" class="oi-graph-node-icon"></lightning-icon>
         <div class="oi-graph-node-labels">
             <span class="oi-graph-node-label" title={label}>{label}</span>
+            <span class="oi-graph-node-type" data-id="node-type-label">{resolvedTypeLabel}</span>
             <template lwc:if={hasSecondaryKey}>
                 <span class="oi-graph-node-secondary" data-id="node-secondary" title={secondaryKey}>{secondaryKey}</span>
+            </template>
+            <!-- The "why is this here" answer: a compact chip stating this node's relationship
+                 role, never a paragraph, and never left for the user to infer from an edge line
+                 alone (the sprint's own acceptance rule). -->
+            <template lwc:if={hasRelationshipChip}>
+                <span class="oi-graph-node-relationship-chip" data-id="node-relationship-chip">{relationshipChipText}</span>
+            </template>
+            <template lwc:if={hasHopLabel}>
+                <span class="oi-graph-node-hop-label" data-id="node-hop-label">{hopLabel}</span>
             </template>
         </div>
         <button data-id="expand-toggle-button" class="oi-graph-node-expand-toggle" title={expandToggleLabel} onclick={handleExpandToggle}>

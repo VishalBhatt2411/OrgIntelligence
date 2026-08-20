@@ -35,6 +35,15 @@
     box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
 }
 
+/** Path-to-centre highlight and de-emphasis — identical treatment to oiGraphNode.css's own rules, so plain-pill nodes and schema cards read consistently during the same interaction. */
+.oi-schema-card.is-on-path {
+    box-shadow: 0 0 0 2px var(--slds-g-color-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+.oi-schema-card.is-dimmed {
+    opacity: 0.35;
+}
+
 .oi-schema-card-header {
     display: flex;
     align-items: center;
@@ -92,6 +101,29 @@
     color: var(--slds-g-color-on-surface-2, #706e6b);
     font-size: 0.65rem;
     flex: 1;
+}
+
+/** The card's own "why is this here" answer — same visual language as oiGraphNode's chip so the two node shapes read as one system. */
+.oi-schema-card-relationship-chip {
+    margin: 0 0.55rem 0.35rem;
+    display: inline-block;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.65rem;
+    background: var(--slds-g-color-accent-container-1, rgba(1, 118, 211, 0.1));
+    color: var(--slds-g-color-accent-1, #0176d3);
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 1.1rem);
+}
+
+.oi-schema-card-hop-label {
+    margin: 0 0.55rem 0.35rem;
+    font-size: 0.6rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-style: italic;
 }
 
 /** Hover-reveal, full-text tooltip — identical pattern and rationale to oiGraphNode.css's .oi-graph-node-tooltip. */

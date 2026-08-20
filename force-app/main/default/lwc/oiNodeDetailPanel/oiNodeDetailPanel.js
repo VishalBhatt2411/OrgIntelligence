@@ -90,6 +90,8 @@ export default class OiNodeDetailPanel extends LightningElement {
     intelligenceErrorMessage = null;
     technicalDetailsVisible = false;
     intelligenceRequestId = 0;
+    /** The currently-open drill-down selection, or null. Cleared on every new node selection so a dialog can never outlive the node it describes. */
+    drilldown = null;
     _nodeKey;
     detailRequestId = 0;
     fieldRequestId = 0;
@@ -123,6 +125,7 @@ export default class OiNodeDetailPanel extends LightningElement {
         this.isLoadingIntelligence = false;
         this.intelligenceErrorMessage = null;
         this.technicalDetailsVisible = false;
+        this.drilldown = null;
     }
 
     async loadIntelligence() {
@@ -482,7 +485,14 @@ export default class OiNodeDetailPanel extends LightningElement {
         return !!this.fieldRelationshipTypeLabel;
     }
 
-    /** Honest, structural-edges-only relationship summary — the real number available today in place of a full Impact/Dependency Engine. */
+    /**
+     * The structural relationship summary — every row now a drill-down trigger.
+     *
+     * Each row carries the (direction, edgeTypeKey) pair the drill-down needs, which is the same
+     * pair this count was computed from. That is what makes the product's central promise
+     * enforceable: clicking "52" opens exactly those 52, because both sides describe the same
+     * selection rather than two independently-derived ones.
+     */
     get relationshipCountRows() {
         if (!this.detail) {
             return [];
@@ -494,6 +504,8 @@ export default class OiNodeDetailPanel extends LightningElement {
             rows.push({
                 key: 'out-' + typeKey,
                 direction: 'Outgoing',
+                drilldownDirection: 'outgoing',
+                edgeTypeKey: typeKey,
                 label: resolveEdgeStyle(this.registry, typeKey).displayLabel || typeKey,
                 count: outgoing[typeKey]
             });
@@ -502,11 +514,50 @@ export default class OiNodeDetailPanel extends LightningElement {
             rows.push({
                 key: 'in-' + typeKey,
                 direction: 'Incoming',
+                drilldownDirection: 'incoming',
+                edgeTypeKey: typeKey,
                 label: resolveEdgeStyle(this.registry, typeKey).displayLabel || typeKey,
                 count: incoming[typeKey]
             });
         }
         return rows;
+    }
+
+    /**
+     * Opens the drill-down for one summary row. State lives here rather than in the child so the
+     * child stays a pure, parameterised view that can be reused by any other surface later
+     * (the graph canvas, a future Org Health page) without inheriting this panel's state.
+     */
+    handleDrilldownOpen(event) {
+        const key = event.currentTarget.dataset.rowKey;
+        const row = this.relationshipCountRows.find((candidate) => candidate.key === key);
+        if (!row) {
+            return;
+        }
+        this.drilldown = {
+            direction: row.drilldownDirection,
+            edgeTypeKey: row.edgeTypeKey,
+            relationshipLabel: row.label
+        };
+    }
+
+    handleDrilldownClose() {
+        this.drilldown = null;
+    }
+
+    /** A drill-down row asking to be shown on the graph closes the dialog and re-emits upward — the panel never mutates graph state itself. */
+    handleDrilldownNodeSelect(event) {
+        const nodeKey = event.detail.nodeKey;
+        this.drilldown = null;
+        this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey } }));
+    }
+
+    get hasDrilldown() {
+        return !!this.drilldown;
+    }
+
+    get drilldownAnchorLabel() {
+        return this.detail ? this.detail.label : '';
     }
 
     get hasRelationshipCounts() {

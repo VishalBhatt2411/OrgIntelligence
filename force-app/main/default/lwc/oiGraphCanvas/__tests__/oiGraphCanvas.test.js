@@ -231,6 +231,267 @@ describe('c-oi-graph-canvas', () => {
         });
     });
 
+    describe('"Why is this node here?" — relationship chip and hop distance (this sprint\'s central requirement)', () => {
+        function findGraphNode(element, nodeKey) {
+            return [...element.shadowRoot.querySelectorAll('c-oi-graph-node')].find((node) => node.nodeKey === nodeKey);
+        }
+
+        it('stamps the neighbour\'s role and its parent\'s label onto a direct child, resolved from the edge\'s registry-provided role labels', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'SalesforceMetadata.CustomObject', label: 'Account', secondaryKey: 'Account', state: 'Active' },
+                { nodeKey: 'trigger1', typeKey: 'SalesforceMetadata.ApexTrigger', typeLabel: 'Apex Trigger', label: 'AccountTrigger', secondaryKey: 'AccountTrigger', state: 'Active' }
+            ];
+            // EXECUTES_ON travels Trigger -> Object (source=trigger, target=object) — the real
+            // scanner convention — with role labels the container would have already resolved
+            // from the registry (sourceRoleLabel/targetRoleLabel), exactly as oiGraphExplorer's
+            // allCanvasEdges now supplies them.
+            element.edges = [
+                {
+                    edgeKey: 'e1',
+                    typeKey: 'SalesforceMetadata.EXECUTES_ON',
+                    sourceNodeKey: 'trigger1',
+                    targetNodeKey: 'root',
+                    sourceRoleLabel: 'Executes On',
+                    targetRoleLabel: 'Runs On'
+                }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const triggerNode = findGraphNode(element, 'trigger1');
+                expect(triggerNode.relationshipRole).toBe('Executes On');
+                expect(triggerNode.relationshipContext).toBe('Account');
+                expect(triggerNode.hopDistance).toBe(1);
+            });
+        });
+
+        it('gives the neighbour the OTHER role when the anchor is on the other side of the edge — proves direction is resolved per edge, not hardcoded', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'trigger1';
+            element.nodes = [
+                { nodeKey: 'trigger1', typeKey: 'SalesforceMetadata.ApexTrigger', label: 'AccountTrigger', secondaryKey: 'AccountTrigger', state: 'Active' },
+                { nodeKey: 'root', typeKey: 'SalesforceMetadata.CustomObject', typeLabel: 'Object', label: 'Account', secondaryKey: 'Account', state: 'Active' }
+            ];
+            element.edges = [
+                {
+                    edgeKey: 'e1',
+                    typeKey: 'SalesforceMetadata.EXECUTES_ON',
+                    sourceNodeKey: 'trigger1',
+                    targetNodeKey: 'root',
+                    sourceRoleLabel: 'Executes On',
+                    targetRoleLabel: 'Runs On'
+                }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const objectNode = findGraphNode(element, 'root');
+                expect(objectNode.relationshipRole).toBe('Runs On');
+                expect(objectNode.relationshipContext).toBe('AccountTrigger');
+            });
+        });
+
+        it('derives the relationship field\'s own API name for a field-sourced edge (LOOKUP_TO) from the absorbed field\'s own identity, never from a guess', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'opportunity';
+            element.nodes = [
+                {
+                    nodeKey: 'opportunity',
+                    typeKey: 'SalesforceMetadata.CustomObject',
+                    label: 'Opportunity',
+                    secondaryKey: 'Opportunity',
+                    state: 'Active',
+                    showFieldList: true
+                },
+                { nodeKey: 'opportunity.accountid', typeKey: 'SalesforceMetadata.CustomField', label: 'Account Name', secondaryKey: 'Opportunity.AccountId', state: 'Active' },
+                {
+                    nodeKey: 'account',
+                    typeKey: 'SalesforceMetadata.CustomObject',
+                    typeLabel: 'Object',
+                    label: 'Account',
+                    secondaryKey: 'Account',
+                    state: 'Active',
+                    showFieldList: true
+                }
+            ];
+            element.edges = [
+                // Field membership: absorbs opportunity.accountid into the Opportunity card.
+                { edgeKey: 'e-field', typeKey: 'SalesforceMetadata.HAS_FIELD', sourceNodeKey: 'opportunity', targetNodeKey: 'opportunity.accountid', isFieldMembership: true },
+                // LOOKUP_TO travels FIELD -> referenced object (source=field), per OI_FieldScanner's real convention.
+                {
+                    edgeKey: 'e-lookup',
+                    typeKey: 'SalesforceMetadata.LOOKUP_TO',
+                    sourceNodeKey: 'opportunity.accountid',
+                    targetNodeKey: 'account',
+                    sourceRoleLabel: 'References',
+                    targetRoleLabel: 'Referenced By'
+                }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const accountCard = [...element.shadowRoot.querySelectorAll('c-oi-schema-object-card')].find((card) => card.nodeKey === 'account');
+                expect(accountCard.relationshipRole).toBe('Referenced By');
+                expect(accountCard.relationshipContext).toBe('Opportunity');
+                expect(accountCard.relationshipVia).toBe('AccountId');
+            });
+        });
+
+        it('marks a node beyond one hop with its real distance, so it never reads as if directly related to the centre', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'mid', typeKey: 'T', label: 'Mid', secondaryKey: 'Mid', state: 'Active' },
+                { nodeKey: 'far', typeKey: 'T', label: 'Far', secondaryKey: 'Far', state: 'Active' }
+            ];
+            element.edges = [
+                { edgeKey: 'e1', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'mid', sourceRoleLabel: 'Related To', targetRoleLabel: 'Related To' },
+                { edgeKey: 'e2', typeKey: 'T', sourceNodeKey: 'mid', targetNodeKey: 'far', sourceRoleLabel: 'Related To', targetRoleLabel: 'Related To' }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                expect(findGraphNode(element, 'mid').hopDistance).toBe(1);
+                expect(findGraphNode(element, 'far').hopDistance).toBe(2);
+            });
+        });
+    });
+
+    describe('Visible edge labels and primary/secondary hierarchy', () => {
+        it('shows a concise, registry-resolved label on a direct/primary edge — never the raw typeKey', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'child', typeKey: 'T', label: 'Child', secondaryKey: 'Child', state: 'Active' }
+            ];
+            element.edges = [
+                { edgeKey: 'e1', typeKey: 'SalesforceMetadata.LOOKUP_TO', sourceNodeKey: 'root', targetNodeKey: 'child', displayLabel: 'Lookup' }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const label = element.shadowRoot.querySelector('[data-id="graph-edge-label"]');
+                expect(label.textContent).toBe('Lookup');
+                expect(label.textContent).not.toContain('SalesforceMetadata.');
+            });
+        });
+
+        it('includes the via-field in the label when one is known ("AccountId · Lookup")', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'child', typeKey: 'T', label: 'Child', secondaryKey: 'Child', state: 'Active' }
+            ];
+            element.edges = [
+                { edgeKey: 'e1', typeKey: 'SalesforceMetadata.LOOKUP_TO', sourceNodeKey: 'root', targetNodeKey: 'child', displayLabel: 'Lookup', viaFieldApiName: 'AccountId' }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                expect(element.shadowRoot.querySelector('[data-id="graph-edge-label"]').textContent).toBe('AccountId · Lookup');
+            });
+        });
+
+        it('renders no visible label on a secondary (non-tree) edge by default, keeping the primary structure the visually dominant thing', () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'a', typeKey: 'T', label: 'A', secondaryKey: 'A', state: 'Active' },
+                { nodeKey: 'b', typeKey: 'T', label: 'B', secondaryKey: 'B', state: 'Active' },
+                { nodeKey: 'hub', typeKey: 'T', label: 'Hub', secondaryKey: 'Hub', state: 'Active' }
+            ];
+            element.edges = [
+                { edgeKey: 'e1', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'a', displayLabel: 'Rel' },
+                { edgeKey: 'e2', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'b', displayLabel: 'Rel' },
+                { edgeKey: 'e3', typeKey: 'T', sourceNodeKey: 'a', targetNodeKey: 'hub', displayLabel: 'Rel' },
+                { edgeKey: 'e4', typeKey: 'T', sourceNodeKey: 'b', targetNodeKey: 'hub', displayLabel: 'Rel' }
+            ];
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const labels = [...element.shadowRoot.querySelectorAll('[data-id="graph-edge-label"]')].map((el) => el.textContent);
+                // Exactly one of the two edges into "hub" is the BFS tree edge (primary); the
+                // other is secondary and must render with empty label text by default.
+                const nonEmpty = labels.filter((text) => text);
+                expect(nonEmpty.length).toBeLessThan(labels.length);
+            });
+        });
+    });
+
+    describe('Path-to-centre highlight (hover/selection)', () => {
+        function buildChain(element) {
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'mid', typeKey: 'T', label: 'Mid', secondaryKey: 'Mid', state: 'Active' },
+                { nodeKey: 'far', typeKey: 'T', label: 'Far', secondaryKey: 'Far', state: 'Active' },
+                { nodeKey: 'unrelated', typeKey: 'T', label: 'Unrelated', secondaryKey: 'Unrelated', state: 'Active' }
+            ];
+            element.edges = [
+                { edgeKey: 'e1', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'mid' },
+                { edgeKey: 'e2', typeKey: 'T', sourceNodeKey: 'mid', targetNodeKey: 'far' },
+                { edgeKey: 'e3', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'unrelated' }
+            ];
+        }
+
+        it('highlights the full path back to the centre on hover and dims everything off that path', async () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            buildChain(element);
+            document.body.appendChild(element);
+            await Promise.resolve();
+
+            const farForeignObject = element.shadowRoot.querySelector('[data-node-key="far"]');
+            farForeignObject.dispatchEvent(new CustomEvent('mouseenter'));
+            await Promise.resolve();
+
+            const onPath = ['root', 'mid', 'far'];
+            for (const key of onPath) {
+                const node = [...element.shadowRoot.querySelectorAll('c-oi-graph-node')].find((n) => n.nodeKey === key);
+                expect(node.isOnActivePath).toBe(true);
+                expect(node.isDimmed).toBe(false);
+            }
+            const unrelated = [...element.shadowRoot.querySelectorAll('c-oi-graph-node')].find((n) => n.nodeKey === 'unrelated');
+            expect(unrelated.isOnActivePath).toBe(false);
+            expect(unrelated.isDimmed).toBe(true);
+        });
+
+        it('clears the highlight back to no dimming once the pointer leaves and nothing is selected', async () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            buildChain(element);
+            document.body.appendChild(element);
+            await Promise.resolve();
+
+            const farForeignObject = element.shadowRoot.querySelector('[data-node-key="far"]');
+            farForeignObject.dispatchEvent(new CustomEvent('mouseenter'));
+            await Promise.resolve();
+            farForeignObject.dispatchEvent(new CustomEvent('mouseleave'));
+            await Promise.resolve();
+
+            /** No highlight active means renderableNodes returns nodes unchanged — isDimmed is undefined, not an explicit false. Either reads as "not dimmed" to the rendering component, so falsy is the correct assertion. */
+            const unrelated = [...element.shadowRoot.querySelectorAll('c-oi-graph-node')].find((n) => n.nodeKey === 'unrelated');
+            expect(unrelated.isDimmed).toBeFalsy();
+        });
+
+        it('keeps the highlight on the selected node\'s path after the pointer leaves, rather than clearing to nothing', async () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            buildChain(element);
+            element.selectedNodeKey = 'far';
+            document.body.appendChild(element);
+            await Promise.resolve();
+
+            const unrelated = [...element.shadowRoot.querySelectorAll('c-oi-graph-node')].find((n) => n.nodeKey === 'unrelated');
+            expect(unrelated.isDimmed).toBe(true);
+            const mid = [...element.shadowRoot.querySelectorAll('c-oi-graph-node')].find((n) => n.nodeKey === 'mid');
+            expect(mid.isOnActivePath).toBe(true);
+        });
+    });
+
     it('dragging a node moves it and suppresses the resulting click-to-select', async () => {
         const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
         element.centerNodeKey = 'root';

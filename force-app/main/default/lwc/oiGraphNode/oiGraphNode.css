@@ -105,6 +105,57 @@
     color: var(--slds-g-color-on-surface-2, #706e6b);
 }
 
+/** The node's type (Object, Field, Apex Trigger, ...) — a caption under the label, quieter than the label itself and never a raw typeKey. */
+.oi-graph-node-type {
+    font-size: 0.6rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/**
+ * The relationship-role chip — the card's answer to "why am I here?" (this sprint's central
+ * requirement). Deliberately its own visual weight, distinct from the type caption above: the
+ * type says WHAT the node is, the chip says WHY it is connected, and conflating them into one
+ * line would bury the more important of the two facts.
+ */
+.oi-graph-node-relationship-chip {
+    display: inline-block;
+    margin-top: 0.15rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.65rem;
+    background: var(--slds-g-color-accent-container-1, rgba(1, 118, 211, 0.1));
+    color: var(--slds-g-color-accent-1, #0176d3);
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/** Multi-hop distance — a quiet caption, never competing with the relationship chip which is the more important fact for a direct neighbour. */
+.oi-graph-node-hop-label {
+    font-size: 0.6rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-style: italic;
+}
+
+/**
+ * Path-to-centre highlight (hover/selection). A visible ring rather than a colour swap alone, so
+ * the highlight reads correctly even under a colour-vision deficiency — the same accessibility
+ * discipline GraphUI.md already applies to selection.
+ */
+.oi-graph-node.is-on-path {
+    box-shadow: 0 0 0 2px var(--slds-g-color-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+/** De-emphasis for everything NOT on the active path — opacity only, never display:none, so layout and existing interactions (drag, click) are completely undisturbed. */
+.oi-graph-node.is-dimmed {
+    opacity: 0.35;
+}
+
 .oi-graph-node-expand-toggle {
     border: none;
     background: transparent;

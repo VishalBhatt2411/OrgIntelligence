@@ -1,0 +1,140 @@
+<template>
+    <!-- SLDS modal markup rather than lightning-modal: this must render inside the Explorer's own
+         layout on an App Page, and the dialog needs a wide, table-first body that the standard
+         modal component constrains. role/aria wiring is explicit for the same reason. -->
+    <section
+        role="dialog"
+        tabindex="-1"
+        aria-modal="true"
+        aria-labelledby="oi-drilldown-heading"
+        class="slds-modal slds-fade-in-open slds-modal_large oi-drilldown"
+        data-id="drilldown"
+        onkeydown={handleKeyDown}
+    >
+        <div class="slds-modal__container">
+            <header class="slds-modal__header oi-drilldown-header">
+                <button
+                    class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                    title="Close"
+                    data-id="drilldown-close"
+                    onclick={handleClose}
+                >
+                    <lightning-icon icon-name="utility:close" size="small" alternative-text="Close" variant="inverse"></lightning-icon>
+                </button>
+                <h2 id="oi-drilldown-heading" class="slds-modal__title" data-id="drilldown-title">{headerTitle}</h2>
+                <p class="oi-drilldown-subtitle" data-id="drilldown-subtitle">{headerSubtitle}</p>
+                <p class="oi-drilldown-count" data-id="drilldown-count">{resultSummary}</p>
+            </header>
+
+            <div class="slds-modal__content slds-p-around_medium oi-drilldown-body">
+                <template lwc:if={isUnavailable}>
+                    <p class="oi-drilldown-note" data-id="drilldown-unavailable">{unavailableReason}</p>
+                </template>
+
+                <template lwc:else>
+                    <div class="oi-drilldown-toolbar">
+                        <lightning-input
+                            type="search"
+                            label="Search these results"
+                            variant="label-hidden"
+                            placeholder="Search by name or API name..."
+                            data-id="drilldown-search"
+                            onchange={handleSearchChange}
+                        ></lightning-input>
+                    </div>
+
+                    <template lwc:if={isLoading}>
+                        <div class="oi-drilldown-state" data-id="drilldown-loading">
+                            <lightning-spinner alternative-text="Loading results" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template lwc:elseif={hasError}>
+                        <p class="oi-drilldown-error" role="alert" data-id="drilldown-error">{errorMessage}</p>
+                    </template>
+
+                    <template lwc:elseif={isEmpty}>
+                        <p class="oi-drilldown-note" data-id="drilldown-empty">{emptyStateMessage}</p>
+                    </template>
+
+                    <template lwc:else>
+                        <table class="slds-table slds-table_bordered slds-table_fixed-layout oi-drilldown-table" data-id="drilldown-table">
+                            <thead>
+                                <tr class="slds-line-height_reset">
+                                    <th scope="col">
+                                        <button type="button" class="oi-drilldown-sort" data-field="label" data-id="sort-label" onclick={handleSort}>Name</button>
+                                    </th>
+                                    <th scope="col">
+                                        <button type="button" class="oi-drilldown-sort" data-field="apiName" data-id="sort-apiName" onclick={handleSort}>API Name</button>
+                                    </th>
+                                    <th scope="col">
+                                        <button type="button" class="oi-drilldown-sort" data-field="typeLabel" data-id="sort-typeLabel" onclick={handleSort}>Type</button>
+                                    </th>
+                                    <th scope="col">Relationship</th>
+                                    <template lwc:if={showDataTypeColumn}>
+                                        <th scope="col">Data Type</th>
+                                    </template>
+                                    <template lwc:if={showReferencedObjectColumn}>
+                                        <th scope="col">References</th>
+                                    </template>
+                                    <th scope="col" class="oi-drilldown-actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={sortedRows} for:item="row">
+                                    <tr key={row.rowKey} class="slds-hint-parent" data-id="drilldown-row">
+                                        <td data-label="Name">{row.label}</td>
+                                        <td data-label="API Name"><span class="oi-drilldown-api">{row.apiName}</span></td>
+                                        <td data-label="Type">{row.typeLabel}</td>
+                                        <td data-label="Relationship"><span class="oi-drilldown-role">{row.roleLabel}</span></td>
+                                        <template lwc:if={showDataTypeColumn}>
+                                            <td data-label="Data Type">{row.dataType}</td>
+                                        </template>
+                                        <template lwc:if={showReferencedObjectColumn}>
+                                            <td data-label="References">{row.referencedObject}</td>
+                                        </template>
+                                        <td data-label="Actions" class="oi-drilldown-actions-col">
+                                            <button
+                                                type="button"
+                                                class="oi-drilldown-link"
+                                                data-row-key={row.rowKey}
+                                                data-id="drilldown-select"
+                                                onclick={handleRowSelect}
+                                            >Show on graph</button>
+                                            <button
+                                                type="button"
+                                                class="oi-drilldown-link"
+                                                data-row-key={row.rowKey}
+                                                data-id="drilldown-open"
+                                                onclick={handleRowOpen}
+                                            >Open in Setup</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+
+                        <template lwc:if={sortScopeNote}>
+                            <p class="oi-drilldown-note" data-id="drilldown-sort-scope">{sortScopeNote}</p>
+                        </template>
+
+                        <template lwc:if={hasMore}>
+                            <button
+                                type="button"
+                                class="slds-button slds-button_neutral oi-drilldown-more"
+                                data-id="drilldown-load-more"
+                                disabled={isLoadingMore}
+                                onclick={handleLoadMore}
+                            >Load more</button>
+                        </template>
+                    </template>
+
+                    <template lwc:if={actionMessage}>
+                        <p class="oi-drilldown-note" role="status" data-id="drilldown-action-message">{actionMessage}</p>
+                    </template>
+                </template>
+            </div>
+        </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open" data-id="drilldown-backdrop" onclick={handleClose}></div>
+</template>

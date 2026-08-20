@@ -157,7 +157,18 @@
                                 <template for:each={relationshipCountRows} for:item="row">
                                     <tr key={row.key}>
                                         <th scope="row">{row.direction} — {row.label}</th>
-                                        <td>{row.count}</td>
+                                        <td>
+                                            <!-- The count itself is the control: the product rule is that every number
+                                                 must be explainable, so the number is what you click. -->
+                                            <button
+                                                type="button"
+                                                class="oi-node-detail-panel-count-button"
+                                                data-id="relationship-count-button"
+                                                data-row-key={row.key}
+                                                title="Show these connections"
+                                                onclick={handleDrilldownOpen}
+                                            >{row.count}</button>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -327,6 +338,22 @@
         </template>
         <template lwc:else>
             <div class="oi-node-detail-panel-empty" data-id="detail-placeholder">Select a node to see its details.</div>
+        </template>
+
+        <!-- Outside the loading/error/detail chain on purpose: this is an overlay, not one of the
+             panel's mutually-exclusive states, and chaining it would have broken the not-found and
+             placeholder branches that follow. -->
+        <template lwc:if={hasDrilldown}>
+            <c-oi-intelligence-drilldown
+                data-id="drilldown-host"
+                node-key={nodeKey}
+                direction={drilldown.direction}
+                edge-type-key={drilldown.edgeTypeKey}
+                anchor-label={drilldownAnchorLabel}
+                relationship-label={drilldown.relationshipLabel}
+                onclose={handleDrilldownClose}
+                onnodeselect={handleDrilldownNodeSelect}
+            ></c-oi-intelligence-drilldown>
         </template>
     </div>
 </template>

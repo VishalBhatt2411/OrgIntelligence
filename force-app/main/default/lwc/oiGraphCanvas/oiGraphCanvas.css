@@ -112,6 +112,39 @@
 }
 
 /**
+ * Path-to-centre highlight (hover/selection, this sprint's explainability requirement). Applied
+ * on top of the secondary/primary distinction above rather than replacing it — a highlighted
+ * edge always reads as the most prominent thing on screen regardless of its own line style.
+ */
+.oi-graph-edge-on-path {
+    stroke: var(--slds-g-color-accent-1, #0176d3);
+    stroke-width: 3;
+    opacity: 1;
+}
+
+.oi-graph-edge-dimmed {
+    opacity: 0.15;
+}
+
+/**
+ * The visible, concise edge label (GraphUI.md's "intelligent hierarchy" — shown by default on
+ * primary/direct connections only; renderableEdges decides which edges qualify, this rule is
+ * pure presentation). A small opaque backdrop via paint-order keeps text legible over both the
+ * grid and any crossing line, without needing a separate <rect> element per label.
+ */
+.oi-graph-edge-label {
+    font-size: 9px;
+    font-weight: 600;
+    fill: var(--slds-g-color-on-surface-2, #444);
+    paint-order: stroke;
+    stroke: var(--slds-g-color-surface-1, #f6f7f9);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    pointer-events: none;
+    user-select: none;
+}
+
+/**
  * SVG's own UA stylesheet defaults <foreignObject> to overflow:hidden — invisible here in any
  * markup/attribute, but the reason a node's hover tooltip (oiGraphNode.css/oiSchemaObjectCard.css
  * .oi-*-tooltip) would otherwise be clipped to exactly the node's own box no matter what overflow
