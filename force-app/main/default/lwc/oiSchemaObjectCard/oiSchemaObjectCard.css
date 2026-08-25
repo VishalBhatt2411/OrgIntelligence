@@ -6,6 +6,9 @@
  */
 .oi-schema-card {
     --oi-node-accent: var(--slds-g-color-accent-1, #0176d3);
+    /** Deliberately literal, not var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified live in a real org (audit #09): those two distinct SLDS tokens resolve to the exact same color under this org's actual theme, which made the relationship-role chip below a solid color block with invisible text. Same fix as oiGraphNode.css's identical collision. */
+    --oi-node-chip-bg: rgba(1, 118, 211, 0.1);
+    --oi-node-chip-color: #0176d3;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -109,8 +112,8 @@
     display: inline-block;
     padding: 0.05rem 0.35rem;
     border-radius: 0.65rem;
-    background: var(--slds-g-color-accent-container-1, rgba(1, 118, 211, 0.1));
-    color: var(--slds-g-color-accent-1, #0176d3);
+    background: var(--oi-node-chip-bg);
+    color: var(--oi-node-chip-color);
     font-size: 0.62rem;
     font-weight: 600;
     white-space: nowrap;

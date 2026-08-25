@@ -61,16 +61,28 @@ import { parseRecordNodeKey } from 'c/recordNodeKey';
 const OBJECT_TYPE_KEY = 'SalesforceMetadata.CustomObject';
 const FIELD_TYPE_KEY = 'SalesforceMetadata.CustomField';
 const HAS_FIELD_TYPE_KEY = 'SalesforceMetadata.HAS_FIELD';
+const LOOKUP_TO_TYPE_KEY = 'SalesforceMetadata.LOOKUP_TO';
+const MASTER_DETAIL_TO_TYPE_KEY = 'SalesforceMetadata.MASTER_DETAIL_TO';
 const RECORD_TYPE_PREFIX = 'SalesforceRecord.';
 const RECORD_PARENT_EDGE_TYPE_KEY = 'SalesforceRecord.LOOKUP_TO';
 const RECORD_CHILD_EDGE_TYPE_KEY = 'SalesforceRecord.CHILD_OF';
 const FIELD_TYPE_FILTERS = ['All', 'Standard', 'Custom'];
+/** GraphUI.md §42/Intelligence Panel rebuild — a scanned-but-old result is flagged rather than presented as fresh. A tunable client constant, same MVP-constant precedent as oiGraphExplorer.js's WORKING_SET_CEILING. */
+const STALE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
+/** OI_NodeIntelligenceService's own fixed, small category vocabulary (never a dynamic/open-ended list) — a plain lookup table, not a per-type branch in rendering logic. */
+const CATEGORY_ICON_NAMES = {
+    Automation: 'utility:apex_plugin',
+    Code: 'utility:code_playground',
+    Security: 'utility:lock'
+};
 
 /** Attribute keys already surfaced explicitly elsewhere in the template — excluded from the generic "Other Attributes" fallback table so nothing is shown twice. */
 const CURATED_ATTRIBUTE_KEYS = new Set(['label', 'custom', 'namespace', 'type', 'referenceTo', 'relationshipName']);
 
 export default class OiNodeDetailPanel extends LightningElement {
     @api registry = null;
+    /** Object mode's distinct-object relationship counts (Self/Referenced/Referencing), supplied by oiGraphExplorer — null for Field/Record modes, or before a center is selected, so this panel falls back to its existing generic relationshipCountRows there (GraphUI.md §42's curated Relationships breakdown is an Object-mode concept). */
+    @api objectRelationshipSummary = null;
 
     detail = null;
     isLoading = false;
@@ -92,6 +104,13 @@ export default class OiNodeDetailPanel extends LightningElement {
     intelligenceRequestId = 0;
     /** The currently-open drill-down selection, or null. Cleared on every new node selection so a dialog can never outlive the node it describes. */
     drilldown = null;
+    /** Collapsible-section UI state (GraphUI.md §42 Intelligence Panel rebuild) — a set of collapsed section keys ('fields'/'relationships'/'Automation'/'Code'/'Security'/'impact'); Technical Details keeps its own pre-existing technicalDetailsVisible toggle (already collapsed-by-default) rather than joining this set. Empty (everything expanded) on a fresh node selection. */
+    collapsedSections = new Set();
+    /** Which categories' "Coverage details" disclosure is open — collapsed (empty set) by default on a fresh node selection. */
+    expandedCoverageDetails = new Set();
+    /** Whole-panel chrome (Intelligence Panel header) — isPanelExpanded collapses the entire body to reclaim canvas space; isPanelPinned, when on, keeps collapsedSections/expandedCoverageDetails as-is across a node change instead of resetting them, so a layout a user has arranged (e.g. "just show me Security") survives browsing between nodes. Neither is node-specific state, so neither is touched by the nodeKey setter's reset logic below. */
+    isPanelExpanded = true;
+    isPanelPinned = false;
     _nodeKey;
     detailRequestId = 0;
     fieldRequestId = 0;
@@ -107,6 +126,10 @@ export default class OiNodeDetailPanel extends LightningElement {
         this.resetFieldBrowser();
         this.resetImpactAnalysis();
         this.resetIntelligence();
+        if (!this.isPanelPinned) {
+            this.collapsedSections = new Set();
+            this.expandedCoverageDetails = new Set();
+        }
         this.loadDetail();
         /**
          * Loaded automatically on selection, unlike Impact Analysis which stays an explicit
@@ -161,23 +184,56 @@ export default class OiNodeDetailPanel extends LightningElement {
      * informative ("no triggers found, and here is what we can detect"); omitting it entirely
      * leaves the user unable to tell "nothing found" from "not looked for", which is the exact
      * ambiguity this sprint exists to remove.
+     *
+     * Empty-state classification (GraphUI.md §42 Intelligence Panel rebuild, item 22): an empty
+     * category is never presented as a single undifferentiated "nothing found" — it is one of
+     * Unscanned / Stale / Possibly Incomplete / True Zero, in that priority order, derived
+     * entirely from fields OI_NodeIntelligenceDTO already returns (lastScannedAt,
+     * hasCoverageLimitations, category.truncated) — no Apex change. True per-category
+     * Unsupported-vs-Degraded precision would need an additive OI_NodeIntelligenceDTO.Category
+     * status field (reusing OI_ScanCoverage's existing vocabulary) — a known, documented Phase-2
+     * gap, not built here.
      */
     get intelligenceSections() {
         if (!this.intelligence || !this.intelligence.categories) {
             return [];
         }
-        return this.intelligence.categories.map((category) => ({
-            key: category.category,
-            title: category.category,
-            items: (category.items || []).map((item) => ({
-                ...item,
-                directionLabel: item.direction === 'incoming' ? 'uses this' : 'used by this'
-            })),
-            hasItems: (category.items || []).length > 0,
-            countLabel: `${(category.items || []).length}`,
-            truncated: !!category.truncated,
-            coverageNote: category.coverageNote
-        }));
+        return this.intelligence.categories.map((category) => {
+            const hasItems = (category.items || []).length > 0;
+            const emptyStateKind = hasItems ? null : this.classifyEmptyState(category);
+            return {
+                key: category.category,
+                title: category.category,
+                iconName: CATEGORY_ICON_NAMES[category.category] || 'utility:knowledge_base',
+                iconModifierClass: 'oi-node-detail-panel-section-icon is-' + category.category.toLowerCase(),
+                items: (category.items || []).map((item) => ({
+                    ...item,
+                    directionLabel: item.direction === 'incoming' ? 'uses this' : 'used by this'
+                })),
+                hasItems,
+                countLabel: `${(category.items || []).length}`,
+                truncated: !!category.truncated,
+                coverageNote: category.coverageNote,
+                isCoverageDetailsExpanded: this.expandedCoverageDetails.has(category.category),
+                emptyStateKind,
+                emptyStateMessage: emptyStateKind ? buildEmptyStateMessage(category.category, emptyStateKind) : null,
+                emptyStateBadgeClass: emptyStateKind ? `oi-node-detail-panel-empty-state-badge oi-node-detail-panel-empty-state-${emptyStateKind}` : null,
+                isExpanded: !this.collapsedSections.has(category.category)
+            };
+        });
+    }
+
+    /** "Coverage details" disclosure (GraphUI.md §42, item 15) — the scanner's own honest "Detected... Not detected..." explanation stays available, just collapsed by default so it never dominates the primary panel the way a permanently-visible paragraph did. Independent of the section's own collapse state (collapsedSections) — collapsing/re-expanding a whole section shouldn't discard whether its coverage note was open. */
+    handleCoverageDetailsToggle(event) {
+        event.stopPropagation();
+        const category = event.currentTarget.dataset.category;
+        const updated = new Set(this.expandedCoverageDetails);
+        if (updated.has(category)) {
+            updated.delete(category);
+        } else {
+            updated.add(category);
+        }
+        this.expandedCoverageDetails = updated;
     }
 
     get hasIntelligenceSections() {
@@ -186,6 +242,81 @@ export default class OiNodeDetailPanel extends LightningElement {
 
     get hasIntelligenceError() {
         return !!this.intelligenceErrorMessage;
+    }
+
+    /** Whole-payload facts (one scan run backs every category), applied per-category only when that category is itself empty — priority order matches the honesty rule: a stale/unscanned signal always outranks a plain zero, since "zero" is only a trustworthy answer when the data behind it is current. */
+    classifyEmptyState(category) {
+        if (this.isIntelligenceUnscanned) {
+            return 'unscanned';
+        }
+        if (category.truncated || this.hasCoverageLimitations) {
+            return 'incomplete';
+        }
+        if (this.isIntelligenceStale) {
+            return 'stale';
+        }
+        return 'zero';
+    }
+
+    get isIntelligenceUnscanned() {
+        return !!this.intelligence && !this.intelligence.lastScannedAt;
+    }
+
+    get isIntelligenceStale() {
+        if (!this.intelligence || !this.intelligence.lastScannedAt) {
+            return false;
+        }
+        return Date.now() - new Date(this.intelligence.lastScannedAt).getTime() > STALE_THRESHOLD_MS;
+    }
+
+    /** Toggles one collapsible section open/closed (Fields, Structural Connections, an intelligence category, Impact) — a plain UI concern, never touching data state. Technical Details keeps its own separate, pre-existing toggle. */
+    handleSectionToggle(event) {
+        const section = event.currentTarget.dataset.section;
+        const updated = new Set(this.collapsedSections);
+        if (updated.has(section)) {
+            updated.delete(section);
+        } else {
+            updated.add(section);
+        }
+        this.collapsedSections = updated;
+    }
+
+    // --- Panel chrome (Intelligence Panel header: collapse whole body / pin section layout) ---
+
+    handleTogglePanelExpanded() {
+        this.isPanelExpanded = !this.isPanelExpanded;
+    }
+
+    get panelToggleIconName() {
+        return this.isPanelExpanded ? 'utility:chevronup' : 'utility:chevrondown';
+    }
+
+    get panelToggleLabel() {
+        return this.isPanelExpanded ? 'Collapse Intelligence Panel' : 'Expand Intelligence Panel';
+    }
+
+    handleTogglePin() {
+        this.isPanelPinned = !this.isPanelPinned;
+    }
+
+    get pinToggleLabel() {
+        return this.isPanelPinned ? 'Unpin panel layout (stop keeping sections open across selections)' : 'Pin panel layout (keep sections open when you select another node)';
+    }
+
+    get pinToggleClass() {
+        return 'oi-node-detail-panel-pin-toggle' + (this.isPanelPinned ? ' is-active' : '');
+    }
+
+    get isFieldsExpanded() {
+        return !this.collapsedSections.has('fields');
+    }
+
+    get isRelationshipsExpanded() {
+        return !this.collapsedSections.has('relationships');
+    }
+
+    get isImpactExpanded() {
+        return !this.collapsedSections.has('impact');
     }
 
     /**
@@ -486,6 +617,74 @@ export default class OiNodeDetailPanel extends LightningElement {
     }
 
     /**
+     * "Type" as shown in the Overview grid — deliberately distinct from typeDisplayLabel (the
+     * registry's generic per-typeKey label, e.g. plain "Object") for an Object node specifically:
+     * Overview states "Standard Object"/"Custom Object" directly, reusing the same custom flag
+     * customOrStandardLabel already derives, rather than making a reader cross-reference a
+     * separate "Custom / Standard" row to learn what kind of Object they're looking at. Field and
+     * Record nodes have no such distinct concept, so they fall back to the registry label as
+     * before.
+     */
+    get overviewTypeLabel() {
+        if (this.isObject && this.hasCustomFlag) {
+            return `${this.customOrStandardLabel} Object`;
+        }
+        return this.typeDisplayLabel;
+    }
+
+    /**
+     * The Overview section's ordered (label, value) pairs, replacing what used to be a hand-built
+     * table with an lwc:if per node kind — a flat list a single template loop renders as a
+     * two-column grid (GraphUI.md §42's approved Overview layout), the same information as
+     * before, just described once as data instead of duplicated across four branching template
+     * blocks. Order matters: it is exactly the on-screen order.
+     */
+    get overviewFields() {
+        if (!this.detail) {
+            return [];
+        }
+        if (this.isRecordDetail) {
+            return [
+                { key: 'name', label: 'Name', value: this.detail.label },
+                { key: 'object', label: 'Object', value: this.recordObjectApiName },
+                { key: 'recordId', label: 'Record Id', value: this.recordId }
+            ];
+        }
+        const fields = [];
+        /** A label that differs from the API name (e.g. a custom field's "Deal Size" vs. Deal_Size__c) is real identity information the API Name row alone can't carry — shown whenever the two actually differ, never as a redundant repeat of the same string. */
+        if (this.detail.label && this.detail.label !== this.apiName) {
+            fields.push({ key: 'name', label: 'Name', value: this.detail.label });
+        }
+        fields.push({ key: 'apiName', label: 'API Name', value: this.apiName });
+        if (this.isField) {
+            fields.push({ key: 'type', label: 'Type', value: this.overviewTypeLabel });
+            fields.push({ key: 'dataType', label: 'Data Type', value: this.dataTypeDisplay });
+            if (this.hasCustomFlag) {
+                fields.push({ key: 'customStandard', label: 'Custom / Standard', value: this.customOrStandardLabel });
+            }
+            if (this.hasParentObject) {
+                fields.push({ key: 'parentObject', label: 'Parent Object', value: this.parentObjectApiName });
+            }
+            if (this.hasFieldRelationshipType) {
+                fields.push({ key: 'relationshipType', label: 'Relationship Type', value: this.fieldRelationshipTypeLabel });
+            }
+            if (this.hasReferencedObjects) {
+                fields.push({ key: 'referencedObjects', label: 'Referenced Object(s)', value: this.referencedObjectsDisplay });
+                fields.push({ key: 'relationshipName', label: 'Relationship Name', value: this.relationshipName });
+            }
+            return fields;
+        }
+        fields.push({ key: 'type', label: 'Type', value: this.overviewTypeLabel });
+        if (this.isObject) {
+            fields.push({ key: 'namespace', label: 'Namespace', value: this.namespaceDisplay });
+        }
+        if (this.hasCustomFlag) {
+            fields.push({ key: 'customStandard', label: 'Custom / Standard', value: this.customOrStandardLabel });
+        }
+        return fields;
+    }
+
+    /**
      * The structural relationship summary — every row now a drill-down trigger.
      *
      * Each row carries the (direction, edgeTypeKey) pair the drill-down needs, which is the same
@@ -561,7 +760,64 @@ export default class OiNodeDetailPanel extends LightningElement {
     }
 
     get hasRelationshipCounts() {
-        return this.relationshipCountRows.length > 0;
+        return this.hasCuratedRelationshipRows || this.relationshipCountRows.length > 0;
+    }
+
+    /**
+     * The curated Object-relationship breakdown (GraphUI.md §42's Intelligence Panel rebuild,
+     * item 14): Incoming/Outgoing Lookups and Master-Detail are HAS_FIELD-free, schema-membership
+     * information moved out entirely (it already powers the Fields section's own count) — this
+     * section only ever shows genuine object-to-object relationship metrics, never raw internal
+     * edge-type taxonomy. The four counts are read directly from the same
+     * incoming/outgoingRelationshipCounts getNodeDetail already returns (no new fetch); Self
+     * Relationships/Referenced Objects/Referencing Objects are DISTINCT OBJECT counts the
+     * container computes once from the already-fetched canvas working set (objectRelationshipSummary)
+     * since a per-edge-type count cannot answer "how many distinct objects," and are simply
+     * omitted (not shown as a fabricated zero) when that summary isn't available yet.
+     */
+    get curatedRelationshipRows() {
+        if (!this.detail) {
+            return [];
+        }
+        const incoming = this.detail.incomingRelationshipCounts || {};
+        const outgoing = this.detail.outgoingRelationshipCounts || {};
+        const rows = [
+            { key: 'in-lookup', direction: 'incoming', edgeTypeKey: LOOKUP_TO_TYPE_KEY, label: 'Incoming Lookups', count: incoming[LOOKUP_TO_TYPE_KEY] || 0, isDrilldownEligible: true },
+            { key: 'in-md', direction: 'incoming', edgeTypeKey: MASTER_DETAIL_TO_TYPE_KEY, label: 'Incoming Master-Detail', count: incoming[MASTER_DETAIL_TO_TYPE_KEY] || 0, isDrilldownEligible: true },
+            { key: 'out-lookup', direction: 'outgoing', edgeTypeKey: LOOKUP_TO_TYPE_KEY, label: 'Outgoing Lookups', count: outgoing[LOOKUP_TO_TYPE_KEY] || 0, isDrilldownEligible: true },
+            { key: 'out-md', direction: 'outgoing', edgeTypeKey: MASTER_DETAIL_TO_TYPE_KEY, label: 'Outgoing Master-Detail', count: outgoing[MASTER_DETAIL_TO_TYPE_KEY] || 0, isDrilldownEligible: true }
+        ];
+        if (this.objectRelationshipSummary) {
+            rows.push(
+                { key: 'self', label: 'Self Relationships', count: this.objectRelationshipSummary.selfRelationships, isDrilldownEligible: false },
+                { key: 'referenced-objects', label: 'Referenced Objects', count: this.objectRelationshipSummary.referencedObjects, isDrilldownEligible: false },
+                { key: 'referencing-objects', label: 'Referencing Objects', count: this.objectRelationshipSummary.referencingObjects, isDrilldownEligible: false }
+            );
+        }
+        return rows;
+    }
+
+    /** Object mode only — Field/Record keep the existing generic relationshipCountRows (their own drilldown-eligible per-edge-type breakdown, unchanged). */
+    get hasCuratedRelationshipRows() {
+        return this.isObject && this.curatedRelationshipRows.length > 0;
+    }
+
+    get relationshipSectionCount() {
+        return this.hasCuratedRelationshipRows ? this.curatedRelationshipRows.length : this.relationshipCountRows.length;
+    }
+
+    /** Mirrors handleDrilldownOpen's row-key lookup, scoped to the curated row shape — kept separate rather than unified with the generic handler since the two row shapes (curated vs. per-edge-type) diverge slightly (isDrilldownEligible has no equivalent on the generic rows). */
+    handleCuratedDrilldownOpen(event) {
+        const key = event.currentTarget.dataset.rowKey;
+        const row = this.curatedRelationshipRows.find((candidate) => candidate.key === key);
+        if (!row || !row.isDrilldownEligible) {
+            return;
+        }
+        this.drilldown = {
+            direction: row.direction,
+            edgeTypeKey: row.edgeTypeKey,
+            relationshipLabel: row.label
+        };
     }
 
     get directConnectionCount() {
@@ -823,6 +1079,26 @@ export default class OiNodeDetailPanel extends LightningElement {
                 detail: { nodeKey: this.impactResult.rootNodeKey, fragment: this.impactResult.subgraph }
             })
         );
+    }
+}
+
+/**
+ * Builds an honest, category-specific empty-state message (GraphUI.md §42, item 22) — never a
+ * single generic "nothing found" that could just as easily mean "not scanned yet" or "results
+ * are old." categoryLabel is one of the fixed 'Automation'/'Code'/'Security' category names
+ * OI_NodeIntelligenceService always returns, never a raw internal key.
+ */
+function buildEmptyStateMessage(categoryLabel, kind) {
+    const lowerLabel = (categoryLabel || 'automation').toLowerCase();
+    switch (kind) {
+        case 'unscanned':
+            return `${categoryLabel} data has not been scanned yet.`;
+        case 'stale':
+            return `Results shown are from an older scan — rescan to refresh ${lowerLabel} data.`;
+        case 'incomplete':
+            return `${categoryLabel} results may be incomplete for this org — see the coverage note below.`;
+        default:
+            return `No ${lowerLabel} detected for this component.`;
     }
 }
 

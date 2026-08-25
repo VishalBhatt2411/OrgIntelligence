@@ -62,7 +62,8 @@
 }
 
 .oi-graph-explorer-canvas-column {
-    flex: 2;
+    /** ~75/25 workspace/panel split (target range 70-78/22-30) — applied to every analyze mode, not just Object, per the locked product decision: a wider canvas benefits Field/Record too, and a mode-scoped modifier class would be extra CSS for no visual difference anyone asked to preserve. */
+    flex: 3;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -73,7 +74,8 @@
 }
 
 /** The canvas takes whatever height the filter panel (natural height, below) doesn't need — min-height: 0 is required for a flex child to actually shrink below its content's own intrinsic size instead of overflowing the column. */
-.oi-graph-explorer-canvas-column c-oi-graph-canvas {
+.oi-graph-explorer-canvas-column c-oi-graph-canvas,
+.oi-graph-explorer-canvas-column c-oi-relationship-canvas {
     flex: 1;
     min-height: 0;
 }

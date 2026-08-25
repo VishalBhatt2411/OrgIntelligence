@@ -44,6 +44,20 @@ export default class OiSearchBar extends LightningElement {
         this.runSearch();
     }
 
+    /** Enter is the standard combobox behavior users expect: with suggestions already showing, commit the top one; otherwise run the search immediately rather than waiting on the debounce. */
+    handleInputKeyDown(event) {
+        if (event.key !== 'Enter') {
+            return;
+        }
+        event.preventDefault();
+        clearTimeout(this.debounceTimer);
+        if (this.hasResults) {
+            this.selectResult(this.results[0]);
+        } else {
+            this.runSearch();
+        }
+    }
+
     async runSearch() {
         if (!this.queryTerm || this.queryTerm.trim().length === 0) {
             this.results = [];
@@ -81,8 +95,14 @@ export default class OiSearchBar extends LightningElement {
 
     handleResultClick(event) {
         const nodeKey = event.currentTarget.dataset.nodeKey;
+        const result = (this.results || []).find((r) => r.nodeKey === nodeKey);
+        this.selectResult(result || { nodeKey });
+    }
+
+    /** Closes the suggestion list and leaves the chosen label visible in the box — the only record of what's currently loaded besides the "Analyzing" pill elsewhere on the page, so it must not revert to the placeholder. */
+    selectResult(result) {
         this.results = [];
-        this.queryTerm = '';
-        this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey } }));
+        this.queryTerm = result.label || this.queryTerm;
+        this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey: result.nodeKey } }));
     }
 }

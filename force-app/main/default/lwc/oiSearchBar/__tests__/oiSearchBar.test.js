@@ -33,7 +33,7 @@ describe('c-oi-search-bar', () => {
         expect(search).toHaveBeenCalledWith({ queryTerm: 'Acc' });
     });
 
-    it("renders results and dispatches select with the clicked result's nodeKey, then clears the result list", async () => {
+    it("renders results and dispatches select with the clicked result's nodeKey, then clears the result list but keeps the selected label visible in the box", async () => {
         search.mockResolvedValue([{ nodeKey: 'n1', typeKey: 'SalesforceMetadata.CustomObject', label: 'Account', secondaryKey: 'Account', state: 'Active' }]);
         const element = createElement('c-oi-search-bar', { is: OiSearchBar });
         document.body.appendChild(element);
@@ -54,7 +54,45 @@ describe('c-oi-search-bar', () => {
 
         return Promise.resolve().then(() => {
             expect(element.shadowRoot.querySelector('[data-id="search-results"]')).toBeNull();
+            expect(element.shadowRoot.querySelector('lightning-input').value).toBe('Account');
         });
+    });
+
+    it('pressing Enter with suggestions already showing selects the top one, standard combobox behavior', async () => {
+        search.mockResolvedValue([
+            { nodeKey: 'n1', typeKey: 'SalesforceMetadata.CustomObject', label: 'Account', secondaryKey: 'Account', state: 'Active' },
+            { nodeKey: 'n2', typeKey: 'SalesforceMetadata.CustomObject', label: 'AccountShare', secondaryKey: 'AccountShare', state: 'Active' }
+        ]);
+        const element = createElement('c-oi-search-bar', { is: OiSearchBar });
+        document.body.appendChild(element);
+        const handler = jest.fn();
+        element.addEventListener('select', handler);
+
+        const input = element.shadowRoot.querySelector('lightning-input');
+        input.value = 'Acc';
+        input.dispatchEvent(new CustomEvent('change'));
+        await wait(400);
+
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(handler.mock.calls[0][0].detail.nodeKey).toBe('n1');
+    });
+
+    it('pressing Enter with no suggestions showing yet runs the search immediately, without waiting for the debounce', async () => {
+        search.mockResolvedValue([{ nodeKey: 'n1', typeKey: 'T', label: 'Account', secondaryKey: 'Account', state: 'Active' }]);
+        const element = createElement('c-oi-search-bar', { is: OiSearchBar });
+        document.body.appendChild(element);
+
+        const input = element.shadowRoot.querySelector('lightning-input');
+        input.value = 'Acc';
+        input.dispatchEvent(new CustomEvent('change'));
+
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(search).toHaveBeenCalledWith({ queryTerm: 'Acc' });
     });
 
     it('never calls search for a blank query', async () => {

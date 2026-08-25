@@ -1,5 +1,5 @@
 <template>
-    <div class="oi-graph-canvas-container">
+    <div class={hostClass}>
         <template lwc:if={isEmpty}>
             <div class="oi-graph-canvas-empty" data-id="canvas-empty">Select a node to start exploring the graph.</div>
         </template>
@@ -134,6 +134,16 @@
                     >↺</button>
                     <button type="button" data-id="reset-view-button" class="oi-graph-canvas-zoom-button" title="Reset view" aria-label="Reset view" onclick={handleResetViewClick}>⤢</button>
                 </div>
+                <div class="oi-graph-canvas-view-controls" data-id="export-maximize-controls">
+                    <button type="button" data-id="export-button" class="oi-graph-canvas-zoom-button" title="Export diagram as SVG" aria-label="Export diagram as SVG" onclick={handleExportDiagram}>
+                        <lightning-icon icon-name="utility:download" size="x-small"></lightning-icon>
+                    </button>
+                    <button type="button" data-id="maximize-toggle" class="oi-graph-canvas-zoom-button" title={maximizeButtonLabel} aria-label={maximizeButtonLabel} onclick={handleToggleMaximize}>
+                        <lightning-icon icon-name={maximizeIconName} size="x-small"></lightning-icon>
+                    </button>
+                </div>
+                <!-- A real anchor in this component's own template/shadow tree — see handleExportDiagram's doc comment (oiGraphCanvas.js) for why the download is triggered here rather than via a document.createElement'd, out-of-band element. -->
+                <a data-id="export-link" class="oi-graph-canvas-visually-hidden" href={exportHref} download={exportFileName} tabindex="-1" aria-hidden="true"></a>
             </div>
 
             <template lwc:if={hasMiniMap}>

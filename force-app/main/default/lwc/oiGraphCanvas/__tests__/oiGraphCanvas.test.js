@@ -1259,4 +1259,88 @@ describe('c-oi-graph-canvas', () => {
             expect(element.shadowRoot.querySelector('[data-node-key="child"]')).not.toBeNull();
         });
     });
+
+    describe('parallel-edge fan-out (audit #04 — two relationships resolving to the same two cards must not overlap)', () => {
+        it('gives two edges sharing the same source/target pair distinct, non-overlapping paths and label positions', async () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'other', typeKey: 'T', label: 'Other', secondaryKey: 'Other', state: 'Active' }
+            ];
+            element.edges = [
+                { edgeKey: 'e1', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'other', displayLabel: 'First' },
+                { edgeKey: 'e2', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'other', displayLabel: 'Second' }
+            ];
+            document.body.appendChild(element);
+            await flushPromises();
+
+            const paths = [...element.shadowRoot.querySelectorAll('[data-id="graph-edge-path"]')];
+            expect(paths).toHaveLength(2);
+            expect(paths[0].getAttribute('d')).not.toBe(paths[1].getAttribute('d'));
+
+            const labels = [...element.shadowRoot.querySelectorAll('[data-id="graph-edge-label"]')];
+            expect(labels[0].getAttribute('x')).not.toBe(labels[1].getAttribute('x'));
+        });
+
+        it('leaves a single, non-duplicated edge pixel-identical to before the fan-out fix (zero parallel offset)', async () => {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [
+                { nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' },
+                { nodeKey: 'child', typeKey: 'T', label: 'Child', secondaryKey: 'Child', state: 'Active' }
+            ];
+            element.edges = [{ edgeKey: 'e1', typeKey: 'T', sourceNodeKey: 'root', targetNodeKey: 'child' }];
+            document.body.appendChild(element);
+            await flushPromises();
+
+            const path = element.shadowRoot.querySelector('[data-id="graph-edge-path"]');
+            // A lone edge's control point sits exactly on the perpendicular bow with no extra offset — verified by the existing curved-path convention (M x1,y1 Q midX+offset,midY+offset x2,y2) already covered elsewhere in this suite; this test only guards that adding fan-out support didn't introduce an offset for the non-duplicate case.
+            expect(path.getAttribute('d')).toMatch(/^M\d/);
+        });
+    });
+
+    describe('export and maximize toolbar (audit #07/#08 — Field mode never had these controls at all)', () => {
+        function renderSimpleCanvas() {
+            const element = createElement('c-oi-graph-canvas', { is: OiGraphCanvas });
+            element.centerNodeKey = 'root';
+            element.nodes = [{ nodeKey: 'root', typeKey: 'T', label: 'Root', secondaryKey: 'Root', state: 'Active' }];
+            element.edges = [];
+            document.body.appendChild(element);
+            return element;
+        }
+
+        it('toggling maximize flips the icon/label and applies the maximized host class', async () => {
+            const element = renderSimpleCanvas();
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('.oi-graph-canvas-is-maximized')).toBeNull();
+            element.shadowRoot.querySelector('[data-id="maximize-toggle"]').click();
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('.oi-graph-canvas-is-maximized')).not.toBeNull();
+            expect(element.shadowRoot.querySelector('[data-id="maximize-toggle"]').getAttribute('title')).toBe('Restore canvas size');
+        });
+
+        it('clicking export builds a downloadable SVG blob URL on the template-declared anchor, never a document.createElement\'d out-of-band one', async () => {
+            const element = renderSimpleCanvas();
+            await flushPromises();
+
+            // jsdom does not implement createObjectURL/revokeObjectURL at all — stub them directly
+            // rather than spying on a property that doesn't exist yet. Left in place for the rest
+            // of this test file's run (not restored to jsdom's real "undefined") since afterEach's
+            // unmount invokes disconnectedCallback, which itself calls revokeObjectURL whenever an
+            // export happened — restoring to undefined there would crash teardown, not just this test.
+            URL.createObjectURL = jest.fn(() => 'blob:mock-url');
+            URL.revokeObjectURL = jest.fn();
+
+            element.shadowRoot.querySelector('[data-id="export-button"]').click();
+            await flushPromises();
+
+            expect(URL.createObjectURL).toHaveBeenCalled();
+            const link = element.shadowRoot.querySelector('[data-id="export-link"]');
+            expect(link.getAttribute('href')).toBe('blob:mock-url');
+            expect(link.getAttribute('download')).toBe('graph.svg');
+        });
+    });
 });

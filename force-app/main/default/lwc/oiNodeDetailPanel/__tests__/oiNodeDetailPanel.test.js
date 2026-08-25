@@ -100,8 +100,8 @@ describe('c-oi-node-detail-panel', () => {
             expect(sections[2].textContent).toContain('Sales_Access');
         });
 
-        /** An empty section must still render, with its coverage note — otherwise a user cannot tell "no triggers exist" from "triggers are not detected". */
-        it('renders an empty section with an honest empty state and its coverage note', async () => {
+        /** An empty section must still render, with its coverage note available — otherwise a user cannot tell "no triggers exist" from "triggers are not detected". The note itself is collapsed by default (item 15) so it never dominates the panel; opening "Coverage details" reveals it. */
+        it('renders an empty section with an honest, differentiated empty state (true zero, since this fixture is recently scanned with no coverage limitations) and an on-demand coverage note', async () => {
             getNodeDetail.mockResolvedValue(objectDetail());
             getNodeIntelligence.mockResolvedValue(intelligence());
             const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
@@ -111,8 +111,38 @@ describe('c-oi-node-detail-panel', () => {
 
             const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
             expect(codeSection).not.toBeNull();
-            expect(codeSection.querySelector('[data-id="intelligence-empty"]').textContent).toContain('Nothing found in the scanned data');
+            expect(codeSection.querySelector('[data-id="intelligence-empty"]').textContent).toContain('No code detected for this component.');
+            expect(codeSection.querySelector('[data-id="intelligence-coverage"]')).toBeNull();
+
+            codeSection.querySelector('[data-id="coverage-details-toggle"]').click();
+            await flushPromises();
             expect(codeSection.querySelector('[data-id="intelligence-coverage"]').textContent).toContain('Not detected: dynamic Apex');
+        });
+
+        it('truncates a long namespaced Permission Set name to a single line with the full name available via title, instead of word-breaking across three lines (audit #11)', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence({
+                categories: [
+                    { category: 'Automation', items: [], truncated: false, coverageNote: 'n/a' },
+                    { category: 'Code', items: [], truncated: false, coverageNote: 'n/a' },
+                    {
+                        category: 'Security',
+                        items: [{ nodeKey: 'ps1', label: 'MuleSoftSeamlessLoginC2CPermSet', typeKey: 'SalesforceMetadata.PermissionSet', typeLabel: 'Permission Set', direction: 'incoming' }],
+                        truncated: false,
+                        coverageNote: 'n/a'
+                    }
+                ]
+            }));
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const securitySection = element.shadowRoot.querySelector('[data-category="Security"]');
+            const row = securitySection.querySelector('[data-id="intelligence-row"]');
+            const labelCell = row.querySelector('td');
+            expect(labelCell.getAttribute('title')).toBe('MuleSoftSeamlessLoginC2CPermSet');
+            expect(labelCell.textContent).toBe('MuleSoftSeamlessLoginC2CPermSet');
         });
 
         it('never exposes a raw SalesforceMetadata.* typeKey as a user-facing label', async () => {
@@ -175,6 +205,93 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
 
             expect(element.shadowRoot.querySelector('[data-id="intelligence-truncated"]')).not.toBeNull();
+        });
+
+        describe('empty-state differentiation (GraphUI.md §42, item 22) — never one undifferentiated "nothing found"', () => {
+            it('an empty section on a never-scanned node reads as Unscanned, not a zero result', async () => {
+                getNodeDetail.mockResolvedValue(objectDetail());
+                const payload = intelligence({ lastScannedAt: null });
+                payload.categories[1].items = [];
+                getNodeIntelligence.mockResolvedValue(payload);
+                const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+                document.body.appendChild(element);
+                element.nodeKey = 'account';
+                await flushPromises();
+
+                const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
+                const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
+                expect(empty.textContent).toContain('has not been scanned yet');
+                expect(empty.className).toContain('oi-node-detail-panel-empty-state-unscanned');
+            });
+
+            it('an empty section whose scan is older than 30 days reads as Stale, not a fresh zero result', async () => {
+                getNodeDetail.mockResolvedValue(objectDetail());
+                const payload = intelligence({ lastScannedAt: '2026-06-01T00:00:00.000Z' });
+                payload.categories[1].items = [];
+                getNodeIntelligence.mockResolvedValue(payload);
+                const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+                document.body.appendChild(element);
+                element.nodeKey = 'account';
+                await flushPromises();
+
+                const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
+                const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
+                expect(empty.textContent).toContain('older scan');
+                expect(empty.className).toContain('oi-node-detail-panel-empty-state-stale');
+            });
+
+            it('an empty section on a recently-scanned node with no coverage limitations reads as a plain true zero', async () => {
+                getNodeDetail.mockResolvedValue(objectDetail());
+                getNodeIntelligence.mockResolvedValue(intelligence());
+                const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+                document.body.appendChild(element);
+                element.nodeKey = 'account';
+                await flushPromises();
+
+                const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
+                const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
+                expect(empty.className).toContain('oi-node-detail-panel-empty-state-zero');
+                expect(empty.textContent).not.toContain('scanned yet');
+                expect(empty.textContent).not.toContain('older scan');
+            });
+
+            it('an empty section flagged with coverage limitations reads as possibly incomplete, even on a fresh scan', async () => {
+                getNodeDetail.mockResolvedValue(objectDetail());
+                getNodeIntelligence.mockResolvedValue(intelligence({ hasCoverageLimitations: true }));
+                const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+                document.body.appendChild(element);
+                element.nodeKey = 'account';
+                await flushPromises();
+
+                const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
+                const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
+                expect(empty.className).toContain('oi-node-detail-panel-empty-state-incomplete');
+                expect(empty.textContent).toContain('may be incomplete');
+            });
+        });
+
+        it('collapses and re-expands an intelligence section on header click, without discarding its already-loaded data', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            getNodeIntelligence.mockResolvedValue(intelligence());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const automationSection = element.shadowRoot.querySelector('[data-category="Automation"]');
+            expect(automationSection.textContent).toContain('AccountTrigger');
+            const toggle = automationSection.querySelector('[data-id="intelligence-section-toggle"]');
+            expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+            toggle.click();
+            await flushPromises();
+            expect(automationSection.textContent).not.toContain('AccountTrigger');
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+            toggle.click();
+            await flushPromises();
+            expect(automationSection.textContent).toContain('AccountTrigger');
+            expect(toggle.getAttribute('aria-expanded')).toBe('true');
         });
 
         it('selecting a related component dispatches select so the user can navigate to it', async () => {
@@ -393,22 +510,22 @@ describe('c-oi-node-detail-panel', () => {
         expect(content.textContent).toContain('Standard');
         expect(content.textContent).toContain('None (org-native)');
 
+        /**
+         * Object mode gets the curated relationship breakdown (GraphUI.md §42, item 14): HAS_FIELD
+         * is schema-membership information, not an object-to-object relationship, so it must never
+         * appear here — it already powers the Fields section's own count instead. Only genuine
+         * Lookup/Master-Detail metrics show, labeled plainly (Incoming Lookups/Incoming Master-
+         * Detail/Outgoing Lookups/Outgoing Master-Detail), each a real count from the same
+         * getNodeDetail response, never fabricated.
+         */
         const structural = element.shadowRoot.querySelector('[data-id="structural-connections"]');
         expect(structural).not.toBeNull();
-        expect(structural.textContent).toContain('7 directly connected');
-        expect(structural.textContent).toContain('Has Field');
-        expect(structural.textContent).toContain('Lookup To');
+        expect(structural.textContent).not.toContain('Has Field');
         expect(structural.textContent).not.toContain('Impact Analysis');
-        /**
-         * The original intent of this assertion — the structural section must not overclaim what
-         * it covers — still holds, but its wording had to change: automation, code and security
-         * dependencies ARE now detected and shown in their own sections, so the old "not yet
-         * available" copy became false. What must remain true is that THIS section stays scoped
-         * to schema relationships and points elsewhere for the rest, rather than implying it
-         * covers everything.
-         */
-        expect(structural.textContent).toContain('schema relationships only');
-        expect(structural.textContent).not.toContain('not yet available');
+        expect(structural.textContent).toContain('Incoming Lookups');
+        const incomingLookupsCount = structural.querySelector('[data-row-key="in-lookup"]');
+        expect(incomingLookupsCount.textContent).toBe('2');
+        expect(structural.textContent).toContain('Outgoing Master-Detail');
 
         /** Raw attributes now live behind Technical Details, collapsed by default — the data is preserved, only its prominence changed. */
         const technicalDetails = element.shadowRoot.querySelector('[data-id="technical-details"]');
@@ -421,6 +538,57 @@ describe('c-oi-node-detail-panel', () => {
         const revealed = element.shadowRoot.querySelector('[data-id="technical-details-table"]');
         expect(revealed.textContent).toContain('pluralLabel');
         expect(revealed.textContent).not.toContain('custom');
+    });
+
+    it('renders Self Relationships/Referenced Objects/Referencing Objects only when objectRelationshipSummary is supplied (Object mode, from oiGraphExplorer), as plain non-drilldown counts', async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+        element.objectRelationshipSummary = { selfRelationships: 1, referencedObjects: 5, referencingObjects: 71 };
+        document.body.appendChild(element);
+        element.nodeKey = 'account';
+        await flushPromises();
+
+        const structural = element.shadowRoot.querySelector('[data-id="structural-connections"]');
+        expect(structural.textContent).toContain('Self Relationships');
+        expect(structural.textContent).toContain('Referenced Objects');
+        expect(structural.textContent).toContain('Referencing Objects');
+        expect(structural.textContent).toContain('71');
+        expect(structural.querySelectorAll('[data-id="curated-relationship-count"]').length).toBe(3);
+    });
+
+    it('omits Self Relationships/Referenced Objects/Referencing Objects rows (rather than fabricating zeros) when objectRelationshipSummary has not been supplied yet', async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+        document.body.appendChild(element);
+        element.nodeKey = 'account';
+        await flushPromises();
+
+        const structural = element.shadowRoot.querySelector('[data-id="structural-connections"]');
+        expect(structural.textContent).not.toContain('Self Relationships');
+        expect(structural.textContent).not.toContain('Referenced Objects');
+        expect(structural.textContent).not.toContain('Referencing Objects');
+    });
+
+    it('collapses and re-expands the Relationships section on header click', async () => {
+        getNodeDetail.mockResolvedValue(objectDetail({ directConnectionCount: 7, outgoingRelationshipCounts: { 'SalesforceMetadata.HAS_FIELD': 5 }, incomingRelationshipCounts: { 'SalesforceMetadata.LOOKUP_TO': 2 } }));
+        const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+        document.body.appendChild(element);
+        element.nodeKey = 'account';
+        await flushPromises();
+
+        const structural = element.shadowRoot.querySelector('[data-id="structural-connections"]');
+        expect(structural.textContent).toContain('Incoming Lookups');
+        const toggle = structural.querySelector('[data-id="relationships-section-toggle"]');
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+        toggle.click();
+        await flushPromises();
+        expect(structural.textContent).not.toContain('Incoming Lookups');
+        expect(structural.querySelector('[data-id="curated-relationship-count-button"]')).toBeNull();
+
+        toggle.click();
+        await flushPromises();
+        expect(structural.textContent).toContain('Incoming Lookups');
     });
 
     it('renders curated Field fields — Data Type, Parent Object, Relationship Type derived from real outgoing edges — never guessed from attributes (G6)', async () => {
@@ -478,9 +646,32 @@ describe('c-oi-node-detail-panel', () => {
             element.nodeKey = 'account';
             await flushPromises();
 
-            expect(element.shadowRoot.querySelector('[data-id="fields-section"]').textContent).toContain('Fields (2)');
+            const fieldsSection = element.shadowRoot.querySelector('[data-id="fields-section"]');
+            expect(fieldsSection.textContent).toContain('Fields');
+            expect(fieldsSection.querySelector('[data-id="fields-section-toggle"] .oi-node-detail-panel-section-count').textContent).toBe('2');
             expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).not.toBeNull();
             expect(getFieldSummaries).not.toHaveBeenCalled();
+        });
+
+        it('collapsing the Fields section header hides the Show Fields trigger, and re-expanding restores it', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const toggle = element.shadowRoot.querySelector('[data-id="fields-section-toggle"]');
+            expect(toggle.getAttribute('aria-expanded')).toBe('true');
+            expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).not.toBeNull();
+
+            toggle.click();
+            await flushPromises();
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
+            expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).toBeNull();
+
+            toggle.click();
+            await flushPromises();
+            expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).not.toBeNull();
         });
 
         it('does not render a Fields section at all for a non-Object node', async () => {
@@ -670,6 +861,27 @@ describe('c-oi-node-detail-panel', () => {
                 ...overrides
             };
         }
+
+        it('collapsing the Impact section header hides its actions, and re-expanding restores them', async () => {
+            getNodeDetail.mockResolvedValue(objectDetail());
+            const element = createElement('c-oi-node-detail-panel', { is: OiNodeDetailPanel });
+            document.body.appendChild(element);
+            element.nodeKey = 'account';
+            await flushPromises();
+
+            const toggle = element.shadowRoot.querySelector('[data-id="impact-section-toggle"]');
+            expect(toggle.getAttribute('aria-expanded')).toBe('true');
+            expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).not.toBeNull();
+
+            toggle.click();
+            await flushPromises();
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
+            expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).toBeNull();
+
+            toggle.click();
+            await flushPromises();
+            expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).not.toBeNull();
+        });
 
         it('shows both Impact Analysis actions for a non-Apex node too — the feature is generic, never gated to a hardcoded node type', async () => {
             getNodeDetail.mockResolvedValue(objectDetail());

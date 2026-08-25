@@ -26,6 +26,8 @@ Index of ADRs for the Salesforce Org Intelligence Platform. Each record captures
 | [0020](0020-svg-rendering-vendored-layout-library.md) | SVG-Based Rendering with a Narrowly-Vendored Layout Library, Not Canvas/WebGL | Accepted |
 | [0021](0021-record-analysis-deferred-outside-metadata-graph.md) | Record Analysis Deferred, and Kept Architecturally Outside the Metadata Graph When Built | Proposed — amended by 0022 |
 | [0022](0022-hierarchy-accelerator-separate-persistence-lane.md) | Hierarchy Accelerator as a Structurally Separate Persistence Lane | Proposed — amends 0021 |
+| [0023](0023-object-relationship-lane-layout.md) | Object-Relationship Lane Layout for Object Analyze Mode | Accepted — scoped exception to 0019 |
+| [0024](0024-record-relationship-lane-layout.md) | Record Analyze Mode Adopts the Same Directional Lane Layout as Object Mode | Accepted — extends 0023 |
 
 ## When to add a new ADR
 

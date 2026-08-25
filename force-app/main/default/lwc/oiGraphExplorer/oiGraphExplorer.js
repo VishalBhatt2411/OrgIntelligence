@@ -47,6 +47,7 @@ import {
 import { loadPresentationRegistry, resolveNodeStyle, resolveEdgeStyle } from 'c/presentationRegistry';
 import { parseRecordNodeKey } from 'c/recordNodeKey';
 import { createRelationshipFilter, applyRelationshipFilter } from 'c/graphRelationshipFilter';
+import { buildObjectRelationshipView } from 'c/objectRelationshipView';
 
 const WORKING_SET_CEILING = 1000;
 const OBJECT_TYPE_KEY = 'SalesforceMetadata.CustomObject';
@@ -72,6 +73,9 @@ export default class OiGraphExplorer extends LightningElement {
     @track hiddenEdgeTypes = new Set();
     @track relationshipDirection = 'both';
     @track restrictToDirectOnly = false;
+    /** GraphUI.md §42.4 — the connector currently open in oiRelationshipConnectorDetail, Object mode only. Cleared whenever the center changes (resetRelationshipFilter's sibling concern, same lifecycle). */
+    @track selectedConnector = null;
+    @track selectedConnectorRootObject = null;
 
     registry = null;
     centerRequestId = 0;
@@ -94,9 +98,22 @@ export default class OiGraphExplorer extends LightningElement {
         return !!this.viewState.centerNodeKey;
     }
 
-    /** Every currently-loaded node, styled — the full working set, unfiltered by the relationship-view filter (oiFilterPanel/graphRelationshipFilter.js's own job, applied by canvasNodes/canvasEdges below). */
+    /**
+     * Every currently-loaded node, styled — the full working set, unfiltered by the
+     * relationship-view filter (oiFilterPanel/graphRelationshipFilter.js's own job, applied by
+     * canvasNodes/canvasEdges below). Memoized by (viewState, registry) reference identity —
+     * live-org validation against a heavily-customized Account (a large 2-hop working set even
+     * within Max_Canvas_Working_Set__c) showed this matters: this getter, and allCanvasEdges
+     * below, are each read from multiple places in one render pass (the canvas's own nodes/edges
+     * props, plus objectRelationshipSummary's own derivation) — recomputing the full
+     * registry-resolution map() every single time added up to a real, noticeable freeze, not
+     * just restated theoretical O(n) cost.
+     */
     get allCanvasNodes() {
-        return snapshotNodes(this.viewState).map((node) => {
+        if (this._allCanvasNodesCache && this._allCanvasNodesCache.viewState === this.viewState && this._allCanvasNodesCache.registry === this.registry) {
+            return this._allCanvasNodesCache.value;
+        }
+        const value = snapshotNodes(this.viewState).map((node) => {
             const style = resolveNodeStyle(this.registry, node.typeKey);
             return {
                 ...node,
@@ -106,6 +123,8 @@ export default class OiGraphExplorer extends LightningElement {
                 showFieldList: style.showFieldList
             };
         });
+        this._allCanvasNodesCache = { viewState: this.viewState, registry: this.registry, value };
+        return value;
     }
 
     /** Every currently-loaded edge, styled — the filter panel's checkbox list is built from this unfiltered set so a hidden type's own checkbox never disappears (a filter that hides its own control could never be turned back on). */
@@ -119,7 +138,10 @@ export default class OiGraphExplorer extends LightningElement {
      * registry resolution.
      */
     get allCanvasEdges() {
-        return snapshotEdges(this.viewState).map((edge) => {
+        if (this._allCanvasEdgesCache && this._allCanvasEdgesCache.viewState === this.viewState && this._allCanvasEdgesCache.registry === this.registry) {
+            return this._allCanvasEdgesCache.value;
+        }
+        const value = snapshotEdges(this.viewState).map((edge) => {
             const style = resolveEdgeStyle(this.registry, edge.typeKey);
             return {
                 ...edge,
@@ -131,6 +153,47 @@ export default class OiGraphExplorer extends LightningElement {
                 description: style.description
             };
         });
+        this._allCanvasEdgesCache = { viewState: this.viewState, registry: this.registry, value };
+        return value;
+    }
+
+    /**
+     * Object mode's curated Intelligence Panel relationship counts (GraphUI.md §42's Intelligence
+     * Panel rebuild) — Self Relationships / Referenced Objects / Referencing Objects are DISTINCT
+     * OBJECT counts, which the panel's own getNodeDetail response cannot derive (its
+     * incoming/outgoing counts are per-edge-type, not per-distinct-object), so they're computed
+     * once here from the same already-fetched working set the canvas itself uses, via the
+     * existing objectRelationshipView.js transform — no new fetch. Incoming/Outgoing
+     * Lookups/Master-Detail are deliberately NOT recomputed from this same bounded working set
+     * even though they could be — the panel already has always-complete counts for those four
+     * from OI_RelationshipCounts (server-computed, independent of canvas pagination), and reusing
+     * those is both simpler and more robust than trusting the canvas's own working set to be
+     * exhaustive. null outside Object mode (or before a center is selected) so the panel can fall
+     * back to its existing generic relationship rows for Field/Record.
+     */
+    get objectRelationshipSummary() {
+        if (!this.isObjectMode || !this.hasCenterNode) {
+            return null;
+        }
+        const nodes = this.allCanvasNodes;
+        const edges = this.allCanvasEdges;
+        const centerNodeKey = this.viewState.centerNodeKey;
+        if (
+            this._objectRelationshipSummaryCache &&
+            this._objectRelationshipSummaryCache.nodes === nodes &&
+            this._objectRelationshipSummaryCache.edges === edges &&
+            this._objectRelationshipSummaryCache.centerNodeKey === centerNodeKey
+        ) {
+            return this._objectRelationshipSummaryCache.value;
+        }
+        const view = buildObjectRelationshipView(nodes, edges, centerNodeKey);
+        const value = {
+            selfRelationships: view.selfRelationships.length,
+            referencedObjects: view.outgoingRelationships.length,
+            referencingObjects: view.incomingRelationships.length
+        };
+        this._objectRelationshipSummaryCache = { nodes, edges, centerNodeKey, value };
+        return value;
     }
 
     /** The active relationship-view filter (GraphUI.md §22, Backlog UI-4) — a directed-BFS-from-center filter (graphRelationshipFilter.js), not a flat "hide this type" pass, so direction/depth compose correctly with multi-hop chains. */
@@ -264,6 +327,11 @@ export default class OiGraphExplorer extends LightningElement {
         return this.analyzeMode === 'Record';
     }
 
+    /** ADR-0024: Object and Record analyze mode share the same directional lane canvas (oiRelationshipCanvas) — only Field mode still uses the generic radial canvas (oiGraphCanvas), since it's the one mode genuinely browsing a multi-type neighborhood rather than a single-type directional inventory. */
+    get usesRelationshipCanvas() {
+        return this.isObjectMode || this.isRecordMode;
+    }
+
     get objectModeButtonClass() {
         return this.analyzeModeButtonClass(this.isObjectMode);
     }
@@ -322,6 +390,16 @@ export default class OiGraphExplorer extends LightningElement {
         this.errorMessage = null;
         this.resetFieldModePicker();
         this.resetRecordModePicker();
+        this.closeConnectorDetail();
+        // A tab switch is a fresh view, not an edit to the old one (GraphUI.md §11's "a new
+        // center means a new view" principle, applied here to "a new mode means a new view"):
+        // without this, the previous mode's centerNodeKey/nodes/edges/selectedNodeKey stay in
+        // viewState (hasCenterNode isn't gated by analyzeMode), so the old graph renders,
+        // scattered and disconnected, under the newly-selected tab until the user completes a
+        // brand-new search in it.
+        this.viewState = createGraphViewState();
+        this.workingSetCeilingHit = false;
+        this.resetRelationshipFilter();
     }
 
     handleSearchSelect(event) {
@@ -513,6 +591,7 @@ export default class OiGraphExplorer extends LightningElement {
         }
     }
 
+    /** Field mode's own expand affordance — Object and Record mode never emit this event (both moved to oiRelationshipCanvas's "Explore From Here" re-centering instead, ADR-0024), so a nodeKey reaching here is always a metadata nodeKey, never a record one. */
     async handleExpand(event) {
         const nodeKey = event.detail.nodeKey;
         if (isWorkingSetCeilingHit(this.viewState, WORKING_SET_CEILING)) {
@@ -522,10 +601,7 @@ export default class OiGraphExplorer extends LightningElement {
         this.isLoadingFragment = true;
         this.errorMessage = null;
         try {
-            const recordRef = parseRecordNodeKey(nodeKey);
-            const fragment = recordRef
-                ? await getRecordFragment({ objectApiName: recordRef.objectApiName, recordId: recordRef.recordId })
-                : await getGraphFragment({ nodeKey, hopDepth: 1, pageCursor: null, knownChecksums: {} });
+            const fragment = await getGraphFragment({ nodeKey, hopDepth: 1, pageCursor: null, knownChecksums: {} });
             applyExpand(this.viewState, nodeKey, fragment);
             this.workingSetCeilingHit = isWorkingSetCeilingHit(this.viewState, WORKING_SET_CEILING);
             this.refreshViewState();
@@ -552,6 +628,42 @@ export default class OiGraphExplorer extends LightningElement {
         this.hiddenEdgeTypes = new Set();
         this.relationshipDirection = 'both';
         this.restrictToDirectOnly = false;
+        this.closeConnectorDetail();
+    }
+
+    /**
+     * oiRelationshipCanvas's "Explore From Here" (GraphUI.md §42.5, ADR-0024) — a neighbor
+     * card's own action to re-center on it, shared by both Object and Record mode since both
+     * render that same canvas. A full view replacement, identical to a fresh search selection,
+     * not a partial rewind — the same semantics §23's breadcrumb re-centering already
+     * established. Record mode's counterpart cards carry record nodeKeys, not metadata ones, so
+     * re-centering there must go through selectAndCenterRecord (a different Apex method
+     * entirely) rather than selectAndCenter — the nodeKey format alone (c/recordNodeKey) is
+     * what distinguishes the two, exactly as handleExpand used to before Record mode moved off
+     * oiGraphCanvas.
+     */
+    handleExploreFromHere(event) {
+        const nodeKey = event.detail.nodeKey;
+        const recordRef = parseRecordNodeKey(nodeKey);
+        if (recordRef) {
+            return this.selectAndCenterRecord(recordRef.objectApiName, recordRef.recordId);
+        }
+        return this.selectAndCenter(nodeKey);
+    }
+
+    /** Object canvas connector click (GraphUI.md §42.4) — opens oiRelationshipConnectorDetail with the descriptor the canvas already computed; no new fetch. */
+    handleObjectCanvasEdgeClick(event) {
+        this.selectedConnector = event.detail.connector;
+        this.selectedConnectorRootObject = event.detail.rootObject;
+    }
+
+    handleConnectorDetailClose() {
+        this.closeConnectorDetail();
+    }
+
+    closeConnectorDetail() {
+        this.selectedConnector = null;
+        this.selectedConnectorRootObject = null;
     }
 
     extractErrorMessage(error) {

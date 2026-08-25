@@ -5,6 +5,24 @@
     position: relative;
 }
 
+/** Maximize mode — a client-only CSS overlay rather than the browser Fullscreen API (which can be blocked inside Salesforce's own iframe/Lightning-container sandboxing), mirroring oiRelationshipCanvas.css's identical `.oi-orc-is-maximized` rule exactly. */
+.oi-graph-canvas-is-maximized {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    padding: 0.85rem 1rem;
+}
+
+.oi-graph-canvas-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
 /**
  * Every color below is an SLDS global styling hook (--slds-g-color-*) with the prior literal
  * hex as its fallback value: var(--slds-g-color-X, #hex). When Lightning Experience's SLDS 2 /

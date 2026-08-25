@@ -1,5 +1,33 @@
 <template>
     <div class="oi-node-detail-panel">
+        <div class="oi-node-detail-panel-header" data-id="panel-header">
+            <span class="oi-node-detail-panel-header-title">Intelligence Panel</span>
+            <div class="oi-node-detail-panel-header-actions">
+                <button
+                    type="button"
+                    class={pinToggleClass}
+                    data-id="panel-pin-toggle"
+                    aria-pressed={isPanelPinned}
+                    title={pinToggleLabel}
+                    aria-label={pinToggleLabel}
+                    onclick={handleTogglePin}
+                >
+                    <lightning-icon icon-name="utility:pinned" size="xx-small"></lightning-icon>
+                </button>
+                <button
+                    type="button"
+                    class="oi-node-detail-panel-collapse-toggle"
+                    data-id="panel-collapse-toggle"
+                    aria-expanded={isPanelExpanded}
+                    title={panelToggleLabel}
+                    aria-label={panelToggleLabel}
+                    onclick={handleTogglePanelExpanded}
+                >
+                    <lightning-icon icon-name={panelToggleIconName} size="xx-small"></lightning-icon>
+                </button>
+            </div>
+        </div>
+        <template lwc:if={isPanelExpanded}>
         <template lwc:if={isLoading}>
             <div class="oi-node-detail-panel-loading" data-id="detail-loading">
                 <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
@@ -10,73 +38,35 @@
         </template>
         <template lwc:elseif={hasDetail}>
             <div class="oi-node-detail-panel-content" data-id="detail-content">
-                <h2 class="oi-node-detail-panel-label">{detail.label}</h2>
-                <p class="oi-node-detail-panel-type">{typeDisplayLabel}</p>
-
-                <table class="oi-node-detail-panel-table">
-                    <tbody>
-                        <template lwc:if={isRecordDetail}>
-                            <tr>
-                                <th scope="row">Object</th>
-                                <td>{recordObjectApiName}</td>
-                            </tr>
-                            <tr>
-                                <th scope="row">Record Id</th>
-                                <td>{recordId}</td>
-                            </tr>
-                        </template>
-                        <template lwc:else>
-                            <tr>
-                                <th scope="row">API Name</th>
-                                <td>{apiName}</td>
-                            </tr>
-                        </template>
-                        <template lwc:if={hasCustomFlag}>
-                            <tr>
-                                <th scope="row">Custom / Standard</th>
-                                <td>{customOrStandardLabel}</td>
-                            </tr>
-                        </template>
-                        <template lwc:if={isObject}>
-                            <tr>
-                                <th scope="row">Namespace</th>
-                                <td>{namespaceDisplay}</td>
-                            </tr>
-                        </template>
-                        <template lwc:if={isField}>
-                            <tr>
-                                <th scope="row">Data Type</th>
-                                <td>{dataTypeDisplay}</td>
-                            </tr>
-                            <template lwc:if={hasParentObject}>
-                                <tr>
-                                    <th scope="row">Parent Object</th>
-                                    <td>{parentObjectApiName}</td>
-                                </tr>
-                            </template>
-                            <template lwc:if={hasFieldRelationshipType}>
-                                <tr>
-                                    <th scope="row">Relationship Type</th>
-                                    <td>{fieldRelationshipTypeLabel}</td>
-                                </tr>
-                            </template>
-                            <template lwc:if={hasReferencedObjects}>
-                                <tr>
-                                    <th scope="row">Referenced Object(s)</th>
-                                    <td>{referencedObjectsDisplay}</td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">Relationship Name</th>
-                                    <td>{relationshipName}</td>
-                                </tr>
-                            </template>
-                        </template>
-                    </tbody>
-                </table>
+                <div class="oi-node-detail-panel-section-header-static" data-id="overview-header">
+                    <lightning-icon icon-name="utility:apps" size="xx-small" class="oi-node-detail-panel-section-icon is-overview"></lightning-icon>
+                    <span class="oi-node-detail-panel-section-title">Overview</span>
+                </div>
+                <div class="oi-node-detail-panel-overview-grid" data-id="overview-grid">
+                    <template for:each={overviewFields} for:item="field">
+                        <div key={field.key} class="oi-node-detail-panel-overview-cell">
+                            <span class="oi-node-detail-panel-overview-label">{field.label}</span>
+                            <span class="oi-node-detail-panel-overview-value">{field.value}</span>
+                        </div>
+                    </template>
+                </div>
 
                 <template lwc:if={isObject}>
                     <div class="oi-node-detail-panel-section" data-id="fields-section">
-                        <h3 class="oi-node-detail-panel-section-title">Fields ({fieldCount})</h3>
+                        <button
+                            type="button"
+                            class="oi-node-detail-panel-section-header"
+                            data-id="fields-section-toggle"
+                            data-section="fields"
+                            aria-expanded={isFieldsExpanded}
+                            onclick={handleSectionToggle}
+                        >
+                            <lightning-icon icon-name="utility:chevronright" size="xx-small" class="oi-node-detail-panel-section-chevron"></lightning-icon>
+                            <lightning-icon icon-name="utility:type_tool" size="xx-small" class="oi-node-detail-panel-section-icon is-fields"></lightning-icon>
+                            <span class="oi-node-detail-panel-section-title">Fields</span>
+                            <span class="oi-node-detail-panel-section-count">{fieldCount}</span>
+                        </button>
+                        <template lwc:if={isFieldsExpanded}>
                         <template lwc:if={fieldsVisible}>
                             <div class="oi-node-detail-panel-fields-toolbar">
                                 <input
@@ -115,9 +105,9 @@
                                     <tbody>
                                         <template for:each={filteredFieldRows} for:item="row">
                                             <tr key={row.nodeKey} class="oi-node-detail-panel-field-row" data-id="field-row" data-node-key={row.nodeKey} onclick={handleFieldRowClick}>
-                                                <td>{row.label}</td>
-                                                <td>{row.apiName}</td>
-                                                <td>{row.dataType}</td>
+                                                <td title={row.label}>{row.label}</td>
+                                                <td title={row.apiName}>{row.apiName}</td>
+                                                <td title={row.dataType}>{row.dataType}</td>
                                                 <td><span class={row.badgeClass} data-id="field-badge">{row.badgeLabel}</span></td>
                                             </tr>
                                         </template>
@@ -141,38 +131,81 @@
                         <template lwc:else>
                             <p class="oi-node-detail-panel-section-note">This object has no scanned fields.</p>
                         </template>
+                        </template>
                     </div>
                 </template>
 
                 <template lwc:if={hasRelationshipCounts}>
                     <div class="oi-node-detail-panel-section" data-id="structural-connections">
-                        <h3 class="oi-node-detail-panel-section-title">Structural Connections</h3>
-                        <p class="oi-node-detail-panel-section-note">
-                            {directConnectionCount} directly connected metadata component(s) — schema relationships only
-                            (Has Field / Lookup / Master-Detail). Automation, code, and security dependencies are shown in
-                            their own sections below.
-                        </p>
-                        <table class="oi-node-detail-panel-table">
-                            <tbody>
-                                <template for:each={relationshipCountRows} for:item="row">
-                                    <tr key={row.key}>
-                                        <th scope="row">{row.direction} — {row.label}</th>
-                                        <td>
-                                            <!-- The count itself is the control: the product rule is that every number
-                                                 must be explainable, so the number is what you click. -->
-                                            <button
-                                                type="button"
-                                                class="oi-node-detail-panel-count-button"
-                                                data-id="relationship-count-button"
-                                                data-row-key={row.key}
-                                                title="Show these connections"
-                                                onclick={handleDrilldownOpen}
-                                            >{row.count}</button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
+                        <button
+                            type="button"
+                            class="oi-node-detail-panel-section-header"
+                            data-id="relationships-section-toggle"
+                            data-section="relationships"
+                            aria-expanded={isRelationshipsExpanded}
+                            onclick={handleSectionToggle}
+                        >
+                            <lightning-icon icon-name="utility:chevronright" size="xx-small" class="oi-node-detail-panel-section-chevron"></lightning-icon>
+                            <lightning-icon icon-name="utility:relate" size="xx-small" class="oi-node-detail-panel-section-icon is-relationships" title="Lookup and Master-Detail relationships to and from this node"></lightning-icon>
+                            <span class="oi-node-detail-panel-section-title">Relationships</span>
+                            <span class="oi-node-detail-panel-section-count">{relationshipSectionCount}</span>
+                        </button>
+                        <template lwc:if={isRelationshipsExpanded}>
+                        <template lwc:if={hasCuratedRelationshipRows}>
+                            <table class="oi-node-detail-panel-table" data-id="curated-relationships-table">
+                                <tbody>
+                                    <template for:each={curatedRelationshipRows} for:item="row">
+                                        <tr key={row.key}>
+                                            <th scope="row">{row.label}</th>
+                                            <td>
+                                                <template lwc:if={row.isDrilldownEligible}>
+                                                    <button
+                                                        type="button"
+                                                        class="oi-node-detail-panel-count-button"
+                                                        data-id="curated-relationship-count-button"
+                                                        data-row-key={row.key}
+                                                        title="Show these connections"
+                                                        onclick={handleCuratedDrilldownOpen}
+                                                    >{row.count}</button>
+                                                </template>
+                                                <template lwc:else>
+                                                    <span data-id="curated-relationship-count">{row.count}</span>
+                                                </template>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        <template lwc:else>
+                            <p class="oi-node-detail-panel-section-note">
+                                {directConnectionCount} directly connected metadata component(s) — schema relationships only
+                                (Lookup / Master-Detail). Automation, code, and security dependencies are shown in
+                                their own sections below.
+                            </p>
+                            <table class="oi-node-detail-panel-table">
+                                <tbody>
+                                    <template for:each={relationshipCountRows} for:item="row">
+                                        <tr key={row.key}>
+                                            <th scope="row">{row.direction} — {row.label}</th>
+                                            <td>
+                                                <!-- The count itself is the control: the product rule is that every number
+                                                     must be explainable, so the number is what you click. -->
+                                                <button
+                                                    type="button"
+                                                    class="oi-node-detail-panel-count-button"
+                                                    data-id="relationship-count-button"
+                                                    data-row-key={row.key}
+                                                    title="Show these connections"
+                                                    onclick={handleDrilldownOpen}
+                                                >{row.count}</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        </template>
                     </div>
                 </template>
 
@@ -182,33 +215,72 @@
                 <template lwc:if={hasIntelligenceSections}>
                     <template for:each={intelligenceSections} for:item="section">
                         <div key={section.key} class="oi-node-detail-panel-section" data-id="intelligence-section" data-category={section.key}>
-                            <h3 class="oi-node-detail-panel-section-title">{section.title} ({section.countLabel})</h3>
-                            <template lwc:if={section.hasItems}>
-                                <table class="oi-node-detail-panel-table oi-node-detail-panel-fields-table">
-                                    <tbody>
-                                        <template for:each={section.items} for:item="item">
-                                            <tr key={item.nodeKey} class="oi-node-detail-panel-field-row" data-id="intelligence-row" data-node-key={item.nodeKey} onclick={handleIntelligenceRowClick}>
-                                                <td>{item.label}</td>
-                                                <td>{item.typeLabel}</td>
-                                                <td>{item.directionLabel}</td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                                <template lwc:if={section.truncated}>
-                                    <p class="oi-node-detail-panel-section-note" data-id="intelligence-truncated">Showing the first results only — more exist than are listed here.</p>
+                            <button
+                                type="button"
+                                class="oi-node-detail-panel-section-header"
+                                data-id="intelligence-section-toggle"
+                                data-section={section.key}
+                                aria-expanded={section.isExpanded}
+                                onclick={handleSectionToggle}
+                            >
+                                <lightning-icon icon-name="utility:chevronright" size="xx-small" class="oi-node-detail-panel-section-chevron"></lightning-icon>
+                                <lightning-icon icon-name={section.iconName} size="xx-small" class={section.iconModifierClass}></lightning-icon>
+                                <span class="oi-node-detail-panel-section-title">{section.title}</span>
+                                <span class="oi-node-detail-panel-section-count">{section.countLabel}</span>
+                            </button>
+                            <template lwc:if={section.isExpanded}>
+                                <template lwc:if={section.hasItems}>
+                                    <table class="oi-node-detail-panel-table oi-node-detail-panel-fields-table">
+                                        <tbody>
+                                            <template for:each={section.items} for:item="item">
+                                                <tr key={item.nodeKey} class="oi-node-detail-panel-field-row" data-id="intelligence-row" data-node-key={item.nodeKey} onclick={handleIntelligenceRowClick}>
+                                                    <td title={item.label}>{item.label}</td>
+                                                    <td title={item.typeLabel}>{item.typeLabel}</td>
+                                                    <td title={item.directionLabel}>{item.directionLabel}</td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                    <template lwc:if={section.truncated}>
+                                        <p class="oi-node-detail-panel-section-note" data-id="intelligence-truncated">Showing the first results only — more exist than are listed here.</p>
+                                    </template>
+                                </template>
+                                <template lwc:else>
+                                    <p class={section.emptyStateBadgeClass} data-id="intelligence-empty">{section.emptyStateMessage}</p>
+                                </template>
+                                <button
+                                    type="button"
+                                    class="oi-node-detail-panel-coverage-toggle"
+                                    data-id="coverage-details-toggle"
+                                    data-category={section.key}
+                                    aria-expanded={section.isCoverageDetailsExpanded}
+                                    onclick={handleCoverageDetailsToggle}
+                                >
+                                    <lightning-icon icon-name="utility:info" size="xx-small"></lightning-icon>
+                                    Coverage details
+                                </button>
+                                <template lwc:if={section.isCoverageDetailsExpanded}>
+                                    <p class="oi-node-detail-panel-section-note" data-id="intelligence-coverage">{section.coverageNote}</p>
                                 </template>
                             </template>
-                            <template lwc:else>
-                                <p class="oi-node-detail-panel-section-note" data-id="intelligence-empty">Nothing found in the scanned data.</p>
-                            </template>
-                            <p class="oi-node-detail-panel-section-note" data-id="intelligence-coverage">{section.coverageNote}</p>
                         </div>
                     </template>
                 </template>
 
                 <div class="oi-node-detail-panel-section" data-id="impact-analysis-section">
-                    <h3 class="oi-node-detail-panel-section-title">Impact Analysis</h3>
+                    <button
+                        type="button"
+                        class="oi-node-detail-panel-section-header"
+                        data-id="impact-section-toggle"
+                        data-section="impact"
+                        aria-expanded={isImpactExpanded}
+                        onclick={handleSectionToggle}
+                    >
+                        <lightning-icon icon-name="utility:chevronright" size="xx-small" class="oi-node-detail-panel-section-chevron"></lightning-icon>
+                        <lightning-icon icon-name="utility:graph" size="xx-small" class="oi-node-detail-panel-section-icon is-impact"></lightning-icon>
+                        <span class="oi-node-detail-panel-section-title">Impact</span>
+                    </button>
+                    <template lwc:if={isImpactExpanded}>
                     <div class="oi-node-detail-panel-impact-actions">
                         <button type="button" class="oi-node-detail-panel-impact-button" data-id="impact-forward-button" onclick={handleShowForwardImpact}>What does this depend on?</button>
                         <button type="button" class="oi-node-detail-panel-impact-button" data-id="impact-reverse-button" onclick={handleShowReverseImpact}>What depends on this?</button>
@@ -259,6 +331,7 @@
                             <p class="oi-node-detail-panel-section-note" data-id="impact-empty">No dependencies found in the currently-scanned data.</p>
                         </template>
                     </template>
+                    </template>
                 </div>
 
                 <template lwc:if={hasRecordHierarchy}>
@@ -300,7 +373,10 @@
 
                 <template lwc:if={hasOtherAttributes}>
                     <div class="oi-node-detail-panel-section" data-id="technical-details">
-                        <h3 class="oi-node-detail-panel-section-title">Technical Details</h3>
+                        <div class="oi-node-detail-panel-section-header-static">
+                            <lightning-icon icon-name="utility:settings" size="xx-small" class="oi-node-detail-panel-section-icon is-technical"></lightning-icon>
+                            <h3 class="oi-node-detail-panel-section-title">Technical Details</h3>
+                        </div>
                         <button
                             type="button"
                             class="oi-node-detail-panel-show-fields-button"
@@ -354,6 +430,7 @@
                 onclose={handleDrilldownClose}
                 onnodeselect={handleDrilldownNodeSelect}
             ></c-oi-intelligence-drilldown>
+        </template>
         </template>
     </div>
 </template>

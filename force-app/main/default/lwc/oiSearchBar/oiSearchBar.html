@@ -9,6 +9,7 @@
                 placeholder={placeholderText}
                 value={queryTerm}
                 onchange={handleInputChange}
+                onkeydown={handleInputKeyDown}
             ></lightning-input>
             <button type="button" data-id="search-button" class="oi-search-bar-button" onclick={handleSearchButtonClick}>Search</button>
         </div>
