@@ -79,6 +79,9 @@ const CATEGORY_ICON_NAMES = {
 /** Attribute keys already surfaced explicitly elsewhere in the template — excluded from the generic "Other Attributes" fallback table so nothing is shown twice. */
 const CURATED_ATTRIBUTE_KEYS = new Set(['label', 'custom', 'namespace', 'type', 'referenceTo', 'relationshipName']);
 
+/** Sections collapsed by default on a fresh node selection (product decision, per the reference design) — Overview (always visible, no toggle) and Relationships stay open since they're the two sections a user almost always wants immediately; Fields/Automation/Code/Security/Impact start collapsed to keep the panel scannable, one click away rather than a wall of tables on every click. A pinned panel (isPanelPinned) never re-applies this default — it keeps whatever layout the user already arranged. */
+const DEFAULT_COLLAPSED_SECTIONS = ['fields', 'Automation', 'Code', 'Security', 'impact'];
+
 export default class OiNodeDetailPanel extends LightningElement {
     @api registry = null;
     /** Object mode's distinct-object relationship counts (Self/Referenced/Referencing), supplied by oiGraphExplorer — null for Field/Record modes, or before a center is selected, so this panel falls back to its existing generic relationshipCountRows there (GraphUI.md §42's curated Relationships breakdown is an Object-mode concept). */
@@ -104,8 +107,8 @@ export default class OiNodeDetailPanel extends LightningElement {
     intelligenceRequestId = 0;
     /** The currently-open drill-down selection, or null. Cleared on every new node selection so a dialog can never outlive the node it describes. */
     drilldown = null;
-    /** Collapsible-section UI state (GraphUI.md §42 Intelligence Panel rebuild) — a set of collapsed section keys ('fields'/'relationships'/'Automation'/'Code'/'Security'/'impact'); Technical Details keeps its own pre-existing technicalDetailsVisible toggle (already collapsed-by-default) rather than joining this set. Empty (everything expanded) on a fresh node selection. */
-    collapsedSections = new Set();
+    /** Collapsible-section UI state (GraphUI.md §42 Intelligence Panel rebuild) — a set of collapsed section keys ('fields'/'relationships'/'Automation'/'Code'/'Security'/'impact'); Technical Details keeps its own pre-existing technicalDetailsVisible toggle (already collapsed-by-default) rather than joining this set. Defaults to DEFAULT_COLLAPSED_SECTIONS on a fresh node selection — see that constant's own comment. */
+    collapsedSections = new Set(DEFAULT_COLLAPSED_SECTIONS);
     /** Which categories' "Coverage details" disclosure is open — collapsed (empty set) by default on a fresh node selection. */
     expandedCoverageDetails = new Set();
     /** Whole-panel chrome (Intelligence Panel header) — isPanelExpanded collapses the entire body to reclaim canvas space; isPanelPinned, when on, keeps collapsedSections/expandedCoverageDetails as-is across a node change instead of resetting them, so a layout a user has arranged (e.g. "just show me Security") survives browsing between nodes. Neither is node-specific state, so neither is touched by the nodeKey setter's reset logic below. */
@@ -127,7 +130,7 @@ export default class OiNodeDetailPanel extends LightningElement {
         this.resetImpactAnalysis();
         this.resetIntelligence();
         if (!this.isPanelPinned) {
-            this.collapsedSections = new Set();
+            this.collapsedSections = new Set(DEFAULT_COLLAPSED_SECTIONS);
             this.expandedCoverageDetails = new Set();
         }
         this.loadDetail();
@@ -557,7 +560,7 @@ export default class OiNodeDetailPanel extends LightningElement {
     }
 
     get namespaceDisplay() {
-        return this.attributes.namespace ? this.attributes.namespace : 'None (org-native)';
+        return this.attributes.namespace || '—';
     }
 
     get dataTypeDisplay() {

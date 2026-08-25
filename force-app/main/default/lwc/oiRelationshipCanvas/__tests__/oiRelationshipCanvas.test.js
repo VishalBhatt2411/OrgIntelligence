@@ -153,6 +153,40 @@ describe('c-oi-relationship-canvas', () => {
                 expect(element.shadowRoot.querySelector('[data-id="outgoing-empty"]').textContent).toContain('references no other objects');
             });
         });
+
+        /**
+         * Regression for a real, live-org-confirmed defect: the card-to-trunk segment used to be
+         * a single fixed width regardless of what the connector's own label said, so any label
+         * wider than that fixed gap (routine for aggregated connectors, e.g. "3 Lookup
+         * Relationships") had its opaque background visually cut across the shared vertical
+         * trunk line instead of sitting cleanly within its own segment. Asserted here by parsing
+         * the incoming branch path's own "H <x>" endpoint (the trunk's x-coordinate) — a longer
+         * label must produce a farther-out trunk, never the same fixed value regardless of label
+         * length.
+         */
+        it('gives a connector with a long label more room before the trunk than one with a short label, instead of a fixed gap regardless of label length', () => {
+            const shortLabelFixture = {
+                nodes: [objectNode('account', 'Account', 'Account'), objectNode('opp', 'Opportunity', 'Opportunity'), fieldNode('oppAcct', 'AccountId')],
+                edges: [hasFieldEdge('opp', 'oppAcct'), lookupEdge('oppAcct', 'account', 'AccountId')]
+            };
+            const longLabelFixture = {
+                nodes: [objectNode('account', 'Account', 'Account'), objectNode('opp', 'Opportunity', 'Opportunity'), fieldNode('oppAcct', 'ThisIsADeliberatelyVeryLongCustomLookupFieldApiName__c')],
+                edges: [hasFieldEdge('opp', 'oppAcct'), lookupEdge('oppAcct', 'account', 'ThisIsADeliberatelyVeryLongCustomLookupFieldApiName__c')]
+            };
+
+            function trunkXFor(fixture) {
+                const element = renderCanvas({ ...fixture, centerNodeKey: 'account' });
+                return Promise.resolve().then(() => {
+                    const branchPath = element.shadowRoot.querySelector('[data-id="incoming-card"]').closest('svg').querySelector('path.oi-orc-connector-line-incoming:not(.is-trunk):not(.is-trunk-final)');
+                    const match = /H\s+([\d.]+)/.exec(branchPath.getAttribute('d'));
+                    return Number(match[1]);
+                });
+            }
+
+            return Promise.all([trunkXFor(shortLabelFixture), trunkXFor(longLabelFixture)]).then(([shortTrunkX, longTrunkX]) => {
+                expect(longTrunkX).toBeGreaterThan(shortTrunkX);
+            });
+        });
     });
 
     describe('relationship connector correctness', () => {
@@ -354,6 +388,40 @@ describe('c-oi-relationship-canvas', () => {
                 expect(legend.textContent).toContain('System Relationship');
                 expect(legend.textContent).not.toContain('Executes On');
                 expect(legend.textContent).not.toContain('Grants Access To');
+            });
+        });
+
+        /** VisualDesignSpecification.md §3.4: legend docked lower-left and zoom controls docked lower-right, in the SAME persistent footer region — never a legend row and a separately-floating zoom widget. */
+        it('docks the legend and the zoom controls inside the same persistent canvas footer', () => {
+            const fixture = baseFixture();
+            const element = renderCanvas({ ...fixture, centerNodeKey: 'account' });
+
+            return Promise.resolve().then(() => {
+                const footer = element.shadowRoot.querySelector('[data-id="canvas-footer"]');
+                expect(footer).not.toBeNull();
+                expect(footer.querySelector('[data-id="legend"]')).not.toBeNull();
+                expect(footer.querySelector('[data-id="zoom-controls"]')).not.toBeNull();
+            });
+        });
+    });
+
+    describe('neighbor card contract (VisualDesignSpecification.md §5)', () => {
+        it('shows a divider and a relationship field/type footer on the card itself, not only on the floating connector label', () => {
+            const fixture = baseFixture();
+            const element = renderCanvas({ ...fixture, centerNodeKey: 'account' });
+
+            return Promise.resolve().then(() => {
+                const outgoingCard = element.shadowRoot.querySelector('[data-id="outgoing-card"]');
+                expect(outgoingCard.querySelector('.oi-orc-card-divider')).not.toBeNull();
+                const footer = outgoingCard.querySelector('.oi-orc-card-footer');
+                expect(footer).not.toBeNull();
+                expect(footer.textContent).toContain('AccountManagerId');
+                expect(footer.textContent).toContain('Lookup');
+
+                const incomingCard = element.shadowRoot.querySelector('[data-id="incoming-card"]');
+                const incomingFooter = incomingCard.querySelector('.oi-orc-card-footer');
+                expect(incomingFooter.textContent).toContain('AccountId');
+                expect(incomingFooter.textContent).toContain('Master-Detail');
             });
         });
     });

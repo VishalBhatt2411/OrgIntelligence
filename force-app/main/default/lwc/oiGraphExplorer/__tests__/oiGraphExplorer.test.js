@@ -659,6 +659,51 @@ describe('c-oi-graph-explorer', () => {
         });
     });
 
+    describe('Object mode search hierarchy (VisualDesignSpecification.md §3.1/§3.2 — analyzed-state composition)', () => {
+        it('collapses the full search bar into a compact "Object: <label>" banner once an object is analyzed, and restores the search bar via "Change object"', async () => {
+            getGraphFragment.mockResolvedValueOnce({ centerNodeKey: 'root', nodes: [nodeSummaryDto('root', 'Root')], edges: [], frontier: ['root'], hasMore: false, nextCursor: null });
+            const element = createElement('c-oi-graph-explorer', { is: OiGraphExplorer });
+            document.body.appendChild(element);
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('c-oi-search-bar')).not.toBeNull();
+            expect(element.shadowRoot.querySelector('[data-id="object-mode-banner"]')).toBeNull();
+
+            element.shadowRoot.querySelector('c-oi-search-bar').dispatchEvent(new CustomEvent('select', { detail: { nodeKey: 'root' } }));
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('c-oi-search-bar')).toBeNull();
+            const banner = element.shadowRoot.querySelector('[data-id="object-mode-banner"]');
+            expect(banner).not.toBeNull();
+            expect(banner.textContent).toContain('Root');
+
+            element.shadowRoot.querySelector('[data-id="object-mode-change-object"]').click();
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('c-oi-search-bar')).not.toBeNull();
+            expect(element.shadowRoot.querySelector('[data-id="object-mode-banner"]')).toBeNull();
+        });
+
+        it('re-collapses the search bar back to the compact banner once a new object is selected from it', async () => {
+            getGraphFragment.mockResolvedValueOnce({ centerNodeKey: 'root', nodes: [nodeSummaryDto('root', 'Root')], edges: [], frontier: ['root'], hasMore: false, nextCursor: null });
+            const element = createElement('c-oi-graph-explorer', { is: OiGraphExplorer });
+            document.body.appendChild(element);
+            await flushPromises();
+
+            element.shadowRoot.querySelector('c-oi-search-bar').dispatchEvent(new CustomEvent('select', { detail: { nodeKey: 'root' } }));
+            await flushPromises();
+            element.shadowRoot.querySelector('[data-id="object-mode-change-object"]').click();
+            await flushPromises();
+
+            getGraphFragment.mockResolvedValueOnce({ centerNodeKey: 'other', nodes: [nodeSummaryDto('other', 'Other')], edges: [], frontier: ['other'], hasMore: false, nextCursor: null });
+            element.shadowRoot.querySelector('c-oi-search-bar').dispatchEvent(new CustomEvent('select', { detail: { nodeKey: 'other' } }));
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('c-oi-search-bar')).toBeNull();
+            expect(element.shadowRoot.querySelector('[data-id="object-mode-banner"]').textContent).toContain('Other');
+        });
+    });
+
     it('renders a sanitized error banner when getGraphFragment fails, without throwing', async () => {
         getGraphFragment.mockRejectedValue({ body: { message: 'You don\'t have permission to view org graph data.' } });
         const element = createElement('c-oi-graph-explorer', { is: OiGraphExplorer });

@@ -65,20 +65,70 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
-const CARD_WIDTH = 225;
-const CARD_HEIGHT = 68;
+/** VisualDesignSpecification.md §5's card contract targets ~236x80 for neighbor cards; matched exactly here (rather than the previous 225x68) now that each card also carries its own divider + relationship-field footer row (see buildIncomingEntry/buildOutgoingEntry and the template's .oi-orc-card-footer), which needs the extra height to avoid crowding. */
+const CARD_WIDTH = 236;
+const CARD_HEIGHT = 80;
+/** CENTER_WIDTH stays wider than the reference's ~160px: real object labels ("Opportunity"), the type caption, and the "Analyzing" status pill routinely need more room than that at real org data volumes — VisualDesignSpecification.md §9's own tolerance ("card/control dimensions within 4px unless dynamic text requires more width") anticipates exactly this. CENTER_HEIGHT is matched exactly (185 -> 196). */
 const CENTER_WIDTH = 210;
-const CENTER_HEIGHT = 185;
+const CENTER_HEIGHT = 196;
 const ROW_GAP = 26;
 const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 const MARGIN_X = 24;
-const TRUNK_GAP = 150;
 const TOP_MARGIN = 30;
 const SELF_CARD_WIDTH = 190;
 const SELF_CARD_HEIGHT = 62;
 const SELF_CAPTION_HEIGHT = 42;
 const SELF_ENTRY_GAP = 22;
 const SELF_ENTRY_HEIGHT = SELF_CAPTION_HEIGHT + SELF_CARD_HEIGHT + SELF_ENTRY_GAP;
+
+/**
+ * The card-to-trunk segment (where a connector's own label sits) used to be a fixed 150/2=75px
+ * regardless of what the label actually said — live-org verification (a real Account with
+ * several multi-field connectors, e.g. "3 Lookup Relationships") showed labels routinely wider
+ * than that, so the label's own opaque background visually cut across the vertical trunk line
+ * it should have stopped well short of, instead of sitting cleanly within its own segment the
+ * way the reference design does. LABEL_SEGMENT_MIN is the old fixed value, kept as the floor for
+ * short labels; LABEL_SEGMENT_MAX caps how far one unusually long label can stretch the whole
+ * lane before CSS truncation (see .oi-orc-connector-label's max-width) takes over instead.
+ * FINAL_SEGMENT is the old TRUNK_GAP/2's *other* half — the unlabeled trunk-to-center approach —
+ * which never needed to grow, since nothing is ever drawn on it.
+ */
+const LABEL_SEGMENT_MIN = 75;
+const LABEL_SEGMENT_MAX = 260;
+const LABEL_H_PADDING = 28;
+const FINAL_SEGMENT = 75;
+/** A deliberately generous estimate for the connector label's 0.72rem semibold font. Keeping layout geometry independent of Canvas APIs makes it deterministic in Lightning, Jest, and hardened browser contexts; CSS truncation remains the final safety net for unusually wide glyphs. */
+const FALLBACK_CHAR_WIDTH = 7;
+
+function measureLabelWidth(text) {
+    return (text || '').length * FALLBACK_CHAR_WIDTH;
+}
+
+/** The connector's own label text (extracted from decorateConnector so the label-segment-width computation below can measure it before full decoration happens — see that method's own doc comment for what each branch means). */
+function buildConnectorLabelText(connector) {
+    const hasFieldDetail = connector.fields.length > 0 && !!connector.fields[0].fieldApiName;
+    const relationshipTypeLabel = connector.relationshipTypeLabel || (connector.primaryRelationshipType === 'MasterDetail' ? 'Master-Detail' : 'Lookup');
+    let connectorLabel;
+    if (hasFieldDetail) {
+        connectorLabel = connector.relationshipCount > 1 ? `${connector.relationshipCount} ${relationshipTypeLabel} Relationships` : `${connector.fields[0].fieldApiName} · ${relationshipTypeLabel}`;
+    } else {
+        connectorLabel = connector.relationshipCount > 1 ? `${connector.relationshipCount} ${relationshipTypeLabel}` : relationshipTypeLabel;
+    }
+    return { connectorLabel, relationshipTypeLabel };
+}
+
+/** The card-to-trunk segment length this lane needs so its widest label fits entirely within its own segment — never spilling across the trunk line the way a fixed-width gap would for a long label. Deterministic given the same connector set (§"Deterministic SVG diagram geometry" — canvas measureText has no randomness), so this stays consistent with the rest of this file's no-force-relaxation layout philosophy. */
+function computeLabelSegment(connectors) {
+    let maxWidth = 0;
+    for (const connector of connectors) {
+        const { connectorLabel } = buildConnectorLabelText(connector);
+        const width = measureLabelWidth(connectorLabel);
+        if (width > maxWidth) {
+            maxWidth = width;
+        }
+    }
+    return clamp(maxWidth + LABEL_H_PADDING, LABEL_SEGMENT_MIN, LABEL_SEGMENT_MAX);
+}
 
 export default class OiRelationshipCanvas extends LightningElement {
     @api nodes = [];
@@ -563,12 +613,16 @@ export default class OiRelationshipCanvas extends LightningElement {
         const diagramHeight = TOP_MARGIN * 2 + bodyHeight;
         const centerY = TOP_MARGIN + bodyHeight / 2;
 
-        const canvasWidth = MARGIN_X * 2 + CARD_WIDTH * 2 + TRUNK_GAP * 2 + CENTER_WIDTH;
-        const centerX = MARGIN_X + CARD_WIDTH + TRUNK_GAP;
+        /** Sized to each lane's own widest label (see computeLabelSegment's doc comment) — never a fixed constant, so a long "N Lookup Relationships" connector gets the room it needs instead of visually spilling across the trunk line. */
+        const incomingLabelSegment = computeLabelSegment(incoming);
+        const outgoingLabelSegment = computeLabelSegment(outgoing);
+
+        const canvasWidth = MARGIN_X * 2 + CARD_WIDTH * 2 + incomingLabelSegment + outgoingLabelSegment + FINAL_SEGMENT * 2 + CENTER_WIDTH;
+        const centerX = MARGIN_X + CARD_WIDTH + incomingLabelSegment + FINAL_SEGMENT;
         const incomingCardX = MARGIN_X;
         const outgoingCardX = canvasWidth - MARGIN_X - CARD_WIDTH;
-        const incomingTrunkX = incomingCardX + CARD_WIDTH + TRUNK_GAP / 2;
-        const outgoingTrunkX = outgoingCardX - TRUNK_GAP / 2;
+        const incomingTrunkX = incomingCardX + CARD_WIDTH + incomingLabelSegment;
+        const outgoingTrunkX = outgoingCardX - outgoingLabelSegment;
         const centerLeftX = centerX;
         const centerRightX = centerX + CENTER_WIDTH;
         const centerBottomY = centerY + CENTER_HEIGHT / 2;
@@ -738,14 +792,7 @@ export default class OiRelationshipCanvas extends LightningElement {
      * (oiRelationshipConnectorDetail), which already lists every one of them.
      */
     decorateConnector(connector, laneKey, index) {
-        const hasFieldDetail = connector.fields.length > 0 && !!connector.fields[0].fieldApiName;
-        const relationshipTypeLabel = connector.relationshipTypeLabel || (connector.primaryRelationshipType === 'MasterDetail' ? 'Master-Detail' : 'Lookup');
-        let connectorLabel;
-        if (hasFieldDetail) {
-            connectorLabel = connector.relationshipCount > 1 ? `${connector.relationshipCount} ${relationshipTypeLabel} Relationships` : `${connector.fields[0].fieldApiName} · ${relationshipTypeLabel}`;
-        } else {
-            connectorLabel = connector.relationshipCount > 1 ? `${connector.relationshipCount} ${relationshipTypeLabel}` : relationshipTypeLabel;
-        }
+        const { connectorLabel, relationshipTypeLabel } = buildConnectorLabelText(connector);
         const isActive = this.activeConnectorKey === connector.connectorKey;
         const isDimmed = !!this.activeConnectorKey && !isActive;
         return {
@@ -753,7 +800,7 @@ export default class OiRelationshipCanvas extends LightningElement {
             connectorLabel,
             relationshipTypeLabel,
             counterpartTypeLabel: this.counterpartTypeLabel(connector.counterpartObject),
-            selfCaptionSubtitle: this.selfCaptionSubtitle(connector),
+            selfCaptionSubtitle: this.selfCaptionSubtitle(),
             lineClass: this.connectorLineClass(connector, laneKey, isActive, isDimmed),
             labelClass: this.connectorLabelClass(connector, laneKey, isActive, isDimmed),
             cardClass: 'oi-orc-card' + (isActive ? ' is-active' : '') + (isDimmed ? ' is-dimmed' : ''),
@@ -776,7 +823,7 @@ export default class OiRelationshipCanvas extends LightningElement {
      * to another {objectApiName} record" instead, naming the object type both records share
      * rather than a specific record name that would be wrong for one side of the pair.
      */
-    selfCaptionSubtitle(connector) {
+    selfCaptionSubtitle() {
         if (!this.rootObject) {
             return '';
         }

@@ -93,12 +93,20 @@
                 </template>
             </template>
             <template lwc:else>
-                <c-oi-search-bar
-                    placeholder-text={searchPlaceholder}
-                    type-key-filter={searchTypeKeyFilter}
-                    registry={registry}
-                    onselect={handleSearchSelect}
-                ></c-oi-search-bar>
+                <template lwc:if={shouldShowObjectSearchBar}>
+                    <c-oi-search-bar
+                        placeholder-text={searchPlaceholder}
+                        type-key-filter={searchTypeKeyFilter}
+                        registry={registry}
+                        onselect={handleSearchSelect}
+                    ></c-oi-search-bar>
+                </template>
+                <template lwc:elseif={centerObjectSummary}>
+                    <div class="oi-object-mode-banner" data-id="object-mode-banner">
+                        Object: <strong>{centerObjectSummary.label}</strong>
+                        <button type="button" class="oi-object-mode-change" data-id="object-mode-change-object" onclick={handleChangeObjectSearch}>Change object</button>
+                    </div>
+                </template>
             </template>
         </div>
 

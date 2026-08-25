@@ -5,7 +5,7 @@ This file provides guidance to Codex when working in this repository.
 ---
 
 #
-take reference from  ProductSpec.md for every implementation or specification needs. 
+Take `docs/ProductSpecs.md` as the master functional directive and `docs/VisualDesignSpecification.md` as the binding visual contract for Object Analyze mode. When they overlap, the more specific visual contract controls presentation; architecture, security, data, and packaging constraints remain governed by the relevant source-of-truth documents.
 # Mission
 
 You are acting as:

@@ -167,6 +167,8 @@ Implementation approach (user-confirmed): external LLM via Named Credential (Ape
 
 Full spec: [GraphUI.md](GraphUI.md).
 
+Object Analyze mode visual acceptance is additionally governed by [VisualDesignSpecification.md](VisualDesignSpecification.md) and [ADR-0025](ADR/0025-reference-image-as-binding-visual-acceptance-contract.md). No visual-polish item may be marked done from source review or automated tests alone.
+
 | # | Item | Priority |
 |---|---|---|
 | UI-0 | `OI_SettingsController.getPresentationRegistry()` + `oiSharedUtils/presentationRegistry.js` fetch-once-cache module ([GraphUI.md §20, §34](GraphUI.md#20-node-type-rendering-registry)) — prerequisite for UI-2/UI-2a, since node/edge rendering has nothing to resolve styling from without it | P0 |
@@ -193,6 +195,7 @@ Full spec: [GraphUI.md](GraphUI.md).
 | UI-13 | Force-relaxation / edge-crossing-reduction pass per `GraphUI.md` §17/§32 — implemented 2026-08-19 as an in-house barycenter-reordering heuristic (`oiGraphCanvas.js`'s `computeBaseLayout`, passes 2–3), not a vendored library — see [ADR-0020's amendment](ADR/0020-svg-rendering-vendored-layout-library.md#amendment-2026-08-19-the-layout-math-library-was-implemented-in-house-not-vendored) for why. All 207 LWC Jest tests pass, including a new hub-node case (UI-16) | P0 — done |
 | UI-14 | Hub-node handling: a node referenced from multiple currently-expanded ancestors (GraphUI.md §18) is now pulled toward the angular barycenter of ALL its real connections (not just its one BFS parent), and any edge outside the BFS tree renders with a reduced-opacity `oi-graph-edge-secondary` style so it recedes visually without being hidden (ADR-0019's topological-honesty guarantee preserved) | P0 — done |
 | UI-15 | Visual polish pass on `oiGraphNode`/`oiGraphCanvas` re-verified against real rendered screenshots (not estimated dimensions) — contrast, spacing, label truncation, icon/chrome legibility at normal sizes. **Not done**: source review (2026-08-19) shows contrast/spacing were already reasonably addressed in a prior pass (SLDS token hooks throughout, edge contrast already widened per an existing code comment), but this still needs verification against actual rendered output in a real org, which no session so far has done | P0 |
+| UI-17 | Object Analyze visual-conformance audit against the approved reference. Current-state evidence and the prioritized gap matrix are now documented in `CurrentUIVisualGapAssessment.md`. A same-size 1536 × 1024 capture, overlay/perceptual comparison, implementation iteration, and product-owner approval remain. This item cannot be completed by Jest/source review alone | P0 — assessment complete; implementation not authorized; exact-viewport capture still required |
 | UI-16 | Jest fixture covering a shared/hub-node, cross-link graph shape (not just a simple tree) so the crossing-edges gap is guarded going forward — added 2026-08-19 (`oiGraphCanvas.test.js`, the root→A,B→hub diamond case), asserting the hub lands within the angular span between its two real parents | P1 — done |
 
 ## Epic: Package Readiness & Security (Roadmap Phase 5)

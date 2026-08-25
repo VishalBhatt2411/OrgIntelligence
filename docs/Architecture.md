@@ -298,6 +298,8 @@ Read-only consumer of the graph, reached exclusively through the `OI_GraphEngine
 
 **Shell**: a single Lightning App hosting `oiGraphExplorer` as the container/orchestrator. The graph is the primary surface; tables (e.g., a node-list view of search/filter results) are a secondary, always-available alternative rendering of the *same* selection — never a separate data path (`CLAUDE.md` §UI Philosophy). Its complete specification — the container/presentational component split, the Canvas/Node/Edge component architecture, the tree-vs-graph visualization analysis, layout strategy, and every navigation/exploration affordance — lives in the dedicated [GraphUI.md](GraphUI.md); this section gives the summary a reader of this document needs.
 
+**Visual conformance boundary**: [VisualDesignSpecification.md](VisualDesignSpecification.md) is authoritative for Object Analyze mode's application-owned workspace. The package controls the explorer workspace but not Salesforce global chrome. Architecture conformance and visual conformance are separate gates: a correct container/presentational split does not establish that the rendered product matches the approved reference. See [ADR-0025](ADR/0025-reference-image-as-binding-visual-acceptance-contract.md).
+
 ```mermaid
 flowchart TB
     Shell[oiGraphExplorer — container] --> Canvas[oiGraphCanvas — presentational]

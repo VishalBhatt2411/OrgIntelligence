@@ -1,5 +1,7 @@
 # MASTER IMPLEMENTATION DIRECTIVE
 
+> **Visual authority:** For Object Analyze mode, [VisualDesignSpecification.md](VisualDesignSpecification.md) and [ADR-0025](ADR/0025-reference-image-as-binding-visual-acceptance-contract.md) are the binding visual acceptance contract. “Use SLDS” does not authorize a visually approximate substitute. Functional, security, data, performance, and packaging requirements in this document remain controlling.
+
 You are working inside the existing **Salesforce Org Intelligence Platform** repository.
 
 This is NOT a greenfield project.
@@ -692,6 +694,8 @@ Improve:
 * graph readability
 
 Use SLDS.
+
+For Object Analyze mode, use SLDS tokens and accessible patterns while matching the approved reference. A Lightning base component is not mandatory when its shadow-DOM styling boundary prevents the specified appearance; custom semantic markup/CSS is allowed under `VisualDesignSpecification.md` and Coding Standards. Visual validation requires a same-viewport real-org screenshot comparison, not source inspection alone.
 
 Do not use cosmetic improvements as substitutes for broken interactions.
 

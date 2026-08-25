@@ -16,6 +16,17 @@ function flushPromises() {
     return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+/**
+ * Fields/Automation/Code/Security/Impact all start collapsed by default (DEFAULT_COLLAPSED_SECTIONS
+ * in oiNodeDetailPanel.js) — this clicks the given section's header toggle (data-section="fields" /
+ * "Automation" / "Code" / "Security" / "impact") and waits for the resulting re-render, so tests that
+ * only care about a section's expanded content don't have to repeat the click/flush pair inline.
+ */
+async function expandSection(element, section) {
+    element.shadowRoot.querySelector(`[data-section="${section}"]`).click();
+    await flushPromises();
+}
+
 function objectDetail(overrides) {
     return {
         nodeKey: 'account',
@@ -89,6 +100,8 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'Automation');
+            await expandSection(element, 'Security');
 
             const sections = element.shadowRoot.querySelectorAll('[data-id="intelligence-section"]');
             expect(sections).toHaveLength(3);
@@ -108,6 +121,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'Code');
 
             const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
             expect(codeSection).not.toBeNull();
@@ -137,6 +151,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'Security');
 
             const securitySection = element.shadowRoot.querySelector('[data-category="Security"]');
             const row = securitySection.querySelector('[data-id="intelligence-row"]');
@@ -152,6 +167,9 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'Automation');
+            await expandSection(element, 'Code');
+            await expandSection(element, 'Security');
 
             const sectionText = [...element.shadowRoot.querySelectorAll('[data-id="intelligence-section"]')].map((s) => s.textContent).join(' ');
             expect(sectionText).not.toContain('SalesforceMetadata.');
@@ -203,6 +221,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'Automation');
 
             expect(element.shadowRoot.querySelector('[data-id="intelligence-truncated"]')).not.toBeNull();
         });
@@ -217,6 +236,7 @@ describe('c-oi-node-detail-panel', () => {
                 document.body.appendChild(element);
                 element.nodeKey = 'account';
                 await flushPromises();
+                await expandSection(element, 'Code');
 
                 const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
                 const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
@@ -233,6 +253,7 @@ describe('c-oi-node-detail-panel', () => {
                 document.body.appendChild(element);
                 element.nodeKey = 'account';
                 await flushPromises();
+                await expandSection(element, 'Code');
 
                 const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
                 const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
@@ -247,6 +268,7 @@ describe('c-oi-node-detail-panel', () => {
                 document.body.appendChild(element);
                 element.nodeKey = 'account';
                 await flushPromises();
+                await expandSection(element, 'Code');
 
                 const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
                 const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
@@ -262,6 +284,7 @@ describe('c-oi-node-detail-panel', () => {
                 document.body.appendChild(element);
                 element.nodeKey = 'account';
                 await flushPromises();
+                await expandSection(element, 'Code');
 
                 const codeSection = element.shadowRoot.querySelector('[data-category="Code"]');
                 const empty = codeSection.querySelector('[data-id="intelligence-empty"]');
@@ -279,19 +302,19 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
 
             const automationSection = element.shadowRoot.querySelector('[data-category="Automation"]');
-            expect(automationSection.textContent).toContain('AccountTrigger');
-            const toggle = automationSection.querySelector('[data-id="intelligence-section-toggle"]');
-            expect(toggle.getAttribute('aria-expanded')).toBe('true');
-
-            toggle.click();
-            await flushPromises();
             expect(automationSection.textContent).not.toContain('AccountTrigger');
+            const toggle = automationSection.querySelector('[data-id="intelligence-section-toggle"]');
             expect(toggle.getAttribute('aria-expanded')).toBe('false');
 
             toggle.click();
             await flushPromises();
             expect(automationSection.textContent).toContain('AccountTrigger');
             expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+            toggle.click();
+            await flushPromises();
+            expect(automationSection.textContent).not.toContain('AccountTrigger');
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
         });
 
         it('selecting a related component dispatches select so the user can navigate to it', async () => {
@@ -301,6 +324,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'Automation');
             const handler = jest.fn();
             element.addEventListener('select', handler);
 
@@ -508,7 +532,7 @@ describe('c-oi-node-detail-panel', () => {
         const content = element.shadowRoot.querySelector('[data-id="detail-content"]');
         expect(content.textContent).toContain('Object');
         expect(content.textContent).toContain('Standard');
-        expect(content.textContent).toContain('None (org-native)');
+        expect(content.textContent).toContain('—');
 
         /**
          * Object mode gets the curated relationship breakdown (GraphUI.md §42, item 14): HAS_FIELD
@@ -645,6 +669,7 @@ describe('c-oi-node-detail-panel', () => {
 
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
 
             const fieldsSection = element.shadowRoot.querySelector('[data-id="fields-section"]');
             expect(fieldsSection.textContent).toContain('Fields');
@@ -661,6 +686,11 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
 
             const toggle = element.shadowRoot.querySelector('[data-id="fields-section-toggle"]');
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
+            expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).toBeNull();
+
+            toggle.click();
+            await flushPromises();
             expect(toggle.getAttribute('aria-expanded')).toBe('true');
             expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).not.toBeNull();
 
@@ -668,10 +698,6 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
             expect(toggle.getAttribute('aria-expanded')).toBe('false');
             expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).toBeNull();
-
-            toggle.click();
-            await flushPromises();
-            expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).not.toBeNull();
         });
 
         it('does not render a Fields section at all for a non-Object node', async () => {
@@ -695,6 +721,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
 
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
@@ -717,6 +744,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
 
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
@@ -747,6 +775,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
 
@@ -770,6 +799,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
 
@@ -790,6 +820,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
 
@@ -809,6 +840,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
             expect(element.shadowRoot.querySelector('[data-id="fields-table"]')).not.toBeNull();
@@ -817,6 +849,7 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
 
             expect(element.shadowRoot.querySelector('[data-id="fields-table"]')).toBeNull();
+            await expandSection(element, 'fields');
             expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).not.toBeNull();
         });
 
@@ -827,6 +860,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
 
             element.shadowRoot.querySelector('[data-id="show-fields-button"]').click();
             await flushPromises();
@@ -842,6 +876,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'fields');
 
             expect(element.shadowRoot.querySelector('[data-id="show-fields-button"]')).toBeNull();
             expect(element.shadowRoot.querySelector('[data-id="fields-section"]').textContent).toContain('no scanned fields');
@@ -870,6 +905,11 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
 
             const toggle = element.shadowRoot.querySelector('[data-id="impact-section-toggle"]');
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
+            expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).toBeNull();
+
+            toggle.click();
+            await flushPromises();
             expect(toggle.getAttribute('aria-expanded')).toBe('true');
             expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).not.toBeNull();
 
@@ -877,10 +917,6 @@ describe('c-oi-node-detail-panel', () => {
             await flushPromises();
             expect(toggle.getAttribute('aria-expanded')).toBe('false');
             expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).toBeNull();
-
-            toggle.click();
-            await flushPromises();
-            expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).not.toBeNull();
         });
 
         it('shows both Impact Analysis actions for a non-Apex node too — the feature is generic, never gated to a hardcoded node type', async () => {
@@ -889,6 +925,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             expect(element.shadowRoot.querySelector('[data-id="impact-forward-button"]')).not.toBeNull();
             expect(element.shadowRoot.querySelector('[data-id="impact-reverse-button"]')).not.toBeNull();
@@ -902,6 +939,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
@@ -944,6 +982,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
@@ -967,6 +1006,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
@@ -982,6 +1022,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-reverse-button"]').click();
             await flushPromises();
@@ -998,6 +1039,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
@@ -1012,6 +1054,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
@@ -1027,6 +1070,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
 
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
@@ -1042,6 +1086,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
 
@@ -1061,6 +1106,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
 
@@ -1079,6 +1125,7 @@ describe('c-oi-node-detail-panel', () => {
             document.body.appendChild(element);
             element.nodeKey = 'account';
             await flushPromises();
+            await expandSection(element, 'impact');
             element.shadowRoot.querySelector('[data-id="impact-forward-button"]').click();
             await flushPromises();
             expect(element.shadowRoot.querySelector('[data-id="impact-coverage-caveat"]')).not.toBeNull();

@@ -15,6 +15,7 @@
             </template>
             <div class="oi-orc-toolbar-spacer"></div>
             <template lwc:if={showVisibilityToggle}>
+                <div class="oi-orc-toolbar-divider"></div>
                 <span class="oi-orc-toolbar-label" id="oi-orc-visibility-label">Relationship View</span>
                 <div class="oi-orc-visibility-toggle-group" role="group" aria-labelledby="oi-orc-visibility-label">
                     <button type="button" class={businessToggleClass} data-mode="business" aria-pressed={isBusinessMode} onclick={handleVisibilityChange}>Business</button>
@@ -22,6 +23,7 @@
                     <button type="button" class={allToggleClass} data-mode="all" aria-pressed={isAllMode} onclick={handleVisibilityChange}>All</button>
                 </div>
             </template>
+            <div class="oi-orc-toolbar-divider"></div>
             <span class="oi-orc-toolbar-label" id="oi-orc-view-options-label">View Options</span>
             <div class="oi-orc-view-options-wrap">
                 <button
@@ -74,7 +76,8 @@
                 </div>
             </div>
 
-            <div class="oi-orc-diagram-wrapper" data-id="diagram-wrapper">
+            <div class="oi-orc-canvas-body">
+                <div class="oi-orc-diagram-wrapper" data-id="diagram-wrapper">
                 <svg
                     data-id="orc-svg"
                     class="oi-orc-svg"
@@ -119,11 +122,12 @@
 
                     <!-- Connector labels — HTML badges via foreignObject so the label visually belongs to the line -->
                     <template for:each={diagram.incomingCards} for:item="card">
-                        <foreignObject key={card.rowKey} x={card.labelX} y={card.labelY} width="240" height="24" class="oi-orc-label-slot">
+                        <foreignObject key={card.rowKey} x={card.labelX} y={card.labelY} width="300" height="24" class="oi-orc-label-slot">
                             <div
                                 class={card.labelClass}
                                 data-id="incoming-connector"
                                 data-connector-key={card.connectorKey}
+                                title={card.connectorLabel}
                                 role="button"
                                 tabindex="0"
                                 onclick={handleConnectorClick}
@@ -134,11 +138,12 @@
                         </foreignObject>
                     </template>
                     <template for:each={diagram.outgoingCards} for:item="card">
-                        <foreignObject key={card.rowKey} x={card.labelX} y={card.labelY} width="240" height="24" class="oi-orc-label-slot oi-orc-label-slot-right">
+                        <foreignObject key={card.rowKey} x={card.labelX} y={card.labelY} width="300" height="24" class="oi-orc-label-slot oi-orc-label-slot-right">
                             <div
                                 class={card.labelClass}
                                 data-id="outgoing-connector"
                                 data-connector-key={card.connectorKey}
+                                title={card.connectorLabel}
                                 role="button"
                                 tabindex="0"
                                 onclick={handleConnectorClick}
@@ -186,12 +191,16 @@
                                 onmouseenter={handleCardMouseEnter}
                                 onmouseleave={handleCardMouseLeave}
                             >
-                                <lightning-icon icon-name={card.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
-                                <div class="oi-orc-card-labels">
-                                    <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
-                                    <span class="oi-orc-card-subtitle">{card.counterpartObject.secondaryKey}</span>
+                                <div class="oi-orc-card-main">
+                                    <lightning-icon icon-name={card.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
+                                    <div class="oi-orc-card-labels">
+                                        <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
+                                        <span class="oi-orc-card-subtitle">{card.counterpartTypeLabel}</span>
+                                    </div>
+                                    <span class="oi-orc-card-chevron">&#8250;</span>
                                 </div>
-                                <span class="oi-orc-card-chevron">&#8250;</span>
+                                <div class="oi-orc-card-divider"></div>
+                                <div class="oi-orc-card-footer" title={card.connectorLabel}>{card.connectorLabel}</div>
                             </div>
                         </foreignObject>
                     </template>
@@ -212,12 +221,16 @@
                                 onmouseenter={handleCardMouseEnter}
                                 onmouseleave={handleCardMouseLeave}
                             >
-                                <lightning-icon icon-name={card.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
-                                <div class="oi-orc-card-labels">
-                                    <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
-                                    <span class="oi-orc-card-subtitle">{card.counterpartObject.secondaryKey}</span>
+                                <div class="oi-orc-card-main">
+                                    <lightning-icon icon-name={card.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
+                                    <div class="oi-orc-card-labels">
+                                        <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
+                                        <span class="oi-orc-card-subtitle">{card.counterpartTypeLabel}</span>
+                                    </div>
+                                    <span class="oi-orc-card-chevron">&#8250;</span>
                                 </div>
-                                <span class="oi-orc-card-chevron">&#8250;</span>
+                                <div class="oi-orc-card-divider"></div>
+                                <div class="oi-orc-card-footer" title={card.connectorLabel}>{card.connectorLabel}</div>
                             </div>
                         </foreignObject>
                     </template>
@@ -232,10 +245,12 @@
                     <template for:each={diagram.selfEntries} for:item="entry">
                         <foreignObject key={entry.connectorKey} x={entry.cardX} y={entry.cardY} width={entry.cardWidth} height={entry.cardHeight}>
                             <div class="oi-orc-card oi-orc-card-self" data-id="self-card">
-                                <lightning-icon icon-name={entry.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
-                                <div class="oi-orc-card-labels">
-                                    <span class="oi-orc-card-title">{entry.counterpartObject.label} (Self)</span>
-                                    <span class="oi-orc-card-subtitle">{entry.counterpartTypeLabel}</span>
+                                <div class="oi-orc-card-main">
+                                    <lightning-icon icon-name={entry.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
+                                    <div class="oi-orc-card-labels">
+                                        <span class="oi-orc-card-title">{entry.counterpartObject.label} (Self)</span>
+                                        <span class="oi-orc-card-subtitle">{entry.counterpartTypeLabel}</span>
+                                    </div>
                                 </div>
                             </div>
                         </foreignObject>
@@ -271,11 +286,6 @@
                     </foreignObject>
                 </svg>
 
-                <div class="oi-orc-zoom-controls" data-id="zoom-controls" role="group" aria-label="Zoom">
-                    <button type="button" class="oi-orc-zoom-button" data-id="zoom-out" aria-label="Zoom out" onclick={handleZoomOut}>&#8722;</button>
-                    <button type="button" class="oi-orc-zoom-reset" data-id="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%" onclick={handleZoomReset}>{zoomPercentLabel}</button>
-                    <button type="button" class="oi-orc-zoom-button" data-id="zoom-in" aria-label="Zoom in" onclick={handleZoomIn}>&#43;</button>
-                </div>
                 <button type="button" class="oi-orc-maximize-button" data-id="maximize-toggle" aria-label={maximizeButtonLabel} title={maximizeButtonLabel} onclick={handleToggleMaximize}>
                     <lightning-icon icon-name={maximizeIconName} size="x-small"></lightning-icon>
                 </button>
@@ -295,22 +305,37 @@
             <template lwc:else>
                 <div class="oi-orc-lane-empty oi-orc-lane-empty-incoming" data-id="incoming-empty">{incomingEmptyMessage}</div>
             </template>
-        </template>
-        <!-- the two empty lwc:if/elseif branches above are intentional: they suppress the paired lwc:else from firing when the lane genuinely has content, without rendering anything themselves -->
+            <!-- the two empty lwc:if/elseif branches above are intentional: they suppress the paired lwc:else from firing when the lane genuinely has content, without rendering anything themselves -->
+            </div>
 
-        <div class="oi-orc-legend" data-id="legend">
-            <span class="oi-orc-legend-title">Legend</span>
-            <template lwc:if={isRecordMode}>
-                <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"></span>Related Record</span>
-            </template>
-            <template lwc:else>
-                <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"></span>Lookup</span>
-                <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-master-detail"></span>Master-Detail</span>
-            </template>
-            <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-self"></span>Self Relationship</span>
-            <template lwc:if={showVisibilityToggle}>
-                <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-system"></span>System Relationship</span>
-            </template>
-        </div>
+            <!--
+                Persistent footer (VisualDesignSpecification.md §3.4): legend docked lower-left,
+                zoom controls docked lower-right, both in the SAME bordered footer region — never
+                scrolled away with the diagram (oi-orc-canvas-body is the scrollable region above;
+                this footer is a sibling, always visible within the canvas viewport) and never
+                floating detached over the diagram content the way the zoom controls previously did.
+            -->
+            <div class="oi-orc-canvas-footer" data-id="canvas-footer">
+                <div class="oi-orc-legend" data-id="legend">
+                    <span class="oi-orc-legend-title">Legend</span>
+                    <template lwc:if={isRecordMode}>
+                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"></span>Related Record</span>
+                    </template>
+                    <template lwc:else>
+                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"></span>Lookup</span>
+                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-master-detail"></span>Master-Detail</span>
+                    </template>
+                    <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-self"></span>Self Relationship</span>
+                    <template lwc:if={showVisibilityToggle}>
+                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-system"></span>System Relationship</span>
+                    </template>
+                </div>
+                <div class="oi-orc-zoom-controls" data-id="zoom-controls" role="group" aria-label="Zoom">
+                    <button type="button" class="oi-orc-zoom-button" data-id="zoom-out" aria-label="Zoom out" onclick={handleZoomOut}>&#8722;</button>
+                    <button type="button" class="oi-orc-zoom-reset" data-id="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%" onclick={handleZoomReset}>{zoomPercentLabel}</button>
+                    <button type="button" class="oi-orc-zoom-button" data-id="zoom-in" aria-label="Zoom in" onclick={handleZoomIn}>&#43;</button>
+                </div>
+            </div>
+        </template>
     </div>
 </template>

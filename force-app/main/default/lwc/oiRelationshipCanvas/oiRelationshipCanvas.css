@@ -12,6 +12,7 @@
  * still overridable by a consuming org/theme that wants to customize them, just never silently
  * collapsed into each other by an SLDS token happening to share a value in some theme.
  */
+/** VisualDesignSpecification.md §4's canvas/surface token target (#ffffff) — set explicitly here rather than left to inherit whatever background the hosting FlexiPage/App Builder region happens to have, which is exactly CurrentUIVisualGapAssessment.md's P1 "Canvas background" gap ("main relationship surface is light gray"). */
 .oi-orc {
     display: flex;
     flex-direction: column;
@@ -21,6 +22,7 @@
     gap: 0.85rem;
     padding: 0.85rem 1rem;
     overflow: auto;
+    background: var(--slds-g-color-surface-container-1, #ffffff);
     --oi-orc-color-incoming: #5e35b1;
     --oi-orc-color-outgoing: #0176d3;
     --oi-orc-color-master-detail: #0b827c;
@@ -32,13 +34,23 @@
 
 /* --- Toolbar --- */
 
+/** VisualDesignSpecification.md §3.2's ~60px compact toolbar, three groups (Analyzing / Relationship View / View Options) separated by vertical rules (.oi-orc-toolbar-divider) rather than plain gaps. */
 .oi-orc-toolbar {
     display: flex;
     align-items: center;
     gap: 0.9rem;
     flex-wrap: wrap;
+    min-height: 3.4rem;
     padding-bottom: 0.6rem;
     border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+}
+
+.oi-orc-toolbar-divider {
+    align-self: stretch;
+    width: 1px;
+    min-height: 1.6rem;
+    background: var(--slds-g-color-border-1, #e2e1df);
+    flex-shrink: 0;
 }
 
 .oi-orc-analyzing {
@@ -207,19 +219,23 @@
     background: var(--slds-g-color-surface-container-2, #f3f3f3);
 }
 
-/** Floating zoom controls, anchored bottom-right over the diagram — never affects layout flow. */
+/**
+ * Docked in the persistent canvas footer (.oi-orc-canvas-footer), not floating over the diagram —
+ * VisualDesignSpecification.md §3.4's "zoom controls docked to the lower right in the same footer
+ * region" as the legend, and CurrentUIVisualGapAssessment.md's P1 "Footer tools" gap ("legend and
+ * bottom-right zoom controls are not visible in the captured viewport... dock both inside a
+ * persistent canvas footer"). Static flex-row positioning now, not position:absolute — the footer
+ * itself is what stays fixed at the bottom of the component regardless of diagram scroll.
+ */
 .oi-orc-zoom-controls {
-    position: absolute;
-    right: 0.75rem;
-    bottom: 0.75rem;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
     border: 1px solid var(--slds-g-color-border-1, #dddbda);
     border-radius: 1.2rem;
     background: var(--slds-g-color-surface-container-1, #ffffff);
     box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.1));
     overflow: hidden;
-    z-index: 10;
 }
 
 .oi-orc-zoom-button,
@@ -247,10 +263,11 @@
     background: var(--slds-g-color-surface-container-2, #f3f3f3);
 }
 
+/** Anchored top-right of the diagram now that zoom controls have moved into the persistent footer below (they no longer share this corner). */
 .oi-orc-maximize-button {
     position: absolute;
     right: 0.75rem;
-    bottom: 3.1rem;
+    top: 0.75rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -342,9 +359,23 @@
  * "Fit to Screen" (which now does real, useful work: shrinking an oversized diagram on request)
  * are how a user opts into a smaller view — never the default.
  */
+/**
+ * Groups the diagram and its empty-lane messages into one flexed, independently-scrollable region
+ * so the persistent footer below (.oi-orc-canvas-footer) never scrolls out of view with it —
+ * VisualDesignSpecification.md §3.4's "legend/zoom docked in a persistent footer" requires the
+ * footer to stay put regardless of how tall the diagram itself gets.
+ */
+.oi-orc-canvas-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
 .oi-orc-diagram-wrapper {
     width: 100%;
-    min-height: 16rem;
+    flex: 1;
+    min-height: 0;
     position: relative;
     overflow: auto;
 }
@@ -409,6 +440,18 @@
     cursor: pointer;
     background: var(--slds-g-color-surface-container-1, #ffffff);
     border: 1px solid transparent;
+    /**
+     * A defensive ceiling, not the primary sizing mechanism: oiRelationshipCanvas.js's
+     * computeLabelSegment already sizes each lane's card-to-trunk gap to fit its own widest
+     * label (measured via canvas, deliberately capped at LABEL_SEGMENT_MAX=260px there). This
+     * max-width matches that cap so the two never disagree — if canvas measureText's estimate
+     * ever drifts from real DOM layout (different font actually loaded, browser quirk), a label
+     * truncates with an ellipsis instead of silently spilling across the trunk line again. The
+     * full text is still available via this element's own title attribute.
+     */
+    max-width: 232px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .oi-orc-connector-label-incoming {
@@ -439,20 +482,49 @@
 
 /* --- Neighbor / center cards --- */
 
+/**
+ * VisualDesignSpecification.md §5's card contract: icon tile, bold label + Standard/Custom
+ * caption, chevron, a divider, then the relationship field API name + relationship type below it
+ * — so the card is now a column (.oi-orc-card-main for the icon/label/chevron row, then
+ * .oi-orc-card-divider, then .oi-orc-card-footer) rather than one flat horizontal row.
+ */
 .oi-orc-card {
     display: flex;
-    align-items: center;
-    gap: 0.55rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
     width: 100%;
     height: 100%;
     box-sizing: border-box;
     background: var(--slds-g-color-surface-container-1, #ffffff);
     border: 1px solid var(--slds-g-color-border-1, #e2e1df);
     border-radius: 0.55rem;
-    padding: 0.55rem 0.7rem;
+    padding: 0.5rem 0.7rem;
     box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.1));
     cursor: pointer;
     position: relative;
+}
+
+.oi-orc-card-main {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.oi-orc-card-divider {
+    height: 1px;
+    background: var(--slds-g-color-border-1, #e2e1df);
+    flex-shrink: 0;
+}
+
+.oi-orc-card-footer {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .oi-orc-card:hover,
@@ -555,6 +627,7 @@
 
 /* --- Center card --- */
 
+/** Green border + a subtle green glow (VisualDesignSpecification.md §5's center-card contract, layered on top of the existing elevation shadow rather than replacing it) — what makes the analyzed object read as visually dominant, not just outlined. */
 .oi-orc-center-card {
     display: flex;
     flex-direction: column;
@@ -568,7 +641,7 @@
     border: 2px solid var(--slds-g-color-success-1, #04844b);
     border-radius: 0.65rem;
     padding: 1rem;
-    box-shadow: var(--slds-g-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.14));
+    box-shadow: var(--slds-g-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.14)), 0 0 0 5px rgba(4, 132, 75, 0.12);
 }
 
 .oi-orc-center-card-label {
@@ -652,15 +725,23 @@
     background: var(--oi-orc-explore-bg-hover);
 }
 
-/* --- Legend --- */
+/* --- Persistent canvas footer: legend (left) + zoom controls (right), VisualDesignSpecification.md §3.4 --- */
+
+.oi-orc-canvas-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-shrink: 0;
+    border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    padding-top: 0.6rem;
+}
 
 .oi-orc-legend {
     display: flex;
     align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
-    border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    padding-top: 0.6rem;
     font-size: 0.78rem;
     color: var(--slds-g-color-on-surface-2, #706e6b);
 }

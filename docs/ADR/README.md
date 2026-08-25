@@ -1,5 +1,7 @@
 # Architecture Decision Records
 
+The current visual acceptance decision for Object Analyze mode is [ADR-0025](0025-reference-image-as-binding-visual-acceptance-contract.md).
+
 Index of ADRs for the Salesforce Org Intelligence Platform. Each record captures a significant, hard-to-reverse architectural choice: the context that forced it, the decision, its consequences (including accepted trade-offs), and the alternatives rejected. See [../Architecture.md](../Architecture.md) for how these decisions fit into the overall system.
 
 | # | Title | Status |

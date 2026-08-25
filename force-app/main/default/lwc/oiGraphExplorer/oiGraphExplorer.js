@@ -31,9 +31,10 @@
  *              a parallel path from Object/Field's OI_GraphController, joined back into the
  *              exact same GraphViewState/Canvas rendering once a fragment is in hand.
  */
-import { LightningElement, track } from 'lwc';
+import { LightningElement, track, wire } from 'lwc';
 import getGraphFragment from '@salesforce/apex/OI_GraphController.getGraphFragment';
 import getRecordFragment from '@salesforce/apex/OI_RecordHierarchyController.getRecordFragment';
+import { getObjectInfos } from 'lightning/uiObjectInfoApi';
 import {
     createGraphViewState,
     setCenterFromFragment,
@@ -53,6 +54,18 @@ const WORKING_SET_CEILING = 1000;
 const OBJECT_TYPE_KEY = 'SalesforceMetadata.CustomObject';
 const FIELD_TYPE_KEY = 'SalesforceMetadata.CustomField';
 const HAS_FIELD_EDGE_TYPE_KEY = 'SalesforceMetadata.HAS_FIELD';
+
+/** themeInfo.iconUrl looks like ".../assets/icons/standard/account_120.png" or ".../custom/custom18_120.png" — this parses it back into the exact <lightning-icon> name ("standard:account"/"custom:custom18") Setup already assigned that object, standard or custom, with no per-object configuration of our own to maintain. */
+const OBJECT_ICON_URL_PATTERN = /\/(standard|custom)\/([a-zA-Z0-9_]+?)(?:_\d+)?\.(?:png|svg)(?:[?#].*)?$/i;
+
+function parseObjectIconName(themeInfo) {
+    const iconUrl = themeInfo && themeInfo.iconUrl;
+    if (!iconUrl) {
+        return null;
+    }
+    const match = OBJECT_ICON_URL_PATTERN.exec(iconUrl);
+    return match ? `${match[1]}:${match[2]}` : null;
+}
 
 /** Object needs 2 hops to reach both referenced and referencing objects; Field needs only 1 to reach its parent object and any referenced object. Record centering goes through selectAndCenterRecord instead (a different Apex method entirely), not this map. */
 const HOP_DEPTH_BY_MODE = { Object: 2, Field: 1 };
@@ -76,6 +89,35 @@ export default class OiGraphExplorer extends LightningElement {
     /** GraphUI.md §42.4 — the connector currently open in oiRelationshipConnectorDetail, Object mode only. Cleared whenever the center changes (resetRelationshipFilter's sibling concern, same lifecycle). */
     @track selectedConnector = null;
     @track selectedConnectorRootObject = null;
+    /**
+     * VisualDesignSpecification.md §3.1/§3.2: once an object is analyzed, the workspace moves
+     * directly from the mode selector to one compact context toolbar — a full-width search row
+     * competing with it is exactly the "search hierarchy" gap the current-state assessment calls
+     * out (CurrentUIVisualGapAssessment.md, P0 "Overall composition"). Object mode therefore
+     * collapses its search bar into oiRelationshipCanvas's own "Analyzing Object" chip once a
+     * center exists, surfacing a compact "Change object" affordance instead — mirroring the
+     * pattern Field/Record mode's object picker already uses (resetFieldModePicker/
+     * resetRecordModePicker) rather than inventing a new interaction. False (search bar showing)
+     * whenever there is no center node yet, regardless of this flag.
+     */
+    @track isObjectSearchOpen = false;
+
+    /**
+     * Per-SObject card icon/color, resolved via the platform's own UI API (CLAUDE.md's API
+     * Selection Priority ranks UI API above Tooling/REST/SOQL for exactly this kind of read).
+     * The Presentation Type Registry (GraphUI.md §20) is deliberately generic per *metadata
+     * category* (typeKey) — every Object node shares one typeKey regardless of whether it's
+     * Account, Contact, or a customer's own custom object — so without this, every card in
+     * Object analyze mode would render the same generic icon. This resolves the other axis
+     * (per-object-API-name) entirely client-side via Lightning Data Service, which already
+     * knows every org's assigned standard/custom icon and enforces the same FLS/CRUD a user
+     * already has — no new Apex surface, no Custom Metadata to maintain per object. Falls back
+     * to the registry's generic icon whenever UI API has nothing for an object (unknown object,
+     * no assigned icon, or the wire hasn't resolved yet) — never an error, matching §20's
+     * unregistered-type contract.
+     */
+    @track objectIconByApiName = new Map();
+    _objectApiNamesCache = [];
 
     registry = null;
     centerRequestId = 0;
@@ -94,6 +136,42 @@ export default class OiGraphExplorer extends LightningElement {
         }
     }
 
+    /** The distinct Object-node API names currently in the working set — reference-stable across renders when the set hasn't actually changed, so the getObjectInfos wire below doesn't re-subscribe on every unrelated render. */
+    get objectApiNames() {
+        const distinct = new Set();
+        for (const node of snapshotNodes(this.viewState)) {
+            if (node.typeKey === OBJECT_TYPE_KEY && node.secondaryKey) {
+                distinct.add(node.secondaryKey);
+            }
+        }
+        const next = [...distinct].sort();
+        const prev = this._objectApiNamesCache;
+        if (prev.length === next.length && prev.every((value, index) => value === next[index])) {
+            return prev;
+        }
+        this._objectApiNamesCache = next;
+        return next;
+    }
+
+    @wire(getObjectInfos, { objectApiNames: '$objectApiNames' })
+    wiredObjectInfos({ data }) {
+        if (!data || !Array.isArray(data.results)) {
+            return;
+        }
+        const next = new Map();
+        for (const entry of data.results) {
+            const result = entry && entry.result;
+            if (!result || !result.apiName) {
+                continue;
+            }
+            const iconName = parseObjectIconName(result.themeInfo);
+            if (iconName) {
+                next.set(result.apiName, iconName);
+            }
+        }
+        this.objectIconByApiName = next;
+    }
+
     get hasCenterNode() {
         return !!this.viewState.centerNodeKey;
     }
@@ -110,20 +188,26 @@ export default class OiGraphExplorer extends LightningElement {
      * just restated theoretical O(n) cost.
      */
     get allCanvasNodes() {
-        if (this._allCanvasNodesCache && this._allCanvasNodesCache.viewState === this.viewState && this._allCanvasNodesCache.registry === this.registry) {
+        if (
+            this._allCanvasNodesCache &&
+            this._allCanvasNodesCache.viewState === this.viewState &&
+            this._allCanvasNodesCache.registry === this.registry &&
+            this._allCanvasNodesCache.objectIconByApiName === this.objectIconByApiName
+        ) {
             return this._allCanvasNodesCache.value;
         }
         const value = snapshotNodes(this.viewState).map((node) => {
             const style = resolveNodeStyle(this.registry, node.typeKey);
+            const perObjectIconName = node.typeKey === OBJECT_TYPE_KEY ? this.objectIconByApiName.get(node.secondaryKey) : null;
             return {
                 ...node,
-                iconName: style.iconName,
+                iconName: perObjectIconName || style.iconName,
                 colorToken: style.colorToken,
                 typeLabel: style.displayLabel || node.typeKey,
                 showFieldList: style.showFieldList
             };
         });
-        this._allCanvasNodesCache = { viewState: this.viewState, registry: this.registry, value };
+        this._allCanvasNodesCache = { viewState: this.viewState, registry: this.registry, objectIconByApiName: this.objectIconByApiName, value };
         return value;
     }
 
@@ -354,7 +438,24 @@ export default class OiGraphExplorer extends LightningElement {
     }
 
     get searchPlaceholder() {
-        return this.isFieldMode ? 'First, search for the object this field belongs to (e.g. Account)...' : 'Search objects (e.g. Account)...';
+        return this.isFieldMode ? 'First, search for the object this field belongs to (e.g. Account)...' : 'Search objects (e.g., Account, Opportunity...)';
+    }
+
+    /** Object mode's own compact-toolbar counterpart to hasFieldModeObject/hasRecordModeObject below — true whenever the full search bar should render, false once a center exists and the user hasn't asked to change it. */
+    get shouldShowObjectSearchBar() {
+        return !this.hasCenterNode || this.isObjectSearchOpen;
+    }
+
+    /** The centered object's own already-styled summary (label/icon), for the compact "Object: <label>" banner replacing the search bar once analyzed — derived from allCanvasNodes, no new fetch. */
+    get centerObjectSummary() {
+        if (!this.isObjectMode || !this.hasCenterNode) {
+            return null;
+        }
+        return this.allCanvasNodes.find((node) => node.nodeKey === this.viewState.centerNodeKey) || null;
+    }
+
+    handleChangeObjectSearch() {
+        this.isObjectSearchOpen = true;
     }
 
     get hasFieldModeObject() {
@@ -390,6 +491,7 @@ export default class OiGraphExplorer extends LightningElement {
         this.errorMessage = null;
         this.resetFieldModePicker();
         this.resetRecordModePicker();
+        this.isObjectSearchOpen = false;
         this.closeConnectorDetail();
         // A tab switch is a fresh view, not an edit to the old one (GraphUI.md §11's "a new
         // center means a new view" principle, applied here to "a new mode means a new view"):
@@ -579,6 +681,7 @@ export default class OiGraphExplorer extends LightningElement {
             setCenterFromFragment(this.viewState, fragment);
             this.workingSetCeilingHit = false;
             this.resetRelationshipFilter();
+            this.isObjectSearchOpen = false;
             this.refreshViewState();
         } catch (error) {
             if (requestId === this.centerRequestId) {
