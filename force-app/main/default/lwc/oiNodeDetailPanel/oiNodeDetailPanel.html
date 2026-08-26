@@ -224,7 +224,12 @@
                                 onclick={handleSectionToggle}
                             >
                                 <lightning-icon icon-name="utility:chevronright" size="xx-small" class="oi-node-detail-panel-section-chevron"></lightning-icon>
-                                <lightning-icon icon-name={section.iconName} size="xx-small" class={section.iconModifierClass}></lightning-icon>
+                                <template lwc:if={section.isCode}>
+                                    <span class="oi-node-detail-panel-code-icon" aria-hidden="true">&lt;/&gt;</span>
+                                </template>
+                                <template lwc:else>
+                                    <lightning-icon icon-name={section.iconName} size="xx-small" class={section.iconModifierClass}></lightning-icon>
+                                </template>
                                 <span class="oi-node-detail-panel-section-title">{section.title}</span>
                                 <span class="oi-node-detail-panel-section-count">{section.countLabel}</span>
                             </button>

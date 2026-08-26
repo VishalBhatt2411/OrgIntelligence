@@ -45,7 +45,7 @@
 
 .oi-graph-node:hover {
     box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.1));
-    transform: translateY(-1px);
+    transform: translateY(-2px) scale(1.015);
 }
 
 .oi-graph-node.is-selected {
@@ -156,7 +156,22 @@
 
 /** De-emphasis for everything NOT on the active path — opacity only, never display:none, so layout and existing interactions (drag, click) are completely undisturbed. */
 .oi-graph-node.is-dimmed {
-    opacity: 0.35;
+    opacity: 1;
+}
+
+.oi-graph-node-open {
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    padding: 0.1rem 0.25rem;
+    font-size: 0.8rem;
+}
+
+.oi-graph-node-open:hover,
+.oi-graph-node-open:focus-visible {
+    background: var(--slds-g-color-surface-container-2, #eef4ff);
 }
 
 .oi-graph-node-expand-toggle {

@@ -137,6 +137,7 @@
                             onselect={handleCanvasSelect}
                             onexplorefromhere={handleExploreFromHere}
                             onedgeclick={handleObjectCanvasEdgeClick}
+                            onopen={handleCanvasOpen}
                         ></c-oi-relationship-canvas>
                     </template>
                     <template lwc:else>
@@ -146,6 +147,7 @@
                             edges={canvasEdges}
                             selected-node-key={selectedNodeKey}
                             onselect={handleCanvasSelect}
+                            onopen={handleCanvasOpen}
                             onexpand={handleExpand}
                             oncollapse={handleCollapse}
                         ></c-oi-graph-canvas>

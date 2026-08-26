@@ -209,6 +209,7 @@ export default class OiNodeDetailPanel extends LightningElement {
                 title: category.category,
                 iconName: CATEGORY_ICON_NAMES[category.category] || 'utility:knowledge_base',
                 iconModifierClass: 'oi-node-detail-panel-section-icon is-' + category.category.toLowerCase(),
+                isCode: category.category === 'Code',
                 items: (category.items || []).map((item) => ({
                     ...item,
                     directionLabel: item.direction === 'incoming' ? 'uses this' : 'used by this'

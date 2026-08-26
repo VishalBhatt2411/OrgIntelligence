@@ -123,4 +123,9 @@ export default class OiSchemaObjectCard extends LightningElement {
         event.stopPropagation();
         this.dispatchEvent(new CustomEvent('expandtoggle', { detail: { nodeKey: this.nodeKey } }));
     }
+
+    handleOpen(event) {
+        event.stopPropagation();
+        this.dispatchEvent(new CustomEvent('open', { detail: { nodeKey: this.nodeKey } }));
+    }
 }

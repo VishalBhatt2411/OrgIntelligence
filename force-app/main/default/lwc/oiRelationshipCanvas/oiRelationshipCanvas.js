@@ -794,7 +794,7 @@ export default class OiRelationshipCanvas extends LightningElement {
     decorateConnector(connector, laneKey, index) {
         const { connectorLabel, relationshipTypeLabel } = buildConnectorLabelText(connector);
         const isActive = this.activeConnectorKey === connector.connectorKey;
-        const isDimmed = !!this.activeConnectorKey && !isActive;
+        const isDimmed = false;
         return {
             ...connector,
             connectorLabel,
@@ -890,6 +890,11 @@ export default class OiRelationshipCanvas extends LightningElement {
         const connectorKey = event.currentTarget.dataset.connectorKey;
         this.selectedConnectorKey = connectorKey || null;
         this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey } }));
+    }
+
+    handleCardOpen(event) {
+        event.stopPropagation();
+        this.dispatchEvent(new CustomEvent('open', { detail: { nodeKey: event.currentTarget.dataset.nodeKey } }));
     }
 
     handleCardKeydown(event) {

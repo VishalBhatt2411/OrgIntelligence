@@ -1181,6 +1181,10 @@ export default class OiGraphCanvas extends LightningElement {
         this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey } }));
     }
 
+    handleNodeOpen(event) {
+        this.dispatchEvent(new CustomEvent('open', { detail: { nodeKey: event.detail.nodeKey } }));
+    }
+
     handleNodeExpandToggle(event) {
         const nodeKey = event.detail.nodeKey;
         if (nodeKey.startsWith(CLUSTER_PREFIX)) {

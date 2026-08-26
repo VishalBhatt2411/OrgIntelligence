@@ -197,7 +197,7 @@
                                         <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
                                         <span class="oi-orc-card-subtitle">{card.counterpartTypeLabel}</span>
                                     </div>
-                                    <span class="oi-orc-card-chevron">&#8250;</span>
+                                    <button type="button" class="oi-orc-card-open" data-id="open-card" data-node-key={card.counterpartObject.nodeKey} title="Open in Salesforce" aria-label="Open in Salesforce" onclick={handleCardOpen}>&#8599;</button>
                                 </div>
                                 <div class="oi-orc-card-divider"></div>
                                 <div class="oi-orc-card-footer" title={card.connectorLabel}>{card.connectorLabel}</div>
@@ -227,7 +227,7 @@
                                         <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
                                         <span class="oi-orc-card-subtitle">{card.counterpartTypeLabel}</span>
                                     </div>
-                                    <span class="oi-orc-card-chevron">&#8250;</span>
+                                    <button type="button" class="oi-orc-card-open" data-id="open-card" data-node-key={card.counterpartObject.nodeKey} title="Open in Salesforce" aria-label="Open in Salesforce" onclick={handleCardOpen}>&#8599;</button>
                                 </div>
                                 <div class="oi-orc-card-divider"></div>
                                 <div class="oi-orc-card-footer" title={card.connectorLabel}>{card.connectorLabel}</div>

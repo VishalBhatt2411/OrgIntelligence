@@ -307,6 +307,21 @@ describe('c-oi-relationship-canvas', () => {
             });
         });
 
+        it('emits open without selecting when a neighbor card open action is clicked', async () => {
+            const fixture = baseFixture();
+            const element = renderCanvas({ ...fixture, centerNodeKey: 'account' });
+            const openHandler = jest.fn();
+            const selectHandler = jest.fn();
+            element.addEventListener('open', openHandler);
+            element.addEventListener('select', selectHandler);
+            await Promise.resolve();
+
+            element.shadowRoot.querySelector('[data-id="open-card"]').click();
+            expect(openHandler).toHaveBeenCalledTimes(1);
+            expect(openHandler.mock.calls[0][0].detail.nodeKey).toBeTruthy();
+            expect(selectHandler).not.toHaveBeenCalled();
+        });
+
         it('shows a contextual "Explore From Here" action only after a card is selected, never as a permanent per-card link', () => {
             const fixture = baseFixture();
             const element = renderCanvas({ ...fixture, centerNodeKey: 'account' });

@@ -159,6 +159,16 @@ describe('c-oi-relationship-connector-detail', () => {
         expect(handler).toHaveBeenCalledTimes(1);
     });
 
+    it('renders the backdrop as a sibling behind the dialog, never as a child that can cover the modal content', () => {
+        const element = renderDetail(outgoingConnector());
+        const dialog = element.shadowRoot.querySelector('[data-id="connector-detail"]');
+        const backdrop = element.shadowRoot.querySelector('[data-id="connector-detail-backdrop"]');
+
+        expect(backdrop).not.toBeNull();
+        expect(dialog.contains(backdrop)).toBe(false);
+        expect(dialog.parentElement).toBe(backdrop.parentElement);
+    });
+
     describe('Record mode (ADR-0024)', () => {
         it('labels Source/Target as Record rather than Object, and shows the fieldless relationship type plainly without appending "Relationship" again', () => {
             const element = renderDetail(recordOutgoingConnector(), { mode: 'Record', rootObjectOverride: recordRootObject() });

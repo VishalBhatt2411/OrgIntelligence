@@ -24,6 +24,22 @@ describe('c-oi-graph-node', () => {
         });
     });
 
+    it('dispatches open without selecting when the external-open action is clicked', async () => {
+        const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+        element.nodeKey = 'n1';
+        element.label = 'Account';
+        document.body.appendChild(element);
+        const openHandler = jest.fn();
+        const selectHandler = jest.fn();
+        element.addEventListener('open', openHandler);
+        element.addEventListener('select', selectHandler);
+        await Promise.resolve();
+
+        element.shadowRoot.querySelector('[data-id="open-node-button"]').click();
+        expect(openHandler.mock.calls[0][0].detail.nodeKey).toBe('n1');
+        expect(selectHandler).not.toHaveBeenCalled();
+    });
+
     describe('relationship chip ("why is this node here?", this sprint\'s central requirement)', () => {
         it('renders the relationship role and context as a single compact chip', () => {
             const element = createElement('c-oi-graph-node', { is: OiGraphNode });

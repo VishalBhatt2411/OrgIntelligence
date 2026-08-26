@@ -32,8 +32,10 @@
  *              exact same GraphViewState/Canvas rendering once a fragment is in hand.
  */
 import { LightningElement, track, wire } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
 import getGraphFragment from '@salesforce/apex/OI_GraphController.getGraphFragment';
 import getRecordFragment from '@salesforce/apex/OI_RecordHierarchyController.getRecordFragment';
+import getNavigationTarget from '@salesforce/apex/OI_GraphController.getNavigationTarget';
 import { getObjectInfos } from 'lightning/uiObjectInfoApi';
 import {
     createGraphViewState,
@@ -49,6 +51,7 @@ import { loadPresentationRegistry, resolveNodeStyle, resolveEdgeStyle } from 'c/
 import { parseRecordNodeKey } from 'c/recordNodeKey';
 import { createRelationshipFilter, applyRelationshipFilter } from 'c/graphRelationshipFilter';
 import { buildObjectRelationshipView } from 'c/objectRelationshipView';
+import { navigateToTarget, NAVIGATION_KIND_RECORD } from 'c/metadataNavigation';
 
 const WORKING_SET_CEILING = 1000;
 const OBJECT_TYPE_KEY = 'SalesforceMetadata.CustomObject';
@@ -70,7 +73,7 @@ function parseObjectIconName(themeInfo) {
 /** Object needs 2 hops to reach both referenced and referencing objects; Field needs only 1 to reach its parent object and any referenced object. Record centering goes through selectAndCenterRecord instead (a different Apex method entirely), not this map. */
 const HOP_DEPTH_BY_MODE = { Object: 2, Field: 1 };
 
-export default class OiGraphExplorer extends LightningElement {
+export default class OiGraphExplorer extends NavigationMixin(LightningElement) {
     @track viewState = createGraphViewState();
     @track isLoadingFragment = false;
     @track errorMessage = null;
@@ -638,6 +641,29 @@ export default class OiGraphExplorer extends LightningElement {
     handleCanvasSelect(event) {
         selectNode(this.viewState, event.detail.nodeKey);
         this.refreshViewState();
+    }
+
+    async handleCanvasOpen(event) {
+        const nodeKey = event.detail && event.detail.nodeKey;
+        const recordRef = parseRecordNodeKey(nodeKey);
+        if (recordRef) {
+            navigateToTarget(this, { kind: NAVIGATION_KIND_RECORD, recordId: recordRef.recordId, objectApiName: recordRef.objectApiName });
+            return;
+        }
+        const node = this.allCanvasNodes.find((candidate) => candidate.nodeKey === nodeKey);
+        if (!node || !node.typeKey || !node.secondaryKey) {
+            this.errorMessage = 'This item cannot be opened directly.';
+            return;
+        }
+        try {
+            const target = await getNavigationTarget({ typeKey: node.typeKey, apiName: node.secondaryKey });
+            const result = navigateToTarget(this, target);
+            if (!result.navigated) {
+                this.errorMessage = result.message;
+            }
+        } catch (error) {
+            this.errorMessage = this.extractErrorMessage(error);
+        }
     }
 
     /** A field row picked from the detail panel's field browser — a plain selection exactly like clicking an already-visible canvas node, never a re-center/re-fetch. If the field isn't part of the current working set (not yet expanded into view), it simply won't be highlighted on the canvas; the detail panel itself still resolves it independently via its own getNodeDetail call. */

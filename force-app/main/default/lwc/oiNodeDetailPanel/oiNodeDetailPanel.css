@@ -408,7 +408,7 @@
 
 .oi-node-detail-panel-section-chevron {
     flex-shrink: 0;
-    transition: transform 0.12s ease;
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .oi-node-detail-panel-section-header[aria-expanded='true'] .oi-node-detail-panel-section-chevron {
@@ -475,7 +475,44 @@
 /** One colored identity icon per section — a quiet visual anchor distinguishing Fields/Relationships/Automation/Code/Security/Impact/Technical Details at a glance, matching the approved reference's section iconography. */
 .oi-node-detail-panel-section-icon {
     flex-shrink: 0;
+    box-sizing: content-box;
+    padding: 0.28rem;
+    border-radius: 0.35rem;
+    background: color-mix(in srgb, currentColor 12%, transparent);
     --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-node-detail-panel-code-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.7rem;
+    height: 1.3rem;
+    border-radius: 0.35rem;
+    background: #fff2d8;
+    color: #b85d00;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.oi-node-detail-panel-section-header[aria-expanded='true'] ~ * {
+    animation: oi-panel-disclosure-in 0.22s cubic-bezier(0.2, 0, 0, 1) both;
+    transform-origin: top;
+}
+
+@keyframes oi-panel-disclosure-in {
+    from { opacity: 0; transform: translateY(-5px) scaleY(0.98); }
+    to { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .oi-node-detail-panel-section-chevron,
+    .oi-node-detail-panel-section-header[aria-expanded='true'] ~ * {
+        transition: none;
+        animation: none;
+    }
 }
 
 .oi-node-detail-panel-section-icon.is-overview {
