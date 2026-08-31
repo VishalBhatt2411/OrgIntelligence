@@ -258,6 +258,8 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable {
             OI_IMetadataScanner scanner = resolveScanner(metadataTypeApiName, config.Scanner_Class__c);
             Integer batchSize = config.Batch_Size__c == null ? 100 : Integer.valueOf(config.Batch_Size__c);
             OI_DiscoveryBatch batch = scanner.scan(new OI_ScanContext(task.Id, batchSize, null, config.Preferred_Api__c));
+            /** Recorded before ingestion, so a Scanner's own honest account of what it could and could not extract survives even if a later ingest hop fails. */
+            recordCoverage(task.Id, batch.coverage);
 
             if (batch.components.size() <= CHUNK_SIZE && batch.relationships.size() <= CHUNK_SIZE) {
                 ingestSmallBatchThenAdvance(metadataTypeApiName, task.Id, batch, remainingTypesAfterThis);
@@ -284,8 +286,41 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable {
     /** The single-hop-inline path: ingest, then attempt retire-detection's first page inline before deciding whether another hop is needed. */
     private void ingestSmallBatchThenAdvance(String metadataTypeApiName, Id scanTaskId, OI_DiscoveryBatch batch, List<String> remainingTypesAfterThis) {
         OI_DiscoveryBatch noAutoRetireBatch = new OI_DiscoveryBatch(batch.scanTaskId, batch.componentKind, batch.components, batch.relationships, false, batch.apiCallsConsumed);
-        Set<String> observed = new OI_MutationGenerator().translateAndIngest(noAutoRetireBatch);
+        OI_MutationGenerator generator = new OI_MutationGenerator();
+        Set<String> observed = generator.translateAndIngest(noAutoRetireBatch);
+        invalidateImpactCacheFor(generator.consumeIngestDelta());
+        addSkippedRelationships(scanTaskId, generator.consumeSkippedRelationshipCount());
         finalizeTypeAfterIngest(scanRunId, scanTaskId, metadataTypeApiName, observed, batch.isFullSnapshot, remainingTypesAfterThis);
+    }
+
+    /**
+     * DE-7: drops cached Impact Analysis results that this ingest just made stale.
+     *
+     * Called at each ingest site rather than threaded through to the shared completion tail,
+     * because the Batch Apex paths construct a fresh OI_MutationGenerator per execute() scope —
+     * an instance-accumulated delta cannot survive to finish(), and per-scope invalidation is
+     * both correct and idempotent anyway.
+     *
+     * Deliberately best-effort: a failure to evict cache rows must never fail the scan that
+     * produced the data. The cost of a swallowed failure here is a stale cached impact row that
+     * still expires on its own TTL; the cost of propagating would be a failed scan task and lost
+     * metadata. Logged rather than silently discarded, so the degradation is observable — this
+     * is the one place in this class where swallowing is the correct call, and it is narrow.
+     */
+    public static void invalidateImpactCacheFor(OI_IngestDelta delta) {
+        if (delta == null || delta.impactedNodeKeys.isEmpty()) {
+            return;
+        }
+        try {
+            new OI_DependencyEngineService().invalidateForScanDelta(delta.impactedNodeKeys);
+        } catch (Exception e) {
+            new OI_LoggerService().error(
+                'Impact Analysis cache invalidation failed for ' + delta.impactedNodeKeys.size() + ' changed node(s): ' + e.getMessage(),
+                'OI_ScanOrchestratorQueueable',
+                null,
+                e.getStackTraceString()
+            );
+        }
     }
 
     /**
@@ -341,6 +376,48 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable {
 
     private static void completeTask(Id scanTaskId, Boolean isFullSnapshot, Integer recordsScanned) {
         update new OI_Scan_Task__c(Id = scanTaskId, Status__c = 'Succeeded', Is_Full_Snapshot__c = isFullSnapshot, Records_Scanned__c = recordsScanned);
+    }
+
+    /**
+     * Persists a Scanner's own coverage declaration onto its task, so an admin can tell an
+     * empty dependency result caused by "this org really has none" from one caused by "this
+     * dependency class was never extracted" (OI_ScanCoverage explains why that distinction is
+     * the whole point). Written immediately after scan() rather than at completion, so the
+     * information survives even if ingestion later fails.
+     *
+     * Assigns only Id plus the coverage fields on a fresh sObject — Apex DML sends every field
+     * ever assigned on an instance, and reusing a fully-populated task record here would re-send
+     * unrelated fields (a real bug this class's own completeTask doc comment already records).
+     */
+    public static void recordCoverage(Id scanTaskId, OI_ScanCoverage coverage) {
+        if (scanTaskId == null || coverage == null) {
+            return;
+        }
+        try {
+            /** Routed through OI_ScanCoverageFields, which no-ops when the coverage fields are not visible in this org — see that class for the reproduced org defect that makes a static field reference unsafe here. */
+            OI_ScanCoverageFields.writeCoverage(scanTaskId, coverage);
+        } catch (Exception e) {
+            /** Coverage reporting is diagnostic metadata about a scan, never the scan's payload — failing to record it must not fail the scan that produced real graph data. Logged so the omission is observable rather than invisible. */
+            new OI_LoggerService().warn('Could not record scan coverage for task ' + scanTaskId + ': ' + e.getMessage(), 'OI_ScanOrchestratorQueueable', String.valueOf(scanTaskId));
+        }
+    }
+
+    /**
+     * Adds to a task's skipped-relationship tally. Additive rather than absolute because the
+     * chunked ingest paths discover skips across many Batch Apex scopes, and each only knows its
+     * own share — the total is only meaningful as a sum. Re-reads before writing rather than
+     * using a formula/rollup, since OI_Scan_Task__c is a plain object and the write volume here
+     * (once per type, at finish) makes contention a non-issue.
+     */
+    public static void addSkippedRelationships(Id scanTaskId, Integer skippedCount) {
+        if (scanTaskId == null || skippedCount == null || skippedCount <= 0) {
+            return;
+        }
+        try {
+            OI_ScanCoverageFields.addSkipped(scanTaskId, skippedCount);
+        } catch (Exception e) {
+            new OI_LoggerService().warn('Could not record skipped relationships for task ' + scanTaskId + ': ' + e.getMessage(), 'OI_ScanOrchestratorQueueable', String.valueOf(scanTaskId));
+        }
     }
 
     /**

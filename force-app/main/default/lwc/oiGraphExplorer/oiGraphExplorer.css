@@ -62,7 +62,8 @@
 }
 
 .oi-graph-explorer-canvas-column {
-    flex: 2;
+    /** ~75/25 workspace/panel split (target range 70-78/22-30) — applied to every analyze mode, not just Object, per the locked product decision: a wider canvas benefits Field/Record too, and a mode-scoped modifier class would be extra CSS for no visual difference anyone asked to preserve. */
+    flex: 3;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -73,7 +74,8 @@
 }
 
 /** The canvas takes whatever height the filter panel (natural height, below) doesn't need — min-height: 0 is required for a flex child to actually shrink below its content's own intrinsic size instead of overflowing the column. */
-.oi-graph-explorer-canvas-column c-oi-graph-canvas {
+.oi-graph-explorer-canvas-column c-oi-graph-canvas,
+.oi-graph-explorer-canvas-column c-oi-relationship-canvas {
     flex: 1;
     min-height: 0;
 }
@@ -167,6 +169,24 @@
 }
 
 .oi-record-mode-change-object {
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+}
+
+/** Object mode's own compact analyzed-state banner, replacing the full-width search row once a center exists (VisualDesignSpecification.md §3.1/§3.2's "one compact context toolbar", CurrentUIVisualGapAssessment.md's P0 "Overall composition" gap) — same pattern as the Field/Record object banners above. */
+.oi-object-mode-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--slds-g-color-on-surface-1, #444);
+}
+
+.oi-object-mode-change {
     border: none;
     background: transparent;
     color: var(--slds-g-color-accent-1, #0176d3);

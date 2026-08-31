@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Relationships_Discovered__c</fullName>
+    <description>How many dependency relationships this task's scanner discovered before ingestion. Compared against Relationships_Skipped__c to distinguish "this type genuinely has few dependencies" from "dependencies were found and then dropped".</description>
+    <externalId>false</externalId>
+    <label>Relationships Discovered</label>
+    <precision>9</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <trackTrending>false</trackTrending>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

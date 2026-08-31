@@ -49,6 +49,22 @@ describe('c-oi-schema-object-card', () => {
         });
     });
 
+    it('dispatches open without selecting when the Object Manager action is clicked', async () => {
+        const element = createElement('c-oi-schema-object-card', { is: OiSchemaObjectCard });
+        element.nodeKey = 'account';
+        element.label = 'Account';
+        document.body.appendChild(element);
+        const openHandler = jest.fn();
+        const selectHandler = jest.fn();
+        element.addEventListener('open', openHandler);
+        element.addEventListener('select', selectHandler);
+        await Promise.resolve();
+
+        element.shadowRoot.querySelector('[data-id="open-node-button"]').click();
+        expect(openHandler.mock.calls[0][0].detail.nodeKey).toBe('account');
+        expect(selectHandler).not.toHaveBeenCalled();
+    });
+
     it('renders a plain field-count line instead of individual field rows — field browsing lives in the Detail Panel now, not on the canvas card', () => {
         const element = createElement('c-oi-schema-object-card', { is: OiSchemaObjectCard });
         element.nodeKey = 'n1';

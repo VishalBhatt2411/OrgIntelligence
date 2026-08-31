@@ -4,6 +4,98 @@
  */
 @isTest
 private class OI_GraphBuilderTest {
+    /**
+     * DE-7's foundation: the Builder is the only component that can tell a real change from a
+     * liveness touch, so the delta it reports is what makes Impact Analysis cache invalidation
+     * both correct and affordable. These four tests pin that contract.
+     */
+    @isTest
+    static void testIngestReportsANewObservationAsAChangedNode() {
+        OI_FakeGraphStorageProvider fake = new OI_FakeGraphStorageProvider();
+        OI_GraphBuilder builder = new OI_GraphBuilder(new OI_GraphRepository(fake, fake));
+
+        OI_IngestDelta delta = builder.ingest(
+            new List<OI_GraphMutation>{
+                OI_GraphMutation.upsertNode('d1', 'Test.Type', 'Label', null, null, new Map<String, Object>(), 'c1', null, UserInfo.getUserId())
+            }
+        );
+
+        System.assertEquals(new Set<String>{ 'd1' }, delta.changedNodeKeys);
+        System.assert(delta.impactedNodeKeys.contains('d1'));
+        System.assertEquals(false, delta.isEmpty());
+    }
+
+    /**
+     * The case that decides whether the impact cache is worth having at all: a rescan that
+     * changes nothing must invalidate nothing. Reporting observations instead of changes here
+     * would flush the entire cache on every scan.
+     */
+    @isTest
+    static void testIngestReportsNoChangeForAnUnchangedRescan() {
+        OI_FakeGraphStorageProvider fake = new OI_FakeGraphStorageProvider();
+        OI_GraphBuilder builder = new OI_GraphBuilder(new OI_GraphRepository(fake, fake));
+        Id runId = UserInfo.getUserId();
+        builder.ingest(
+            new List<OI_GraphMutation>{
+                OI_GraphMutation.upsertNode('d2', 'Test.Type', 'Label', null, null, new Map<String, Object>(), 'same', null, runId)
+            }
+        );
+
+        OI_IngestDelta secondDelta = builder.ingest(
+            new List<OI_GraphMutation>{
+                OI_GraphMutation.upsertNode('d2', 'Test.Type', 'Label', null, null, new Map<String, Object>(), 'same', null, runId)
+            }
+        );
+
+        System.assertEquals(true, secondDelta.isEmpty(), 'An unchanged rescan is a liveness touch and must report zero changes, or the impact cache would be flushed on every scan.');
+        System.assertEquals(0, secondDelta.impactedNodeKeys.size());
+    }
+
+    /**
+     * The subtle half of DE-7: a changed EDGE must invalidate BOTH endpoint nodes, including
+     * one whose own content never changed. Concretely — class A starts calling class B: A's
+     * node re-versions, B's is byte-identical, yet B's cached "what depends on me?" answer is
+     * now wrong. Without this, B would serve a stale answer until its TTL expired.
+     */
+    @isTest
+    static void testAChangedEdgeMarksBothEndpointNodesAsImpactedEvenWhenNeitherNodeChanged() {
+        OI_FakeGraphStorageProvider fake = new OI_FakeGraphStorageProvider();
+        OI_GraphBuilder builder = new OI_GraphBuilder(new OI_GraphRepository(fake, fake));
+
+        OI_IngestDelta delta = builder.ingest(
+            new List<OI_GraphMutation>{
+                OI_GraphMutation.upsertEdge('e1', 'Test.REFERENCES', 'classA', 'classB', new Map<String, Object>(), null, null, null, UserInfo.getUserId())
+            }
+        );
+
+        System.assertEquals(new Set<String>{ 'e1' }, delta.changedEdgeKeys);
+        System.assertEquals(0, delta.changedNodeKeys.size(), 'No NODE changed here — only the edge did.');
+        System.assert(delta.impactedNodeKeys.contains('classA'), 'The edge source must be invalidated.');
+        System.assert(
+            delta.impactedNodeKeys.contains('classB'),
+            'The edge TARGET must be invalidated too — its own content never changed, but its reverse-impact answer did. This is the exact stale-result defect DE-7 exists to prevent.'
+        );
+    }
+
+    /** A retirement is a change; an idempotent no-op retire is not. Both must be reported accurately or invalidation over- or under-fires. */
+    @isTest
+    static void testRetirementIsReportedAsAChangeButARepeatedRetireIsNot() {
+        OI_FakeGraphStorageProvider fake = new OI_FakeGraphStorageProvider();
+        OI_GraphBuilder builder = new OI_GraphBuilder(new OI_GraphRepository(fake, fake));
+        Id runId = UserInfo.getUserId();
+        builder.ingest(
+            new List<OI_GraphMutation>{
+                OI_GraphMutation.upsertNode('d3', 'Test.Type', 'Label', null, null, new Map<String, Object>(), 'c1', null, runId)
+            }
+        );
+
+        OI_IngestDelta retireDelta = builder.ingest(new List<OI_GraphMutation>{ OI_GraphMutation.retireNode('d3', runId) });
+        System.assert(retireDelta.changedNodeKeys.contains('d3'), 'Retiring a live node is a real change — anything whose cached impact referenced it is now wrong.');
+
+        OI_IngestDelta repeatDelta = builder.ingest(new List<OI_GraphMutation>{ OI_GraphMutation.retireNode('d3', runId) });
+        System.assertEquals(true, repeatDelta.isEmpty(), 'Re-retiring an already-Stale node is an idempotent no-op and must report no change.');
+    }
+
     @isTest
     static void testNewObservationInsertsVersionOneActive() {
         OI_FakeGraphStorageProvider fake = new OI_FakeGraphStorageProvider();

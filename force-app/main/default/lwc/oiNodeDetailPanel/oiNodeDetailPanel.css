@@ -5,9 +5,68 @@
  * dark-mode tokens where present, and renders pixel-identical to before where they aren't.
  */
 .oi-node-detail-panel {
-    padding: 0.75rem;
     height: 100%;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    /** Deliberately literal, not var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified live in a real org (audit #09): those two distinct SLDS tokens resolve to the exact same color under this org's actual theme, which silently made any element pairing them (an accent-colored label over an accent-container background) an invisible-text color block. Same fix as oiRelationshipCanvas.css/oiGraphNode.css/oiSchemaObjectCard.css's identical collision. */
+    --oi-panel-accent-bg: #eef4fc;
+    --oi-panel-accent-color: #0176d3;
+}
+
+/** The panel's own chrome — always visible regardless of loading/error/empty/detail state, matching the approved reference's persistent "Intelligence Panel" title bar. */
+.oi-node-detail-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid var(--slds-g-color-border-1, #dddbda);
+    flex-shrink: 0;
+}
+
+.oi-node-detail-panel-header-title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--slds-g-color-on-surface-1, #181818);
+}
+
+.oi-node-detail-panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.oi-node-detail-panel-pin-toggle,
+.oi-node-detail-panel-collapse-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border: none;
+    border-radius: 0.3rem;
+    background: transparent;
+    cursor: pointer;
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-node-detail-panel-pin-toggle:hover,
+.oi-node-detail-panel-collapse-toggle:hover {
+    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+.oi-node-detail-panel-pin-toggle.is-active {
+    background: var(--oi-panel-accent-bg);
+    --sds-c-icon-color-foreground-default: var(--oi-panel-accent-color);
+}
+
+.oi-node-detail-panel-loading,
+.oi-node-detail-panel-content,
+.oi-node-detail-panel-empty {
+    padding: 0.75rem;
 }
 
 .oi-node-detail-panel-loading,
@@ -23,17 +82,33 @@
     color: var(--slds-g-color-error-1, #c23934);
 }
 
-.oi-node-detail-panel-label {
-    font-size: 1.15rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--slds-g-color-on-surface-1, #181818);
+/** Overview's two-column grid (GraphUI.md §42's approved reference layout) — label above value, two fields per row, replacing what used to be a one-column key/value table. */
+.oi-node-detail-panel-overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 0.75rem;
+    margin: 0.5rem 0 0.25rem 0;
 }
 
-.oi-node-detail-panel-type,
-.oi-node-detail-panel-secondary {
+.oi-node-detail-panel-overview-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.oi-node-detail-panel-overview-label {
+    font-size: 0.7rem;
     color: var(--slds-g-color-on-surface-2, #706e6b);
-    margin: 0.15rem 0;
+}
+
+.oi-node-detail-panel-overview-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--slds-g-color-on-surface-1, #181818);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .oi-node-detail-panel-table {
@@ -51,9 +126,17 @@
     font-weight: 500;
 }
 
+/**
+ * Single-line truncation, not word-break — a long namespaced name (e.g. a managed-package
+ * Permission Set like MuleSoftSeamlessLoginC2CPermSet) is the normal case for these tables, not
+ * the edge case, so it must stay legible rather than breaking mid-word across three lines. The
+ * full name is still available via the row's own title attribute (html), shown on hover.
+ */
 .oi-node-detail-panel-table td {
-    word-break: break-word;
     padding: 0.3rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .oi-node-detail-panel-table tr:not(:last-child) th,
@@ -93,6 +176,47 @@
  * scrolls — a result spanning many metadata types should grow downward in a narrow side panel,
  * not hide its own tail behind a horizontal scroll the user has no reason to expect here.
  */
+/**
+ * Scan provenance, pinned as the panel's closing line. Styled as quiet metadata rather than a
+ * banner: it must be findable whenever a user questions a number, without competing with the
+ * intelligence it qualifies. Top border separates it from content as a footer rather than
+ * another section.
+ */
+.oi-node-detail-panel-freshness {
+    margin: 0.75rem 0 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/** A known-incomplete scan is a real caveat on every number above it, so it gets warning colour — but stays inline, since it qualifies the freshness line rather than being an error in its own right. */
+.oi-node-detail-panel-freshness-warning {
+    color: var(--slds-g-color-warning-base-40, #a86403);
+    font-weight: 600;
+}
+
+/**
+ * A summary count rendered as the control that opens its own detail — the product rule that every
+ * number must be explainable, expressed in the smallest possible affordance. Styled as a link
+ * rather than a button so a column of them reads as data, not as a toolbar.
+ */
+.oi-node-detail-panel-count-button {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+}
+
+.oi-node-detail-panel-count-button:hover,
+.oi-node-detail-panel-count-button:focus {
+    text-decoration: underline;
+}
+
 .oi-node-detail-panel-impact-breakdown {
     display: flex;
     flex-wrap: wrap;
@@ -127,11 +251,11 @@
 .oi-node-detail-panel-show-fields-button {
     border: 1px solid var(--slds-g-color-border-accent-1, #0176d3);
     background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
+    color: var(--oi-panel-accent-color);
 }
 
 .oi-node-detail-panel-show-fields-button:hover {
-    background: var(--slds-g-color-accent-container-1, #f3f7fb);
+    background: var(--oi-panel-accent-bg);
 }
 
 /** A visually quieter secondary action than Show Fields — a collapse should read as lower-commitment than the expand it undoes. */
@@ -155,7 +279,7 @@
 .oi-node-detail-panel-impact-button {
     border: 1px solid var(--slds-g-color-border-accent-1, #0176d3);
     background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
+    color: var(--oi-panel-accent-color);
     border-radius: 0.25rem;
     padding: 0.3rem 0.75rem;
     font-size: 0.75rem;
@@ -166,7 +290,7 @@
 }
 
 .oi-node-detail-panel-impact-button:hover {
-    background: var(--slds-g-color-accent-container-1, #f3f7fb);
+    background: var(--oi-panel-accent-bg);
 }
 
 .oi-node-detail-panel-fields-toolbar {
@@ -247,11 +371,197 @@
 }
 
 .oi-node-detail-panel-field-badge.is-custom {
-    background: var(--slds-g-color-accent-container-1, #eef4fc);
-    color: var(--slds-g-color-accent-1, #0176d3);
+    background: var(--oi-panel-accent-bg);
+    color: var(--oi-panel-accent-color);
 }
 
 .oi-node-detail-panel-field-badge.is-standard {
     background: var(--slds-g-color-surface-container-2, #f3f3f3);
     color: var(--slds-g-color-on-surface-1, #444);
+}
+
+/**
+ * Collapsible section header (GraphUI.md §42 Intelligence Panel rebuild) — a full-width button
+ * so the entire row, not just the chevron, is a click target; keyboard focus and hover read
+ * identically to every other interactive control in this panel.
+ */
+.oi-node-detail-panel-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    text-align: left;
+}
+
+.oi-node-detail-panel-section-header:hover .oi-node-detail-panel-section-title {
+    color: var(--slds-g-color-accent-1, #0176d3);
+}
+
+.oi-node-detail-panel-section-header .oi-node-detail-panel-section-title {
+    margin: 0;
+}
+
+.oi-node-detail-panel-section-chevron {
+    flex-shrink: 0;
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.oi-node-detail-panel-section-header[aria-expanded='true'] .oi-node-detail-panel-section-chevron {
+    transform: rotate(90deg);
+}
+
+/** The count badge reads as a clickable-adjacent affordance (product rule: every number here is explainable) without itself being a second, redundant control inside the header button. */
+.oi-node-detail-panel-section-count {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+    border-radius: 0.65rem;
+    padding: 0.05rem 0.5rem;
+}
+
+/**
+ * Empty-state differentiation (GraphUI.md §42, item 22) — TRUE ZERO / UNSCANNED / STALE /
+ * POSSIBLY INCOMPLETE each get their own quiet, color-coded treatment so a missing scanner never
+ * reads as a confident zero. Deliberately restrained (no banners) — this is a caveat on one
+ * section's count, not an error demanding the whole panel's attention.
+ */
+.oi-node-detail-panel-empty-state-badge {
+    font-size: 0.75rem;
+    margin: 0.25rem 0 0 0;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+.oi-node-detail-panel-empty-state-zero {
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-node-detail-panel-empty-state-unscanned {
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-style: normal;
+    font-weight: 600;
+}
+
+.oi-node-detail-panel-empty-state-stale {
+    color: var(--slds-g-color-warning-base-40, #a86403);
+    font-style: normal;
+    font-weight: 600;
+}
+
+.oi-node-detail-panel-empty-state-incomplete {
+    color: var(--slds-g-color-brand-base-40, #0176d3);
+    font-style: normal;
+}
+
+/** A static (non-collapsible) section header — used for Overview, which stays always-expanded. */
+.oi-node-detail-panel-section-header-static {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.2rem;
+}
+
+.oi-node-detail-panel-section-header-static .oi-node-detail-panel-section-title {
+    margin: 0;
+}
+
+/** One colored identity icon per section — a quiet visual anchor distinguishing Fields/Relationships/Automation/Code/Security/Impact/Technical Details at a glance, matching the approved reference's section iconography. */
+.oi-node-detail-panel-section-icon {
+    flex-shrink: 0;
+    box-sizing: content-box;
+    padding: 0.28rem;
+    border-radius: 0.35rem;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-node-detail-panel-code-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.7rem;
+    height: 1.3rem;
+    border-radius: 0.35rem;
+    background: #fff2d8;
+    color: #b85d00;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.oi-node-detail-panel-section-header[aria-expanded='true'] ~ * {
+    animation: oi-panel-disclosure-in 0.22s cubic-bezier(0.2, 0, 0, 1) both;
+    transform-origin: top;
+}
+
+@keyframes oi-panel-disclosure-in {
+    from { opacity: 0; transform: translateY(-5px) scaleY(0.98); }
+    to { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .oi-node-detail-panel-section-chevron,
+    .oi-node-detail-panel-section-header[aria-expanded='true'] ~ * {
+        transition: none;
+        animation: none;
+    }
+}
+
+.oi-node-detail-panel-section-icon.is-overview {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-3, #7376e0);
+}
+
+.oi-node-detail-panel-section-icon.is-fields {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-4, #c95bb6);
+}
+
+.oi-node-detail-panel-section-icon.is-relationships {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-1, #0176d3);
+}
+
+.oi-node-detail-panel-section-icon.is-automation {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-success-1, #04844b);
+}
+
+.oi-node-detail-panel-section-icon.is-code {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-warning-base-40, #dd7a01);
+}
+
+.oi-node-detail-panel-section-icon.is-security {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-error-1, #c23934);
+}
+
+.oi-node-detail-panel-section-icon.is-impact {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-2, #06a59a);
+}
+
+.oi-node-detail-panel-section-icon.is-technical {
+    --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/** The "Coverage details" disclosure (GraphUI.md §42, item 15) — quiet, secondary styling so the scanner's own honest explanation stays available without dominating the section the way an always-visible paragraph did. */
+.oi-node-detail-panel-coverage-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+    border: none;
+    background: transparent;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.oi-node-detail-panel-coverage-toggle:hover {
+    color: var(--slds-g-color-accent-1, #0176d3);
+    text-decoration: underline;
 }

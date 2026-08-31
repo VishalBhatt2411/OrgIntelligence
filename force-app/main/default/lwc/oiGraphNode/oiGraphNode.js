@@ -43,9 +43,55 @@ export default class OiGraphNode extends LightningElement {
     @api isExpanded = false;
     @api hasMoreNeighbors = false;
     @api isCluster = false;
+    /** Human type name from the registry ("Apex Trigger"), never the raw typeKey. */
+    @api typeLabel;
+    /**
+     * Why this node is on screen, in the user's language: the role it plays relative to whatever
+     * it hangs off ("Field Of", "Executes On"), plus what it relates to. Supplied by the Canvas,
+     * which owns the graph topology — a node cannot know its own context.
+     */
+    @api relationshipRole;
+    @api relationshipContext;
+    /** Hops from the centre. 1 means a direct neighbour; anything higher needs its distance stated, or a far node reads as if it were directly related. */
+    @api hopDistance;
+    /** True when this node is on the currently-highlighted path back to the centre. */
+    @api isOnActivePath = false;
+    /** True when something else is highlighted and this node is not part of it — rendered de-emphasised rather than hidden. */
+    @api isDimmed = false;
 
     get nodeClass() {
-        return 'oi-graph-node' + (this.isSelected ? ' is-selected' : '') + (this.isCluster ? ' is-cluster' : '');
+        return (
+            'oi-graph-node' +
+            (this.isSelected ? ' is-selected' : '') +
+            (this.isCluster ? ' is-cluster' : '') +
+            (this.isOnActivePath ? ' is-on-path' : '') +
+            (this.isDimmed ? ' is-dimmed' : '')
+        );
+    }
+
+    /** The relationship chip's text — the single most important thing on the card for answering "why is this here?". Omitted entirely rather than shown empty when the Canvas has no context to give (e.g. the centre node itself). */
+    get relationshipChipText() {
+        if (!this.relationshipRole) {
+            return null;
+        }
+        return this.relationshipContext ? `${this.relationshipRole} ${this.relationshipContext}` : this.relationshipRole;
+    }
+
+    get hasRelationshipChip() {
+        return !!this.relationshipChipText;
+    }
+
+    /** Distance is stated only beyond one hop: labelling a direct neighbour "1 relationship away" is noise, while leaving a 3-hop node unlabelled actively misleads. */
+    get hopLabel() {
+        return this.hopDistance > 1 ? `${this.hopDistance} relationships away` : null;
+    }
+
+    get hasHopLabel() {
+        return !!this.hopLabel;
+    }
+
+    get resolvedTypeLabel() {
+        return this.typeLabel || '';
     }
 
     get resolvedColor() {
@@ -56,11 +102,21 @@ export default class OiGraphNode extends LightningElement {
         return `--oi-node-accent: ${this.resolvedColor};`;
     }
 
+    /**
+     * Screen-reader text is user-facing text, so it must never contain a raw typeKey — this
+     * previously announced "SalesforceMetadata.CustomObject", which is exactly the internal
+     * vocabulary the product is not allowed to expose. It now uses the registry's human label and
+     * includes the relationship context, so a non-sighted user gets the same "why is this here"
+     * answer the chip gives everyone else.
+     */
     get ariaLabel() {
         const expandState = this.isExpanded ? 'expanded' : 'collapsed';
         const more = this.hasMoreNeighbors ? ', more relationships available' : '';
         const secondary = this.secondaryKey ? `, ${this.secondaryKey}` : '';
-        return `${this.label}${secondary}, ${this.typeKey}, ${expandState}${more}`;
+        const type = this.typeLabel ? `, ${this.typeLabel}` : '';
+        const relationship = this.relationshipChipText ? `, ${this.relationshipChipText}` : '';
+        const hops = this.hopLabel ? `, ${this.hopLabel}` : '';
+        return `${this.label}${secondary}${type}${relationship}${hops}, ${expandState}${more}`;
     }
 
     get hasSecondaryKey() {
@@ -98,5 +154,10 @@ export default class OiGraphNode extends LightningElement {
     handleExpandToggle(event) {
         event.stopPropagation();
         this.dispatchEvent(new CustomEvent('expandtoggle', { detail: { nodeKey: this.nodeKey } }));
+    }
+
+    handleOpen(event) {
+        event.stopPropagation();
+        this.dispatchEvent(new CustomEvent('open', { detail: { nodeKey: this.nodeKey } }));
     }
 }

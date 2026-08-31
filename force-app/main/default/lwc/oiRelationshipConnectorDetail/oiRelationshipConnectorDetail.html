@@ -1,0 +1,60 @@
+<template>
+    <section
+        role="dialog"
+        tabindex="-1"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        class="slds-modal slds-fade-in-open slds-modal_small oi-rcd"
+        data-id="connector-detail"
+        onkeydown={handleKeyDown}
+    >
+        <div class="slds-modal__container">
+            <header class="slds-modal__header oi-rcd-header">
+                <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse" title="Close" data-id="connector-detail-close" onclick={handleClose}>
+                    <lightning-icon icon-name="utility:close" size="small" alternative-text="Close" variant="inverse"></lightning-icon>
+                </button>
+                <h2 id={headingId} class="slds-modal__title" data-id="connector-detail-title">{directionLabel}</h2>
+                <p class="oi-rcd-subtitle" data-id="connector-detail-subtitle">{subtitleLabel}</p>
+            </header>
+
+            <div class="slds-modal__content slds-p-around_medium oi-rcd-body">
+                <template lwc:if={hasActionMessage}>
+                    <div class="oi-rcd-action-message" data-id="connector-detail-action-message" role="status">{actionMessage}</div>
+                </template>
+
+                <dl class="oi-rcd-detail-list">
+                    <dt>{sourceDtLabel}</dt>
+                    <dd>
+                        <button type="button" class="oi-rcd-link" data-id="open-source" onclick={handleOpenSource}>{sourceObject.label}</button>
+                    </dd>
+
+                    <dt>Relationship Type</dt>
+                    <dd data-id="connector-detail-type">{relationshipTypeLabel}</dd>
+
+                    <dt>{targetDtLabel}</dt>
+                    <dd>
+                        <button type="button" class="oi-rcd-link" data-id="open-target" onclick={handleOpenTarget}>{targetObject.label}</button>
+                    </dd>
+
+                    <dt>Direction</dt>
+                    <dd data-id="connector-detail-direction">{directionLabel}</dd>
+                </dl>
+
+                <template lwc:if={hasFields}>
+                    <div class="oi-rcd-fields">
+                        <span class="oi-rcd-fields-title">Field{plural}</span>
+                        <ul class="oi-rcd-field-list" data-id="connector-detail-fields">
+                            <template for:each={fields} for:item="field">
+                                <li key={field.fieldNodeKey}>
+                                    <button type="button" class="oi-rcd-link" data-field-secondary-key={field.fieldSecondaryKey} onclick={handleOpenField}>{field.fieldApiName}</button>
+                                    <span class="oi-rcd-field-type">{field.relationshipType}</span>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open" data-id="connector-detail-backdrop"></div>
+</template>

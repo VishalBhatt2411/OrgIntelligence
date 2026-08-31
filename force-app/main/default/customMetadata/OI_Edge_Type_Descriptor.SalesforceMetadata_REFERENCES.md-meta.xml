@@ -14,4 +14,16 @@
         <field>Line_Style__c</field>
         <value xsi:type="xsd:string">dotted</value>
     </values>
+    <values>
+        <field>Source_Role_Label__c</field>
+        <value xsi:type="xsd:string">References</value>
+    </values>
+    <values>
+        <field>Target_Role_Label__c</field>
+        <value xsi:type="xsd:string">Referenced By</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value xsi:type="xsd:string">Code that names this component in its source.</value>
+    </values>
 </CustomMetadata>

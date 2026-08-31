@@ -19,6 +19,7 @@
 import { LightningElement, api } from 'lwc';
 
 export default class OiFilterPanel extends LightningElement {
+    /** Each option is checkbox state AND legend entry: {typeKey, displayLabel, description, isChecked, swatchClass}. See this component's own doc comment on why the panel now serves both roles. */
     @api edgeTypeOptions = [];
     @api direction = 'both';
     @api restrictToDirectOnly = false;

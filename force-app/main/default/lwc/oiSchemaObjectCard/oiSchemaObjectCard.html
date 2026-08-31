@@ -13,9 +13,16 @@
             <button data-id="expand-toggle-button" class="oi-schema-card-expand-toggle" title={expandToggleLabel} onclick={handleExpandToggle}>
                 {expandToggleLabel}
             </button>
+            <button data-id="open-node-button" class="oi-schema-card-open" title="Open in Object Manager" aria-label="Open in Object Manager" onclick={handleOpen}>&#8599;</button>
         </div>
         <div class="oi-schema-card-subheader" title={secondaryKey}>{secondaryKey}</div>
         <div class="oi-schema-card-field-count" data-id="field-count">{fieldCountLabel}</div>
+        <template lwc:if={hasRelationshipChip}>
+            <div class="oi-schema-card-relationship-chip" data-id="card-relationship-chip">{relationshipChipText}</div>
+        </template>
+        <template lwc:if={hasHopLabel}>
+            <div class="oi-schema-card-hop-label" data-id="card-hop-label">{hopLabel}</div>
+        </template>
         <div class="oi-schema-card-tooltip" data-id="card-tooltip">{tooltipText}</div>
     </div>
 </template>

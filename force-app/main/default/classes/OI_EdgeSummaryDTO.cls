@@ -1,8 +1,10 @@
 /**
  * Purpose: The @AuraEnabled wire shape for OI_EdgeSummary (API.md §2.1).
- * Responsibilities: Carry exactly key/typeKey/sourceNodeKey/targetNodeKey.
+ * Responsibilities: Carry key/typeKey/sourceNodeKey/targetNodeKey, plus the originating field's
+ *                    API name for a relationship edge where one exists.
  * Dependencies: OI_EdgeSummary.
- * Limitations: None.
+ * Limitations: viaFieldApiName is null wherever the edge kind carries no such concept — see
+ *              OI_EdgeSummary.
  */
 public class OI_EdgeSummaryDTO {
     @AuraEnabled
@@ -13,12 +15,15 @@ public class OI_EdgeSummaryDTO {
     public String sourceNodeKey;
     @AuraEnabled
     public String targetNodeKey;
+    @AuraEnabled
+    public String viaFieldApiName;
 
     public OI_EdgeSummaryDTO(OI_EdgeSummary summary) {
         this.edgeKey = summary.edgeKey;
         this.typeKey = summary.typeKey;
         this.sourceNodeKey = summary.sourceNodeKey;
         this.targetNodeKey = summary.targetNodeKey;
+        this.viaFieldApiName = summary.viaFieldApiName;
     }
 
     /** Record Analysis (ADR-0021) — same rationale as OI_NodeSummaryDTO's raw-field constructor. */

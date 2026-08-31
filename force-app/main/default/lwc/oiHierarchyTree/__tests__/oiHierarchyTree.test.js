@@ -77,8 +77,7 @@ describe('c-oi-hierarchy-tree', () => {
         await flushPromises();
 
         const root = element.shadowRoot.querySelector('[data-id="tree-root"]');
-        root.shadowRoot.querySelector('[data-id="tree-node-toggle"]').click();
-        await flushPromises();
+        /** The root auto-expands on first render (oiHierarchyTreeNode's isRoot setter), so its children are already present — clicking the toggle here would collapse them instead. */
         root.shadowRoot.querySelector('c-oi-hierarchy-tree-node').shadowRoot.querySelector('[data-id="tree-node-label"]').click();
 
         expect(handler).toHaveBeenCalledWith(expect.objectContaining({ detail: { objectApiName: 'Account', recordId: '001x2' } }));

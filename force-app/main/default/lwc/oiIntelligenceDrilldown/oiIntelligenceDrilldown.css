@@ -1,0 +1,129 @@
+/**
+ * Every colour is an SLDS global styling hook with the literal hex as fallback, matching the
+ * convention already used across this package's components — so the dialog follows Lightning's
+ * dark mode where SLDS 2 tokens exist and renders unchanged where they do not.
+ */
+
+/** The modal sits above the canvas toolbar and mini-map, which carry z-index 5. */
+.oi-drilldown {
+    z-index: 9001;
+}
+
+.oi-drilldown-header {
+    background: var(--slds-g-color-surface-container-1, #ffffff);
+    padding-bottom: 0.75rem;
+}
+
+/**
+ * Header hierarchy: the anchor name is the title, the relationship is a quieter second line, and
+ * the count is quieter still. Three sizes rather than three colours alone, so the ordering
+ * survives for anyone who cannot distinguish the tones.
+ */
+.oi-drilldown-subtitle {
+    margin: 0.15rem 0 0 0;
+    font-size: 0.8rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-drilldown-count {
+    margin: 0.15rem 0 0 0;
+    font-size: 0.7rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/** A tall, scrollable body: drill-downs are table-first, and the table must scroll inside the dialog rather than pushing the page. */
+.oi-drilldown-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.oi-drilldown-toolbar {
+    margin-bottom: 0.75rem;
+    max-width: 22rem;
+}
+
+.oi-drilldown-state {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0;
+    position: relative;
+    min-height: 4rem;
+}
+
+.oi-drilldown-note {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-drilldown-error {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.8rem;
+    color: var(--slds-g-color-error-base-40, #ba0517);
+}
+
+.oi-drilldown-table {
+    font-size: 0.8rem;
+}
+
+/** API names are identifiers, so they read better in a monospaced face where character-level differences (Id vs ld, 0 vs O) actually matter. */
+.oi-drilldown-api {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    word-break: break-all;
+}
+
+/** The relationship role is the "why is this here" answer, so it is given chip treatment rather than being another plain cell. */
+.oi-drilldown-role {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.75rem;
+    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
+/** Column headers double as sort controls; styled as text so they never read as a row of buttons competing with the data. */
+.oi-drilldown-sort {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-weight: 700;
+    color: var(--slds-g-color-on-surface-1, #181818);
+    cursor: pointer;
+}
+
+.oi-drilldown-sort:hover {
+    text-decoration: underline;
+}
+
+.oi-drilldown-link {
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin-right: 0.75rem;
+    font-size: 0.72rem;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.oi-drilldown-link:hover {
+    text-decoration: underline;
+}
+
+.oi-drilldown-link:last-child {
+    margin-right: 0;
+}
+
+.oi-drilldown-actions-col {
+    width: 12rem;
+}
+
+.oi-drilldown-more {
+    margin-top: 0.75rem;
+}

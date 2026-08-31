@@ -14,4 +14,16 @@
         <field>Line_Style__c</field>
         <value xsi:type="xsd:string">solid</value>
     </values>
+    <values>
+        <field>Source_Role_Label__c</field>
+        <value xsi:type="xsd:string">Executes On</value>
+    </values>
+    <values>
+        <field>Target_Role_Label__c</field>
+        <value xsi:type="xsd:string">Runs On</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value xsi:type="xsd:string">Automation that runs when records of this object change.</value>
+    </values>
 </CustomMetadata>

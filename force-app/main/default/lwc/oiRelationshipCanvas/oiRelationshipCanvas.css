@@ -1,0 +1,827 @@
+/**
+ * SLDS global styling hooks throughout (--slds-g-color-*), each with a literal fallback, so
+ * this canvas adapts to dark mode where SLDS 2 tokens are present and renders identically
+ * where they aren't — the same convention oiGraphCanvas.css/oiSchemaObjectCard.css already use.
+ *
+ * The four relationship-kind colors below are the one deliberate exception: verified live in a
+ * real org, `--slds-g-color-accent-2` and `--slds-g-color-accent-3` both resolve to
+ * near-identical blues under this org's actual theme (rgb(2,42,192) vs rgb(2,80,217)) — visually
+ * indistinguishable, which silently defeats the entire point of this legend (telling Lookup,
+ * Master-Detail, and Self relationships apart by color at a glance). These four are therefore
+ * this component's own scoped custom properties with hardcoded, guaranteed-distinct values —
+ * still overridable by a consuming org/theme that wants to customize them, just never silently
+ * collapsed into each other by an SLDS token happening to share a value in some theme.
+ */
+/** VisualDesignSpecification.md §4's canvas/surface token target (#ffffff) — set explicitly here rather than left to inherit whatever background the hosting FlexiPage/App Builder region happens to have, which is exactly CurrentUIVisualGapAssessment.md's P1 "Canvas background" gap ("main relationship surface is light gray"). */
+.oi-orc {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  --oi-orc-color-incoming: #5e35b1;
+  --oi-orc-color-outgoing: #0176d3;
+  --oi-orc-color-master-detail: #0b827c;
+  --oi-orc-color-self: #a61b7b;
+  --oi-orc-explore-bg: rgba(1, 118, 211, 0.1);
+  --oi-orc-explore-bg-hover: rgba(1, 118, 211, 0.18);
+  --oi-orc-explore-color: #0176d3;
+}
+
+/* --- Toolbar --- */
+
+/** VisualDesignSpecification.md §3.2's ~60px compact toolbar, three groups (Analyzing / Relationship View / View Options) separated by vertical rules (.oi-orc-toolbar-divider) rather than plain gaps. */
+.oi-orc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  min-height: 3.4rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+}
+
+.oi-orc-toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  min-height: 1.6rem;
+  background: var(--slds-g-color-border-1, #e2e1df);
+  flex-shrink: 0;
+}
+
+.oi-orc-analyzing {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.oi-orc-analyzing-label {
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/** A bordered chip so the analyzed object reads as a distinct, glanceable unit in the toolbar rather than plain inline text. */
+.oi-orc-analyzing-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  background: var(--slds-g-color-surface-container-2, #fafaf9);
+}
+
+.oi-orc-analyzing-labels {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.oi-orc-analyzing-name {
+  font-weight: 700;
+  color: var(--slds-g-color-on-surface-1, #181818);
+}
+
+.oi-orc-analyzing-type {
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: 0.72rem;
+}
+
+.oi-orc-toolbar-spacer {
+  flex: 1;
+}
+
+.oi-orc-toolbar-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+  white-space: nowrap;
+}
+
+.oi-orc-visibility-toggle-group {
+  display: flex;
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 0.35rem;
+  overflow: hidden;
+}
+
+.oi-orc-visibility-toggle {
+  border: none;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  color: var(--slds-g-color-on-surface-1, #181818);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+}
+
+.oi-orc-visibility-toggle + .oi-orc-visibility-toggle {
+  border-left: 1px solid var(--slds-g-color-border-1, #dddbda);
+}
+
+.oi-orc-visibility-toggle.is-active {
+  background: var(--slds-g-color-accent-1, #0176d3);
+  color: var(--slds-g-color-on-accent-1, #ffffff);
+  font-weight: 700;
+}
+
+/** "View Options" dropdown — a real combobox (not static text): choosing an option sets the zoom level, and Fit to Screen re-measures the diagram against the current viewport. */
+.oi-orc-view-options-wrap {
+  position: relative;
+}
+
+.oi-orc-view-options-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--slds-g-color-on-surface-1, #181818);
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.oi-orc-view-options-trigger:hover {
+  background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+.oi-orc-view-options-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 20;
+  min-width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 0.4rem;
+  box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.14));
+}
+
+.oi-orc-view-options-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--slds-g-color-on-surface-1, #181818);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.oi-orc-view-options-item:hover {
+  background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+.oi-orc-view-options-item.is-active {
+  color: var(--slds-g-color-accent-1, #0176d3);
+  font-weight: 700;
+}
+
+/** The export anchor is real (part of the template) but never visible — clicked programmatically once its href is set, never rendered as a UI element of its own. */
+.oi-orc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.oi-orc-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 0.35rem;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.oi-orc-icon-button:hover {
+  background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+/**
+ * Docked in the persistent canvas footer (.oi-orc-canvas-footer), not floating over the diagram —
+ * VisualDesignSpecification.md §3.4's "zoom controls docked to the lower right in the same footer
+ * region" as the legend, and CurrentUIVisualGapAssessment.md's P1 "Footer tools" gap ("legend and
+ * bottom-right zoom controls are not visible in the captured viewport... dock both inside a
+ * persistent canvas footer"). Static flex-row positioning now, not position:absolute — the footer
+ * itself is what stays fixed at the bottom of the component regardless of diagram scroll.
+ */
+.oi-orc-zoom-controls {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 1.2rem;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.1));
+  overflow: hidden;
+}
+
+.oi-orc-zoom-button,
+.oi-orc-zoom-reset {
+  border: none;
+  background: transparent;
+  color: var(--slds-g-color-on-surface-1, #181818);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.5rem 0.7rem;
+}
+
+.oi-orc-zoom-reset {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-left: 1px solid var(--slds-g-color-border-1, #e2e1df);
+  border-right: 1px solid var(--slds-g-color-border-1, #e2e1df);
+  min-width: 3.2rem;
+  text-align: center;
+}
+
+.oi-orc-zoom-button:hover,
+.oi-orc-zoom-reset:hover {
+  background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+/** Anchored top-right of the diagram now that zoom controls have moved into the persistent footer below (they no longer share this corner). */
+.oi-orc-maximize-button {
+  position: absolute;
+  right: 0.75rem;
+  top: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid var(--slds-g-color-border-1, #dddbda);
+  border-radius: 50%;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.1));
+  cursor: pointer;
+  z-index: 10;
+}
+
+.oi-orc-maximize-button:hover {
+  background: var(--slds-g-color-surface-container-2, #f3f3f3);
+}
+
+/** Maximize mode — a client-only CSS overlay rather than the browser Fullscreen API, which can be blocked inside Salesforce's own iframe/Lightning-container sandboxing; this always works, needs no permission prompt, and Esc-to-exit is unnecessary since the same button toggles it back. */
+.oi-orc-is-maximized {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  padding: 0.85rem 1rem;
+}
+
+/* --- Lane headers --- */
+
+.oi-orc-lane-headers {
+  display: flex;
+  justify-content: space-between;
+}
+
+.oi-orc-lane-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.oi-orc-lane-header-outgoing {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.oi-orc-lane-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/** Both lane titles share one brand-consistent heading color — direction is already carried by column position and by the connector lines' own distinct colors (purple incoming / blue outgoing), so the headings don't need to repeat that encoding. */
+.oi-orc-lane-header-incoming .oi-orc-lane-title,
+.oi-orc-lane-header-outgoing .oi-orc-lane-title {
+  color: var(--slds-g-color-accent-1, #0176d3);
+}
+
+.oi-orc-lane-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-orc-lane-header-outgoing .oi-orc-lane-subtitle {
+  flex-direction: row-reverse;
+}
+
+.oi-orc-lane-info-icon {
+  --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-3, #aaa);
+  cursor: help;
+}
+
+/* --- Diagram --- */
+
+/**
+ * A real, confirmed-live rendering bug this fixes: with the SVG stretched to `width:100%;
+ * height:100%` of a flex-grown wrapper, its wide-and-short viewBox (~1000x800, two side-by-side
+ * lanes) got fit into whatever arbitrary box the surrounding Lightning page happened to hand this
+ * column — measured live at 364px wide x 1029px tall, a completely different aspect ratio.
+ * `preserveAspectRatio="xMidYMid meet"` had no choice but to shrink the ENTIRE diagram to fit the
+ * narrow dimension, rendering every card/line/label at ~36% scale (illegibly small) while leaving
+ * most of the tall column empty below it. The SVG now carries its own native pixel width/height
+ * (matching its viewBox 1:1, set in the template from `diagram.canvasWidth/canvasHeight`) instead
+ * of stretching to the container — like any diagramming tool (draw.io, Miro), it renders at a
+ * real, legible, constant size and this wrapper scrolls for whatever doesn't fit, rather than
+ * silently shrinking content to avoid ever needing a scrollbar. The explicit zoom controls and
+ * "Fit to Screen" (which now does real, useful work: shrinking an oversized diagram on request)
+ * are how a user opts into a smaller view — never the default.
+ */
+/**
+ * Groups the diagram and its empty-lane messages into one flexed, independently-scrollable region
+ * so the persistent footer below (.oi-orc-canvas-footer) never scrolls out of view with it —
+ * VisualDesignSpecification.md §3.4's "legend/zoom docked in a persistent footer" requires the
+ * footer to stay put regardless of how tall the diagram itself gets.
+ */
+.oi-orc-canvas-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.oi-orc-diagram-wrapper {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+}
+
+.oi-orc-svg {
+  display: block;
+  overflow: visible;
+}
+
+.oi-orc-arrowhead {
+  fill: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/* --- Connector lines: direction is color, relationship type is stroke weight, System is dashed --- */
+
+.oi-orc-connector-line {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.oi-orc-connector-line-incoming {
+  stroke: var(--oi-orc-color-incoming);
+}
+
+.oi-orc-connector-line-outgoing {
+  stroke: var(--oi-orc-color-outgoing);
+}
+
+.oi-orc-connector-line-self {
+  stroke: var(--oi-orc-color-self);
+}
+
+/** Master-Detail always renders in its own dedicated color (matching its own Legend swatch) and a heavier stroke — overrides the direction color, since relationship TYPE is the more important thing to call out here regardless of which lane it's in. */
+.oi-orc-connector-line.is-master-detail {
+  stroke-width: 3;
+  stroke: var(--oi-orc-color-master-detail);
+}
+
+.oi-orc-connector-line.is-system {
+  stroke-dasharray: 5 4;
+}
+
+.oi-orc-connector-line.is-active {
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
+}
+
+.oi-orc-connector-line.is-dimmed {
+  opacity: 0.25;
+}
+
+/* --- Connector labels: HTML badges that visually sit on the connector line --- */
+
+.oi-orc-connector-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.7rem;
+  cursor: pointer;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  border: 1px solid transparent;
+  /**
+     * A defensive ceiling, not the primary sizing mechanism: oiRelationshipCanvas.js's
+     * computeLabelSegment already sizes each lane's card-to-trunk gap to fit its own widest
+     * label (measured via canvas, deliberately capped at LABEL_SEGMENT_MAX=260px there). This
+     * max-width matches that cap so the two never disagree — if canvas measureText's estimate
+     * ever drifts from real DOM layout (different font actually loaded, browser quirk), a label
+     * truncates with an ellipsis instead of silently spilling across the trunk line again. The
+     * full text is still available via this element's own title attribute.
+     */
+  max-width: 232px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oi-orc-connector-label-incoming {
+  color: var(--oi-orc-color-incoming);
+}
+
+.oi-orc-connector-label-outgoing {
+  color: var(--oi-orc-color-outgoing);
+}
+
+.oi-orc-connector-label-self {
+  color: var(--oi-orc-color-self);
+}
+
+.oi-orc-connector-label:hover,
+.oi-orc-connector-label.is-active {
+  border-color: currentColor;
+  background: var(--slds-g-color-surface-container-2, #f3f2f2);
+}
+
+.oi-orc-connector-label.is-dimmed {
+  opacity: 0.35;
+}
+
+.oi-orc-label-slot-right .oi-orc-connector-label {
+  margin-left: auto;
+}
+
+/* --- Neighbor / center cards --- */
+
+/**
+ * VisualDesignSpecification.md §5's card contract: icon tile, bold label + Standard/Custom
+ * caption, chevron, a divider, then the relationship field API name + relationship type below it
+ * — so the card is now a column (.oi-orc-card-main for the icon/label/chevron row, then
+ * .oi-orc-card-divider, then .oi-orc-card-footer) rather than one flat horizontal row.
+ */
+.oi-orc-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  border: 1px solid var(--slds-g-color-border-1, #e2e1df);
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.1));
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+  position: relative;
+}
+
+.oi-orc-card-main {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.oi-orc-card-divider {
+  height: 1px;
+  background: var(--slds-g-color-border-1, #e2e1df);
+  flex-shrink: 0;
+}
+
+.oi-orc-card-footer {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/**
+ * No transform here on purpose: each card is an SVG foreignObject sized to the card's exact
+ * unscaled width/height (see the template's x/y/width/height on the incoming/outgoing/self
+ * foreignObject wrappers) — SVG clips a foreignObject's content hard at that rectangle, unlike
+ * normal HTML overflow. A "pop up" translateY/scale on hover pushed the card's border and shadow
+ * past that boundary, most on the side the card moved toward (top, from translateY(-2px) plus
+ * scale's own growth), and that edge was silently sliced off instead of clipped-but-visible,
+ * reading as "the outline breaks and the card goes borderless" once it met the white canvas
+ * behind it. The elevated look comes entirely from box-shadow + a darker border-color instead,
+ * neither of which changes the card's rendered geometry, so there is nothing left for the
+ * foreignObject to clip.
+ */
+.oi-orc-card:hover,
+.oi-orc-card:focus-visible {
+  box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.14));
+  border-color: var(--slds-g-color-border-2, #b0adab);
+  outline: none;
+}
+
+.oi-orc-card.is-active {
+  border-color: var(--slds-g-color-accent-1, #0176d3);
+  box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3);
+}
+
+.oi-orc-card.is-dimmed {
+  opacity: 1;
+}
+
+.oi-orc-card-open {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: var(--slds-g-color-accent-1, #0176d3);
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.9rem;
+}
+
+.oi-orc-card-open:hover,
+.oi-orc-card-open:focus-visible {
+  background: var(--slds-g-color-surface-container-2, #eef4ff);
+}
+
+.oi-orc-card-icon {
+  flex-shrink: 0;
+}
+
+.oi-orc-card-labels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.oi-orc-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--slds-g-color-on-surface-1, #181818);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oi-orc-card-subtitle {
+  font-size: 0.72rem;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oi-orc-card-chevron {
+  flex-shrink: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--slds-g-color-on-surface-3, #aaa);
+}
+
+.oi-orc-card-self {
+  border-style: dashed;
+  background: var(--slds-g-color-surface-container-2, #faf9f8);
+}
+
+/* --- Show more / explore actions --- */
+
+.oi-orc-show-more {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--slds-g-color-border-accent-1, #0176d3);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--oi-orc-explore-color);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/** Same accent-container-1/accent-1 collision as .oi-orc-explore-button above — see that rule's own doc comment. */
+.oi-orc-show-more:hover {
+  background: var(--oi-orc-explore-bg-hover);
+}
+
+/**
+ * Deliberately NOT var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified
+ * live in a real org (audit #09): those two distinct SLDS tokens resolve to the EXACT same color
+ * under this org's actual theme, so the button's text and background painted identically, making
+ * "Explore From Here" a solid color block with invisible text. Same root cause and same fix as
+ * this file's own top-of-file relationship-color exception above: a scoped custom property pair
+ * with a hardcoded, guaranteed-distinct fallback, immune to two SLDS hooks silently colliding.
+ */
+.oi-orc-explore-button {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0.4rem;
+  background: var(--oi-orc-explore-bg);
+  color: var(--oi-orc-explore-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oi-orc-explore-button:hover {
+  background: var(--oi-orc-explore-bg-hover);
+}
+
+/* --- Center card --- */
+
+/** Green border + a subtle green glow (VisualDesignSpecification.md §5's center-card contract, layered on top of the existing elevation shadow rather than replacing it) — what makes the analyzed object read as visually dominant, not just outlined. */
+.oi-orc-center-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--slds-g-color-surface-container-1, #ffffff);
+  border: 2px solid var(--slds-g-color-success-1, #04844b);
+  border-radius: 0.65rem;
+  padding: 1rem;
+  box-shadow:
+    var(--slds-g-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.14)),
+    0 0 0 5px rgba(4, 132, 75, 0.12);
+}
+
+.oi-orc-center-card-label {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--slds-g-color-on-surface-1, #181818);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.oi-orc-center-card-type {
+  font-size: 0.78rem;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-orc-center-card-status {
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.7rem;
+  color: var(--slds-g-color-success-1, #04844b);
+  background: var(--slds-g-color-success-container-1, rgba(4, 132, 75, 0.1));
+}
+
+/* --- Self relationship caption --- */
+
+.oi-orc-self-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.oi-orc-self-caption-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--oi-orc-color-self);
+}
+
+.oi-orc-self-caption-subtitle {
+  font-size: 0.75rem;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+/* --- Empty lane states --- */
+
+.oi-orc-lane-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.oi-orc-lane-empty-outgoing {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.oi-orc-show-system-link {
+  border: 1px solid var(--slds-g-color-border-accent-1, #0176d3);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--oi-orc-explore-color);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-style: normal;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+}
+
+/** Same accent-container-1/accent-1 collision as .oi-orc-explore-button above — see that rule's own doc comment. */
+.oi-orc-show-system-link:hover {
+  background: var(--oi-orc-explore-bg-hover);
+}
+
+/* --- Persistent canvas footer: legend (left) + zoom controls (right), VisualDesignSpecification.md §3.4 --- */
+
+.oi-orc-canvas-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+  border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
+  padding-top: 0.6rem;
+}
+
+.oi-orc-legend {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--slds-g-color-on-surface-2, #706e6b);
+}
+
+.oi-orc-legend-title {
+  font-weight: 700;
+}
+
+.oi-orc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.oi-orc-legend-swatch {
+  display: inline-block;
+  width: 1.1rem;
+  height: 0.22rem;
+  border-radius: 0.15rem;
+}
+
+.oi-orc-legend-swatch-lookup {
+  background: var(--oi-orc-color-incoming);
+}
+
+.oi-orc-legend-swatch-master-detail {
+  background: var(--oi-orc-color-master-detail);
+  height: 0.32rem;
+}
+
+.oi-orc-legend-swatch-self {
+  background: var(--oi-orc-color-self);
+  border-radius: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.oi-orc-legend-swatch-system {
+  background: repeating-linear-gradient(
+    to right,
+    var(--slds-g-color-on-surface-2, #706e6b) 0,
+    var(--slds-g-color-on-surface-2, #706e6b) 4px,
+    transparent 4px,
+    transparent 7px
+  );
+}

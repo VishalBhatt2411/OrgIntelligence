@@ -18,4 +18,8 @@
         <field>Color_Token__c</field>
         <value xsi:type="xsd:string">warning</value>
     </values>
+    <values>
+        <field>Intelligence_Category__c</field>
+        <value xsi:type="xsd:string">Automation</value>
+    </values>
 </CustomMetadata>

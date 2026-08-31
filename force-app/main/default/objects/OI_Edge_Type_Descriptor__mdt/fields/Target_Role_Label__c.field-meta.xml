@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Target_Role_Label__c</fullName>
+    <description>What the TARGET end of this relationship is, from the source's perspective — e.g. for Lookup To the target is "Referenced By". The mirror of Source Role Label.</description>
+    <externalId>false</externalId>
+    <label>Target Role Label</label>
+    <length>60</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

@@ -1,5 +1,5 @@
 <template>
-    <div class="oi-graph-canvas-container">
+    <div class={hostClass}>
         <template lwc:if={isEmpty}>
             <div class="oi-graph-canvas-empty" data-id="canvas-empty">Select a node to start exploring the graph.</div>
         </template>
@@ -23,10 +23,18 @@
                     </marker>
                 </defs>
                 <rect data-id="canvas-grid-rect" x="-10000" y="-10000" width="20000" height="20000" fill="url(#oi-canvas-grid)"></rect>
+                <!-- The label <text> is unconditional, not `lwc:if`-gated: conditionally
+                     adding/removing an SVG text node inside this for:each (its presence
+                     toggling per edge as clusters expand/collapse) crashed jsdom/LWC's SVG
+                     child-patching with a real removeChild TypeError — reproduced and confirmed
+                     by isolating this exact markup. Always rendering the node and letting empty
+                     content be the "no label" case keeps the child count stable per iteration,
+                     which is what LWC's dynamic-children diffing actually needs here. -->
                 <template for:each={renderableEdges} for:item="edge">
                     <path key={edge.edgeKey} data-id="graph-edge-path" class={edge.cssClass} d={edge.pathD}>
                         <title>{edge.displayLabel}</title>
                     </path>
+                    <text key={edge.labelKey} data-id="graph-edge-label" class="oi-graph-edge-label" x={edge.labelX} y={edge.labelY} text-anchor="middle">{edge.shortLabel}</text>
                 </template>
                 <template for:each={renderableNodes} for:item="node">
                     <foreignObject
@@ -38,6 +46,8 @@
                         data-node-key={node.nodeKey}
                         class="oi-graph-node-draggable"
                         onpointerdown={handleNodeDragStart}
+                        onmouseenter={handleNodeHoverStart}
+                        onmouseleave={handleNodeHoverEnd}
                     >
                         <template lwc:if={node.showFieldList}>
                             <c-oi-schema-object-card
@@ -51,7 +61,14 @@
                                 is-expanded={node.isExpanded}
                                 has-more-neighbors={node.hasMoreNeighbors}
                                 fields={node.fields}
+                                relationship-role={node.relationshipRole}
+                                relationship-context={node.relationshipContext}
+                                relationship-via={node.relationshipVia}
+                                hop-distance={node.hopDistance}
+                                is-on-active-path={node.isOnActivePath}
+                                is-dimmed={node.isDimmed}
                                 onselect={handleNodeSelect}
+                                onopen={handleNodeOpen}
                                 onexpandtoggle={handleNodeExpandToggle}
                             ></c-oi-schema-object-card>
                         </template>
@@ -59,6 +76,7 @@
                             <c-oi-graph-node
                                 node-key={node.nodeKey}
                                 type-key={node.typeKey}
+                                type-label={node.typeLabel}
                                 label={node.label}
                                 secondary-key={node.secondaryKey}
                                 state={node.state}
@@ -68,7 +86,13 @@
                                 is-expanded={node.isExpanded}
                                 has-more-neighbors={node.hasMoreNeighbors}
                                 is-cluster={node.isCluster}
+                                relationship-role={node.relationshipRole}
+                                relationship-context={node.relationshipContext}
+                                hop-distance={node.hopDistance}
+                                is-on-active-path={node.isOnActivePath}
+                                is-dimmed={node.isDimmed}
                                 onselect={handleNodeSelect}
+                                onopen={handleNodeOpen}
                                 onexpandtoggle={handleNodeExpandToggle}
                             ></c-oi-graph-node>
                         </template>
@@ -112,6 +136,16 @@
                     >↺</button>
                     <button type="button" data-id="reset-view-button" class="oi-graph-canvas-zoom-button" title="Reset view" aria-label="Reset view" onclick={handleResetViewClick}>⤢</button>
                 </div>
+                <div class="oi-graph-canvas-view-controls" data-id="export-maximize-controls">
+                    <button type="button" data-id="export-button" class="oi-graph-canvas-zoom-button" title="Export diagram as SVG" aria-label="Export diagram as SVG" onclick={handleExportDiagram}>
+                        <lightning-icon icon-name="utility:download" size="x-small"></lightning-icon>
+                    </button>
+                    <button type="button" data-id="maximize-toggle" class="oi-graph-canvas-zoom-button" title={maximizeButtonLabel} aria-label={maximizeButtonLabel} onclick={handleToggleMaximize}>
+                        <lightning-icon icon-name={maximizeIconName} size="x-small"></lightning-icon>
+                    </button>
+                </div>
+                <!-- A real anchor in this component's own template/shadow tree — see handleExportDiagram's doc comment (oiGraphCanvas.js) for why the download is triggered here rather than via a document.createElement'd, out-of-band element. -->
+                <a data-id="export-link" class="oi-graph-canvas-visually-hidden" href={exportHref} download={exportFileName} tabindex="-1" aria-hidden="true"></a>
             </div>
 
             <template lwc:if={hasMiniMap}>

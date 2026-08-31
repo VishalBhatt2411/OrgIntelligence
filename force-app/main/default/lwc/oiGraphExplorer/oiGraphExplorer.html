@@ -93,12 +93,20 @@
                 </template>
             </template>
             <template lwc:else>
-                <c-oi-search-bar
-                    placeholder-text={searchPlaceholder}
-                    type-key-filter={searchTypeKeyFilter}
-                    registry={registry}
-                    onselect={handleSearchSelect}
-                ></c-oi-search-bar>
+                <template lwc:if={shouldShowObjectSearchBar}>
+                    <c-oi-search-bar
+                        placeholder-text={searchPlaceholder}
+                        type-key-filter={searchTypeKeyFilter}
+                        registry={registry}
+                        onselect={handleSearchSelect}
+                    ></c-oi-search-bar>
+                </template>
+                <template lwc:elseif={centerObjectSummary}>
+                    <div class="oi-object-mode-banner" data-id="object-mode-banner">
+                        Object: <strong>{centerObjectSummary.label}</strong>
+                        <button type="button" class="oi-object-mode-change" data-id="object-mode-change-object" onclick={handleChangeObjectSearch}>Change object</button>
+                    </div>
+                </template>
             </template>
         </div>
 
@@ -120,25 +128,40 @@
                     </div>
                 </template>
                 <template lwc:if={hasCenterNode}>
-                    <c-oi-graph-canvas
-                        center-node-key={viewState.centerNodeKey}
-                        nodes={canvasNodes}
-                        edges={canvasEdges}
-                        selected-node-key={selectedNodeKey}
-                        onselect={handleCanvasSelect}
-                        onexpand={handleExpand}
-                        oncollapse={handleCollapse}
-                    ></c-oi-graph-canvas>
-                    <template lwc:if={hasFilterPanel}>
-                        <c-oi-filter-panel
-                            data-id="filter-panel"
-                            edge-type-options={edgeTypeFilterOptions}
-                            direction={relationshipDirection}
-                            restrict-to-direct-only={restrictToDirectOnly}
-                            onedgetypetoggle={handleEdgeTypeToggle}
-                            ondirectiontoggle={handleDirectionToggle}
-                            ondepthtoggle={handleDepthToggle}
-                        ></c-oi-filter-panel>
+                    <template lwc:if={usesRelationshipCanvas}>
+                        <c-oi-relationship-canvas
+                            mode={analyzeMode}
+                            center-node-key={viewState.centerNodeKey}
+                            nodes={allCanvasNodes}
+                            edges={allCanvasEdges}
+                            onselect={handleCanvasSelect}
+                            onexplorefromhere={handleExploreFromHere}
+                            onedgeclick={handleObjectCanvasEdgeClick}
+                            onopen={handleCanvasOpen}
+                        ></c-oi-relationship-canvas>
+                    </template>
+                    <template lwc:else>
+                        <c-oi-graph-canvas
+                            center-node-key={viewState.centerNodeKey}
+                            nodes={canvasNodes}
+                            edges={canvasEdges}
+                            selected-node-key={selectedNodeKey}
+                            onselect={handleCanvasSelect}
+                            onopen={handleCanvasOpen}
+                            onexpand={handleExpand}
+                            oncollapse={handleCollapse}
+                        ></c-oi-graph-canvas>
+                        <template lwc:if={hasFilterPanel}>
+                            <c-oi-filter-panel
+                                data-id="filter-panel"
+                                edge-type-options={edgeTypeFilterOptions}
+                                direction={relationshipDirection}
+                                restrict-to-direct-only={restrictToDirectOnly}
+                                onedgetypetoggle={handleEdgeTypeToggle}
+                                ondirectiontoggle={handleDirectionToggle}
+                                ondepthtoggle={handleDepthToggle}
+                            ></c-oi-filter-panel>
+                        </template>
                     </template>
                 </template>
                 <template lwc:else>
@@ -148,8 +171,18 @@
                 </template>
             </div>
             <div class="oi-graph-explorer-detail-column">
-                <c-oi-node-detail-panel node-key={selectedNodeKey} registry={registry} onselect={handleDetailPanelSelect} onhighlightimpact={handleHighlightImpact}></c-oi-node-detail-panel>
+                <c-oi-node-detail-panel
+                    node-key={selectedNodeKey}
+                    registry={registry}
+                    object-relationship-summary={objectRelationshipSummary}
+                    onselect={handleDetailPanelSelect}
+                    onhighlightimpact={handleHighlightImpact}
+                ></c-oi-node-detail-panel>
             </div>
         </div>
+
+        <template lwc:if={selectedConnector}>
+            <c-oi-relationship-connector-detail connector={selectedConnector} root-object={selectedConnectorRootObject} mode={analyzeMode} onclose={handleConnectorDetailClose}></c-oi-relationship-connector-detail>
+        </template>
     </div>
 </template>

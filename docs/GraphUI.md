@@ -6,6 +6,8 @@ Applies to: API v67.0
 
 This document is the complete architectural specification of the Visual Graph UI — the primary user experience of the platform (`CLAUDE.md` §Design Philosophy: "the graph is the primary interface... Google Maps for Salesforce Metadata"). It covers component architecture, the Canvas, node/edge rendering, the Detail Panel, Search integration, Graph Engine integration, state management, expand/collapse, layout strategy, the tree-vs-graph decision, filtering, navigation aids, performance, accessibility, and package readiness. It contains no implementation code — only structure, contracts, and rationale.
 
+**Visual authority:** [VisualDesignSpecification.md](VisualDesignSpecification.md) is the binding visual contract for Object Analyze mode and [ADR-0025](ADR/0025-reference-image-as-binding-visual-acceptance-contract.md) records that decision. This document governs component/data/interaction architecture. Where this document offers aesthetic discretion for Object Analyze mode, the approved reference removes that discretion.
+
 **Governing constraints, stated once and enforced throughout, per this round's explicit mandate:**
 
 - **The Canvas never fetches data.** `oiGraphCanvas` is a pure presentational component — props in, events out. Every Apex call in this subsystem is made by a container component, never by the Canvas or anything it renders.
@@ -28,6 +30,7 @@ Architecture §9 and [GraphEngine.md §17](GraphEngine.md#17-rendering-contract-
 | **GraphEngine.md §11's reference-counting algorithm is correct but stated at Apex-conceptual level** ("collapse decrements the supporting-count of each of the collapsed node's direct neighbors") — this is precise enough to review, not precise enough to build without a real, if small, design decision about *which* neighbors "direct" means. | Not a defect — the algorithm was never wrong, just not yet expressed as concrete client data structures. | §13 formalizes it exactly: a per-expand **revealed-set** `R(A)`, tracked separately from the running supporting-ancestor count, so collapse decrements precisely the neighbors *A's own expand* introduced — never a neighbor some other still-expanded ancestor is independently supporting. |
 | **No document had chosen tree, graph, or hybrid visualization** — this round's explicit analysis requirement. | Genuinely new design work, not a correction. | §18 — hybrid, radial, graph-topology-with-tree-like-default-layout. Formalized in [ADR-0019](ADR/0019-hybrid-radial-graph-visualization.md). |
 | **No document had chosen a rendering technology.** | Genuinely new design work. | §32 — SVG, virtualized, a small vendored layout-math library for force/radial positioning. Formalized in [ADR-0020](ADR/0020-svg-rendering-vendored-layout-library.md). |
+| **Object Analyze mode's shared use of the generic radial canvas (§18) surfaces non-Object node types and has no directional (incoming/outgoing) framing** — confirmed, not hypothetical: an Object-centered 2-hop fetch genuinely returns ApexTrigger/Flow/PermissionSet/ApexClass nodes via `EXECUTES_ON`/`GRANTS_ACCESS_TO` edges, and ring-by-hop-distance layout has no notion of "references this" vs. "this references." | Not a defect in §18's choice for its intended, mode-agnostic scope — a narrower product question (Object analyze mode specifically) that scope was never meant to answer. | §42 — a second, narrowly-scoped directional lane layout for Object analyze mode only; §18's radial layout is unchanged and remains authoritative for Field mode, Record mode, and general exploration. Formalized in [ADR-0023](ADR/0023-object-relationship-lane-layout.md). |
 
 Everything else in Architecture §9/§10 and GraphEngine.md §17 — the component list, LMS/`@api` communication split, top-down-data/bottom-up-events flow, the Canvas's generic input/output contract — holds and is elaborated, not contradicted, below.
 
@@ -85,6 +88,8 @@ Explore relationships and dependencies
 | `oiFilterPanel` | Presentational | Nothing — emits `filterChanged`, the shell decides whether that requires a new fetch (§22) |
 | `oiBreadcrumbTrail` | Presentational | Nothing — emits `navigateTo(nodeKey)` |
 | `oiMiniMap` | **Split, §24** | The Frontier Summary half calls `getMiniMapSummary`; the Viewport half is presentational |
+| `oiObjectRelationshipCanvas` (new, §42) | Presentational | Nothing — Object analyze mode's canvas only; renders the lanes `objectRelationshipView.js` derives from already-fetched `nodes`/`edges`, emits `select`/`explorefromhere`/`edgeclick`. `oiGraphExplorer` renders this instead of `oiGraphCanvas` only when `analyzeMode === 'Object'` — Field/Record modes are unaffected |
+| `oiRelationshipConnectorDetail` (new, §42) | Container | `OI_GraphController.getNavigationTarget`, via `c/metadataNavigation` — one connector's source/field/target detail |
 
 **Data flow, restated precisely from Architecture §10**: `oiGraphExplorer` owns the authoritative view-state (§10, §11) and is the *only* place a fetch is triggered — every other component either renders a slice of that state (props down) or reports user intent (events up). No sibling ever reaches into another sibling's internals; cross-sibling coordination (e.g., Search selecting a node the Canvas must then center on) goes through the shell, exactly as Architecture §9's existing LMS/`@api` split already prescribes.
 
@@ -260,7 +265,7 @@ Pure client-side viewport transform (`{panX, panY, zoom}`, §11) — no server i
 
 ## 17. Layout Strategy
 
-**Radial/egocentric layout, centered on the current `centerNodeKey`, ring position determined by hop-distance from center** — chosen over both a literal tree layout and an undirected force-directed layout, for reasons developed fully in §18.
+**Radial/egocentric layout, centered on the current `centerNodeKey`, ring position determined by hop-distance from center** — chosen over both a literal tree layout and an undirected force-directed layout, for reasons developed fully in §18. **Scope note**: this is the layout for Field mode, Record mode, and general multi-type graph exploration. Object analyze mode uses a second, narrower, directional lane layout instead — see §42 and [ADR-0023](ADR/0023-object-relationship-lane-layout.md) — because it asks a different, single-type-directional question this radial strategy was never designed to answer.
 
 - **Ring assignment**: a node's ring = its shortest currently-known hop-distance from `centerNodeKey` within the visible set (not a globally-computed shortest path against the full graph — the visible set is all the client has, and that is sufficient for a *layout* decision, as opposed to a *correctness* decision like traversal, which stays entirely server-side per this round's mandate).
 - **Within-ring positioning**: a light force-relaxation pass (repulsion between same-ring nodes, weak attraction toward the parent that revealed them) to reduce edge crossings and even out angular spacing — this is where the vendored layout-math library (§32) does its work; it never decides *which* nodes exist or *what* the graph's true topology is, only *where* to draw already-known nodes.
@@ -271,7 +276,7 @@ Pure client-side viewport transform (`{panX, panY, zoom}`, §11) — no server i
 
 ## 18. Tree vs. Graph Visualization Strategy
 
-The explicit analysis this round requires. Three options, weighed honestly against this platform's own, already-established data model — not against visualization aesthetics in the abstract.
+The explicit analysis this round requires. Three options, weighed honestly against this platform's own, already-established data model — not against visualization aesthetics in the abstract. **Scope note, added by [ADR-0023](ADR/0023-object-relationship-lane-layout.md)**: the choice below governs the default, mode-agnostic canvas (Field mode, Record mode, general exploration). Object analyze mode's own, narrower question — object-to-object structure only, not a multi-type neighborhood — is answered by a second, purpose-built layout, §42, that coexists with rather than revisits this decision.
 
 **Option A — hierarchical tree.** Rejected as the *sole* strategy, decisively, on data-model grounds established well before this document: [ADR-0001](ADR/0001-graph-data-model-as-core-abstraction.md) explicitly rejected a one-parent-per-relationship model because "relationships are inherently cross-type... an edge can connect any two node types"; [GraphEngine.md §11](GraphEngine.md#11-expand-collapse-algorithm) explicitly designs for "a node reachable through more than one expanded ancestor... common in metadata graphs, e.g. a field referenced by two different Flows"; [Architecture.md §7](Architecture.md#7-dependency-engine-architecture) explicitly requires cycle detection because "Apex `DEPENDS_ON`/`CALLS` graphs can be cyclic." A literal tree data structure cannot represent a node with two parents without either duplicating it (violating this round's explicit "shared nodes must not be duplicated unnecessarily" rule) or arbitrarily picking one parent and silently hiding the other relationship (a correctness failure, not just an aesthetic one — a user would draw wrong conclusions about what depends on what). **A tree is the wrong data structure for this product's actual data**, not merely a suboptimal visualization choice.
 
@@ -298,6 +303,10 @@ Consumes the Domain Type Registry (`OI_Node_Type_Descriptor__mdt`, DataModel §4
 **Lookup contract**: `typeKey → { iconName, colorToken, labelDisplayTemplate }`. **Unregistered `typeKey` behavior, stated explicitly because "the UI must render unknown future node types through the registry" is a hard mandate, not a nicety**: a `typeKey` absent from the fetched registry resolves to a fixed, generic default (`standard:custom` icon, a neutral color token, the raw `label` field with no template) — never an error, never a blank/broken node render, never a client-side crash. This is directly, deliberately testable (§35): a fixture with a synthetic, never-registered `typeKey` must render successfully with the generic default, and this test is what actually proves the "future metadata types render automatically" claim rather than merely asserting it in prose.
 
 **Where the lookup happens**: at the container level (`oiGraphExplorer`/`oiGraphCanvas`), resolving `typeKey → {icon, color}` *before* handing already-resolved visual props down to `oiGraphNode` (§5) — `oiGraphNode` itself never touches the registry, keeping it a simpler, more directly testable component.
+
+**§20.1 Per-object icon override (Object analyze mode only) — added, not a contradiction.** The registry above is deliberately generic per metadata *category* (`typeKey`) — every `SalesforceMetadata.CustomObject` node shares one `typeKey` regardless of whether the underlying SObject is Account, Contact, or a subscriber's own custom object — so a design mandate for Object analyze mode's neighbor cards to show each object's own real, Setup-assigned icon (Contact's person icon, Opportunity's own icon, a customer's custom object's own assigned icon) is a genuinely different lookup axis (per-object-API-name, not per-`typeKey`) that §20's registry was never designed to answer and should not be overloaded to answer.
+
+Resolved via `lightning/uiObjectInfoApi`'s `getObjectInfos` wire adapter (CLAUDE.md's API Selection Priority ranks UI API above Tooling/REST/SOQL for exactly this shape of read) — `oiGraphExplorer.js` reactively wires the distinct Object-node API names currently in the working set, parses each result's `themeInfo.iconUrl` (e.g. `.../standard/account_120.png` → `standard:account`, `.../custom/custom18_120.png` → `custom:custom18`) back into a `<lightning-icon>` name, and overrides `allCanvasNodes`' registry-resolved icon for `SalesforceMetadata.CustomObject` nodes only, before handing props down to `oiRelationshipCanvas`/`oiGraphNode` — the lookup still happens one level up from the presentational layer, consistent with §20's own placement rule. No new Apex surface, no Custom Metadata to maintain per object: Lightning Data Service already knows every org's assigned standard/custom icon (falling back to whatever generic icon that object's own admin assigned, or none) and enforces the same FLS/CRUD a user already has. Unregistered/unresolvable cases (UI API has no `themeInfo` for that object, or the wire hasn't resolved yet) fall back to §20's existing generic registry icon — never an error, matching this section's own unregistered-type contract. Field mode and Record mode's neighbor rendering are unaffected — this override applies only where `oiGraphExplorer` resolves `allCanvasNodes` for Object-typed nodes.
 
 ---
 
@@ -441,11 +450,13 @@ Consolidates the component list (§3) with the folder/naming convention Architec
 ```
 lwc/
 ├── oiGraphExplorer/        # container — the shell, owns GraphViewState
-├── oiGraphCanvas/          # presentational — renders/lays out the visible set
+├── oiGraphCanvas/          # presentational — renders/lays out the visible set (Field/Record modes, general exploration)
 ├── oiGraphNode/            # presentational — new (§5), one per rendered node
+├── oiObjectRelationshipCanvas/  # presentational — new (§42), Object analyze mode only
+├── oiRelationshipConnectorDetail/  # container — new (§42), one connector's source/field/target detail
 ├── oiNodeDetailPanel/      # container — getNodeDetail, getImpact
 ├── oiSearchBar/            # container — unchanged, SearchEngine.md
-├── oiFilterPanel/          # presentational — unchanged
+├── oiFilterPanel/          # presentational — unchanged (Field/Record modes only, §42)
 ├── oiBreadcrumbTrail/      # presentational — unchanged
 ├── oiMiniMap/               # split (§24) — container half + presentational half
 ├── oiScanStatusPanel/      # container — unchanged
@@ -453,7 +464,8 @@ lwc/
 ├── oiAdminConsole/         # container — unchanged
 └── oiSharedUtils/
     ├── graphViewState.js    # the module implementing §11/§12/§13
-    └── presentationRegistry.js  # the module implementing §20/§21's fetch-once-cache pattern
+    ├── presentationRegistry.js  # the module implementing §20/§21's fetch-once-cache pattern
+    └── objectRelationshipView.js  # new (§42) — pure transform: nodes/edges/centerNodeKey -> lanes, Object mode only
 ```
 
 No component in this list violates the container/presentational split (§3) — this is the concrete artifact a code reviewer checks against, the same way the Apex naming table (Architecture §3) lets a reviewer tell a class's layer from its name alone.
@@ -550,3 +562,56 @@ No DTO shape defined elsewhere in this platform is altered by this document — 
 3. **Does the Viewport Mini-map (§24) need its own separate zoom/pan controls**, or is it purely a read-only indicator? Currently designed as read-only (simpler, and consistent with most "you are here" mini-map conventions elsewhere), but click-to-jump-there on the mini-map itself is a plausible, undesigned future affordance.
 4. **Should `Max_Canvas_Working_Set__c` (§26) be a single global default, or admin-tunable per Custom Permission tier** (e.g., a Power User allowed a larger working set than a Viewer)? No concrete need identified yet; a single global default (via `OI_Settings__mdt`, consistent with every other numeric ceiling in this platform) is the simpler starting point.
 5. **Should the re-center-without-losing-breadcrumb affordance (§23) support branching** (multiple divergent explorations from one earlier point, not just a linear trail)? Out of scope for this document — the trail is deliberately linear, matching the simplicity `CLAUDE.md`'s Core Principles favor; a branching history is a real but currently unrequested feature.
+
+---
+
+## 42. Object-Relationship Lane Layout (Object Analyze Mode Only)
+
+Formalized in [ADR-0023](ADR/0023-object-relationship-lane-layout.md); added here per §0's newest finding. **Scope, stated once and binding for this entire section**: everything below applies to Object analyze mode's canvas only. Field mode and Record mode keep using §17/§18's radial canvas, completely unmodified — no getter, filter, or view-state field this section describes is read by, or affects, either of those two modes.
+
+### 42.1 Why a Second Layout, Concretely
+
+Object analyze mode's product question — "how is this Object structurally connected to other Objects?" — is narrower than the general egocentric-neighborhood question §17/§18 designs for. Reusing the radial canvas for it produces two confirmed, present-day defects: non-Object node types (ApexTrigger/Flow via `EXECUTES_ON`, PermissionSet/ApexClass via `GRANTS_ACCESS_TO`) render as cards despite being irrelevant to an object-structure question, and the ring layout has no directional (incoming vs. outgoing) framing at all. §42.2–§42.7 are the direct fix, scoped narrowly rather than generalized into §17/§18.
+
+### 42.2 Presentation Transform — `objectRelationshipView.js`
+
+A new, dependency-free pure module (no Apex import, no registry import — unit-testable exactly like `graphViewState.js`, with no LWC test harness required). Input: the container's already-styled, already-fetched working set (`nodes`, `edges`) plus `centerNodeKey`. Output: `{ rootObject, incomingRelationships[], outgoingRelationships[], selfRelationships[], counts }`.
+
+**Derivation, precisely**:
+1. **Card filter**: only `typeKey === SalesforceMetadata.CustomObject` nodes become renderable cards. This is the structural fix for §42.1's type-leakage problem — every other node type stays in the working set (available to the Intelligence Panel and drilldowns via their own, independent service calls) but is never rendered on this canvas.
+2. **Ownership index**: from every `HAS_FIELD` edge, `fieldKey -> ownerObjectKey` — built unconditionally here, not reused from `oiGraphCanvas`'s registry-gated field-absorption map, which answers a different, narrower question for a different canvas.
+3. **Relationship extraction**: for every `LOOKUP_TO`/`MASTER_DETAIL_TO` edge (edge source = the field's own key, edge target = the referenced object — per `OI_FieldScanner.cls`'s own edge construction), resolve the owning object via the index in step 2. Defensively skip if any side isn't in the current node set (the same "dangling reference" discipline `graphRelationshipFilter.js` already applies elsewhere).
+4. **Center-anchoring**: keep a relationship iff the center object is the owner (outgoing), the referenced object (incoming), or both (self). A relationship between two non-center objects that both happen to be in the working set is deliberately excluded — this view answers "what does *this* object relate to," not "everything currently loaded."
+5. **Aggregation**: group by the `(ownerObjectKey, referencedObjectKey)` pair into one connector — `{counterpartObject, direction, fields[], relationshipCount, primaryRelationshipType, isSystemRelationship}`. `primaryRelationshipType` is Master-Detail if any field in the group is one; connector-level `isSystemRelationship` is true only if *every* field in the group classifies as System (§42.3) — a connector must never look hidden-by-default merely because one of several fields sharing it happens to be a system field. A polymorphic field (e.g. `WhatId`) correctly produces one row per referenced object, by construction — expected, not a duplicate.
+6. **Deterministic bounding**: each lane sorted by `relationshipCount` desc, then counterpart label asc — never force/random positioning. The first 6 connectors per lane render initially; the remainder surface via a client-side "show N more" (mirroring `oiGraphCanvas`'s existing `expandedClusters` precedent, §26) — zero new fetch, since everything is already within the existing bounded working set.
+7. **Center card metadata**: Standard vs. Custom is derived as `secondaryKey.endsWith('__c')` — `OI_NodeSummary` never carries the `attributes` blob (GraphEngine.md's lazy-attribute-load rule), so this mirrors the same no-new-fetch convention `oiNodeDetailPanel.js` already uses for equivalent facts elsewhere.
+
+### 42.3 System vs. Business Relationship Classification
+
+A field-level classification, not a new registry concept: exact match of the field's own API name — derived from the field node's own `secondaryKey` (e.g. `"Account.OwnerId"` → `"OwnerId"`), never `edge.viaFieldApiName`, which despite its name is populated from the edge's stored `relationshipName` attribute (`OI_GraphTraversal.cls`'s `extractViaFieldApiName`) and is therefore the *relationship* name (`"Owner"`, `"CreatedBy"`), not the field API name — a real, live-org-confirmed mismatch this implementation corrected during validation, not a hypothetical concern — against the fixed set `{OwnerId, CreatedById, LastModifiedById}` — the universal, platform-standard audit-field names present on effectively every SObject, not org-specific configuration, so hardcoding this short list does not violate `CLAUDE.md`'s "never assume org metadata" rule (it is the same category of platform constant as a `typeKey` literal). The canvas exposes a **Business / System / All** toggle, defaulting to Business-only — never a silent, permanent hide (§14 in the original mandate this ADR responds to; consistent with this document's existing "no silent caps" principle, §26).
+
+### 42.4 Connector Detail and Navigation
+
+Clicking an aggregated connector opens `oiRelationshipConnectorDetail` (new, container): source object, field(s), relationship type, target object, direction, and Open Source/Field/Target actions via the existing `OI_GraphController.getNavigationTarget` + `c/metadataNavigation` — no new navigation mechanism, no hardcoded Setup URLs. This is a distinct, simpler surface from `oiIntelligenceDrilldown` (a paged, searchable list of *many* connections for one category) — one connector's own detail has no paging/search need.
+
+### 42.5 "Explore From Here"
+
+A neighbor card's explicit action re-centers the graph on that object — implemented as a thin wrapper around `oiGraphExplorer`'s existing `selectAndCenter`, identical to a fresh search selection (§8): a full view replacement, not a partial rewind, consistent with this document's existing re-centering semantics (§23).
+
+### 42.6 Legend and Emphasis
+
+The legend for this canvas covers Lookup / Master-Detail / Self-Relationship / System Relationship only — deliberately not "Executes On" or "Grants Access To," which are Intelligence Panel concepts (Automation/Security sections), not Object-relationship-graph concepts, per §42.1's scope. Hover/select emphasis is simpler than the radial canvas's ancestry-path walk (§4): since every connector here is, by construction, exactly one relationship away from center, emphasis reduces to "the focused card and its own connector," with no path-walking needed. Emphasis persists on click/select, not hover alone (this document's existing accessibility principle, §28, restated for this layout).
+
+### 42.7 Accessibility, Determinism, and Performance
+
+Every card, connector, and toggle is keyboard-navigable with an aria-label composed from real data ("Opportunity references Account through AccountId, Lookup") — never a raw internal `typeKey`, per §28's existing rule. Layout is fully deterministic given the same working set (§42.2 step 6) — no force-relaxation pass, unlike §17's ring layout, since a lane model has no equivalent angular-crossing problem to solve. No new Apex call, traversal, or query is introduced anywhere in this section — every input is already present in the working set §9's existing `getGraphFragment(hopDepth: 2)` call for Object mode already fetches, consistent with §25/§27's existing performance discipline.
+
+`view` (the derived lane model) is memoized by reference identity on `(nodes, edges, centerNodeKey)` — live-org validation against a heavily-customized Account object (hundreds of relationship-bearing fields within its own bounded 2-hop working set) showed this matters concretely: the template reads the derived diagram from well over a dozen distinct bindings in one render pass, and an unmemoized transform meant re-running the full derivation that many times per render. `oiGraphExplorer.js`'s own `allCanvasNodes`/`allCanvasEdges` getters are memoized the same way, since `objectRelationshipSummary` (§42.8) reads them independently of the canvas.
+
+### 42.8 Real Connectors, Not Detached Labels
+
+A visual-acceptance correction, superseding the plainer connector treatment §42.2–§42.6 originally described: connectors are drawn as actual SVG paths joining card to card (a "trunk" per lane — each row branches horizontally off its own card into one shared vertical spine, which makes a single final approach into the center card, keeping routing orthogonal and non-crossing regardless of how many rows converge), with an arrowhead marker and a label rendered as an HTML badge positioned directly on the line — never a bare `<span>` floating beneath a card with no visible line to anchor it. Master-Detail renders as a visibly heavier stroke than Lookup (never color alone); System relationships render dashed, matching the legend exactly. A connector click always opens `oiRelationshipConnectorDetail` — there is no separate inline "expand this aggregate" affordance, since the detail surface already lists every aggregated field.
+
+Self-relationships render as their own small "shadow" card labelled "{Object} (Self)", captioned "SELF RELATIONSHIP / {Object} references {Object}" above it, joined to the real center card by a rounded loop — never a bare label with nothing to visually connect it back to the object it describes.
+
+The Intelligence Panel's Relationships section is, for an Object-centered selection, a curated fixed set — Incoming/Outgoing Lookups, Incoming/Outgoing Master-Detail, Self Relationships, Referenced Objects, Referencing Objects — never raw internal edge-type taxonomy (`HAS_FIELD` is schema membership, not an object-to-object relationship, and is deliberately never shown here; it already powers the Fields section's own count). The four Lookup/Master-Detail counts come from the same `getNodeDetail` counts the panel already had (always-complete, independent of canvas pagination); Self/Referenced/Referencing are distinct-object counts the container computes once via `objectRelationshipView.js` over the same working set the canvas uses (`oiGraphExplorer.js`'s `objectRelationshipSummary`, passed down as a prop) and are simply omitted, never fabricated as zero, when not yet available. Field/Record modes are unaffected — they keep the pre-existing generic per-edge-type relationship rows.

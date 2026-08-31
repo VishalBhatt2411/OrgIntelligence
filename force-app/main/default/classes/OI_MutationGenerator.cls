@@ -48,6 +48,22 @@ public inherited sharing class OI_MutationGenerator {
     private final OI_IngestDelta accumulatedDelta = new OI_IngestDelta();
 
     /**
+     * Relationships this instance dropped because an endpoint componentKey could not be resolved
+     * to a nodeKey. Counted rather than silently discarded (which is what this class did before):
+     * a non-zero value is the difference between "this type genuinely has few dependencies" and
+     * "we found dependencies and threw some away," and only the second one is a defect worth
+     * chasing. Surfaced through scan coverage so it reaches an admin instead of dying here.
+     */
+    private Integer skippedRelationshipCount = 0;
+
+    /** Reads and clears the skipped count — same read-and-clear contract as consumeIngestDelta, for the same reason: a caller must not be able to double-report the same skips. */
+    public Integer consumeSkippedRelationshipCount() {
+        Integer consumed = skippedRelationshipCount;
+        skippedRelationshipCount = 0;
+        return consumed;
+    }
+
+    /**
      * Returns everything this instance has changed since the last call, and clears it.
      *
      * Read-and-clear rather than a plain getter: double-invalidating is harmless but wasteful,
@@ -116,6 +132,8 @@ public inherited sharing class OI_MutationGenerator {
             String fromNodeKey = resolveComponentKeyToNodeKey(relationship.fromComponentKey);
             String toNodeKey = resolveComponentKeyToNodeKey(relationship.toComponentKey);
             if (fromNodeKey == null || toNodeKey == null) {
+                /** Counted, not silently dropped — see skippedRelationshipCount. Skipping is still the right action (an edge needs two resolvable endpoints), but the fact that it happened must survive. */
+                skippedRelationshipCount++;
                 continue;
             }
             String edgeTypeKey = TYPE_KEY_PREFIX + relationship.relationshipKind;

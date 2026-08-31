@@ -18,4 +18,16 @@
         <field>Is_Field_Membership__c</field>
         <value xsi:type="xsd:boolean">true</value>
     </values>
+    <values>
+        <field>Source_Role_Label__c</field>
+        <value xsi:type="xsd:string">Has Field</value>
+    </values>
+    <values>
+        <field>Target_Role_Label__c</field>
+        <value xsi:type="xsd:string">Field Of</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value xsi:type="xsd:string">A field that belongs to this object.</value>
+    </values>
 </CustomMetadata>

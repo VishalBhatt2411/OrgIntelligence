@@ -14,4 +14,16 @@
         <field>Line_Style__c</field>
         <value xsi:type="xsd:string">solid</value>
     </values>
+    <values>
+        <field>Source_Role_Label__c</field>
+        <value xsi:type="xsd:string">Child Of</value>
+    </values>
+    <values>
+        <field>Target_Role_Label__c</field>
+        <value xsi:type="xsd:string">Parent Of</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value xsi:type="xsd:string">A master-detail relationship — a strong parent/child link where the child cannot exist alone.</value>
+    </values>
 </CustomMetadata>

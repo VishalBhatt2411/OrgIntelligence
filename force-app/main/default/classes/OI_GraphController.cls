@@ -64,6 +64,67 @@ public with sharing class OI_GraphController {
     }
 
     /**
+     * The Intelligence panel's Automation / Code / Security sections for one node, plus scan
+     * freshness (OI_NodeIntelligenceService owns all derivation; this is a thin gated boundary).
+     *
+     * Deliberately NOT cacheable, unlike getNodeDetail above: this payload's whole purpose is to
+     * report the current state of scanned intelligence INCLUDING when it was last scanned, and a
+     * platform-cached response would let the panel confidently display a stale "last scanned"
+     * timestamp immediately after a fresh scan — precisely the trust failure this sprint exists
+     * to remove.
+     */
+    @AuraEnabled
+    public static OI_NodeIntelligenceDTO getNodeIntelligence(String nodeKey) {
+        try {
+            OI_SecurityService.assertPermission('OI_View_Graph');
+            return new OI_NodeIntelligenceService().getIntelligence(nodeKey);
+        } catch (Exception e) {
+            throw translate(e);
+        }
+    }
+
+    /**
+     * One page of the actual rows behind a count shown in the Intelligence panel — what makes
+     * "Outgoing — Has Field 22" clickable and answerable.
+     *
+     * Deliberately a SEPARATE call from getNodeDetail rather than more data on it: the panel
+     * opens on every node selection, and loading every connected row each time would make
+     * selection progressively slower on exactly the hub nodes users explore most. Drill-down
+     * rows are fetched only once a user asks for them.
+     *
+     * Not cacheable, because paging and searching vary per request and a cached first page would
+     * make "Load more" return the page the user already has.
+     */
+    @AuraEnabled
+    public static OI_ConnectionPageDTO getNodeConnections(String nodeKey, String direction, String edgeTypeKey, Integer pageSize, String cursor, String searchTerm) {
+        try {
+            OI_SecurityService.assertPermission('OI_View_Graph');
+            return new OI_NodeConnectionsService().getConnections(nodeKey, direction, edgeTypeKey, pageSize, cursor, searchTerm);
+        } catch (Exception e) {
+            throw translate(e);
+        }
+    }
+
+    /**
+     * Where clicking a component should navigate. Resolved server-side because Salesforce Setup
+     * pages are addressed by durable identifiers that are not derivable from an API name — see
+     * OI_MetadataNavigationService for the verified traps (a lookup field's durable id drops its
+     * "Id" suffix; custom objects are not addressable by API name at all).
+     *
+     * Cacheable: a component's Setup address is stable for the life of that component, so
+     * repeated clicks on the same row should not re-query.
+     */
+    @AuraEnabled(cacheable=true)
+    public static OI_NavigationTargetDTO getNavigationTarget(String typeKey, String apiName) {
+        try {
+            OI_SecurityService.assertPermission('OI_View_Graph');
+            return new OI_MetadataNavigationService().resolve(typeKey, apiName);
+        } catch (Exception e) {
+            throw translate(e);
+        }
+    }
+
+    /**
      * Bulk field metadata for one object's own fields (never another object's fields that
      * merely reference it) — backs oiNodeDetailPanel's field browser (Show All/Custom/
      * Standard, field type). One query for the membership edges, one bulk query for the

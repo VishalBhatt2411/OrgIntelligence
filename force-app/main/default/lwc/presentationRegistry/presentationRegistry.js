@@ -14,6 +14,8 @@ import getPresentationRegistry from '@salesforce/apex/OI_SettingsController.getP
 const GENERIC_NODE_ICON = 'standard:custom';
 const GENERIC_NODE_COLOR = 'neutral';
 const GENERIC_EDGE_LINE_STYLE = 'solid';
+/** Neutral wording for an unregistered relationship — never the raw typeKey, which must not reach a user. */
+const GENERIC_ROLE_LABEL = 'Related To';
 
 let cachedRegistry = null;
 
@@ -48,17 +50,67 @@ export function resolveNodeStyle(registry, typeKey) {
     };
 }
 
-/** Identical fallback contract as resolveNodeStyle, for edges (GraphUI.md §21). */
+/**
+ * Identical fallback contract as resolveNodeStyle, for edges (GraphUI.md §21).
+ *
+ * Also resolves the relationship's SEMANTICS — the role each end plays and a one-line
+ * description. These are what let a node card state why it is on screen ("Executes On Account")
+ * and let the legend explain itself, without any component learning what a specific relationship
+ * type is. An unregistered type degrades to generic wording rather than leaking its raw key.
+ */
 export function resolveEdgeStyle(registry, typeKey) {
     const descriptor = registry && registry.edgeTypes.get(typeKey);
     if (!descriptor) {
-        return { lineStyle: GENERIC_EDGE_LINE_STYLE, displayLabel: null, isFieldMembership: false };
+        return {
+            lineStyle: GENERIC_EDGE_LINE_STYLE,
+            displayLabel: null,
+            isFieldMembership: false,
+            sourceRoleLabel: GENERIC_ROLE_LABEL,
+            targetRoleLabel: GENERIC_ROLE_LABEL,
+            description: null
+        };
     }
     return {
         lineStyle: descriptor.lineStyle || GENERIC_EDGE_LINE_STYLE,
         displayLabel: descriptor.displayLabel,
-        isFieldMembership: !!descriptor.isFieldMembership
+        isFieldMembership: !!descriptor.isFieldMembership,
+        sourceRoleLabel: descriptor.sourceRoleLabel || GENERIC_ROLE_LABEL,
+        targetRoleLabel: descriptor.targetRoleLabel || GENERIC_ROLE_LABEL,
+        description: descriptor.description || null
     };
+}
+
+/**
+ * The role a NEIGHBOUR plays relative to an anchor node, given the edge between them.
+ *
+ * Direction is the whole point and the easiest thing to get backwards: on an edge
+ * anchor --> neighbour the neighbour is the TARGET and carries the target role; on
+ * neighbour --> anchor it is the SOURCE. Inverting this would tell a user "Account executes on
+ * this trigger", which is precisely the wrong way round, so the mapping lives in one place and is
+ * unit-tested rather than re-derived per component.
+ */
+export function resolveNeighbourRole(registry, typeKey, anchorNodeKey, edge) {
+    const style = resolveEdgeStyle(registry, typeKey);
+    if (!edge) {
+        return style.targetRoleLabel;
+    }
+    const anchorIsSource = edge.sourceNodeKey === anchorNodeKey;
+    return anchorIsSource ? style.targetRoleLabel : style.sourceRoleLabel;
+}
+
+/** Every registered relationship type with its human label and explanation — the data the graph legend renders. */
+export function listRelationshipLegend(registry) {
+    if (!registry || !registry.edgeTypes) {
+        return [];
+    }
+    return [...registry.edgeTypes.values()]
+        .map((descriptor) => ({
+            typeKey: descriptor.typeKey,
+            displayLabel: descriptor.displayLabel || descriptor.typeKey,
+            lineStyle: descriptor.lineStyle || GENERIC_EDGE_LINE_STYLE,
+            description: descriptor.description || null
+        }))
+        .sort((a, b) => a.displayLabel.localeCompare(b.displayLabel));
 }
 
 /** Test-only seam — the module-level cache is deliberately session-lifetime (GraphUI.md §10), so tests must be able to reset it between cases. */

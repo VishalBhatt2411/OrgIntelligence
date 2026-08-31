@@ -32,9 +32,23 @@
     padding: 0;
 }
 
+/**
+ * Column, not row: an edge-type item now stacks its checkbox row above an optional legend
+ * description (the Direction/Depth sections' plain checkbox items pass no description and
+ * simply render one row tall, unaffected by this change).
+ */
 .oi-filter-panel-checkitem {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+/** The legend's teaching text — what a relationship type actually MEANS, not just its name. Quiet and indented under its checkbox so it reads as an explanation, not another option. */
+.oi-filter-panel-legend-description {
+    margin: 0.1rem 0 0.4rem 1.6rem;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
 }
 
 .oi-filter-panel-checklabel {

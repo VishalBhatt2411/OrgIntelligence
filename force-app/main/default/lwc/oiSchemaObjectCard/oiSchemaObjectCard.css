@@ -6,6 +6,9 @@
  */
 .oi-schema-card {
     --oi-node-accent: var(--slds-g-color-accent-1, #0176d3);
+    /** Deliberately literal, not var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified live in a real org (audit #09): those two distinct SLDS tokens resolve to the exact same color under this org's actual theme, which made the relationship-role chip below a solid color block with invisible text. Same fix as oiGraphNode.css's identical collision. */
+    --oi-node-chip-bg: rgba(1, 118, 211, 0.1);
+    --oi-node-chip-color: #0176d3;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -19,7 +22,7 @@
     /** Was `hidden` — see oiGraphNode.css's identical change for the full rationale: the title/subheader already self-clip, and the outer box must stay open for the hover tooltip (.oi-schema-card-tooltip) to render outside its bounds. */
     overflow: visible;
     box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08));
-    transition: box-shadow 0.15s ease;
+    transition: box-shadow 0.18s ease, transform 0.18s ease;
     font-size: 0.72rem;
     /** Matches oiGraphNode.css's rationale — a drag starting on the card's title/subheader text should move the card, not paint the browser's native text-selection highlight. */
     user-select: none;
@@ -33,6 +36,30 @@
 
 .oi-schema-card.is-selected {
     box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+/** Path-to-centre highlight and de-emphasis — identical treatment to oiGraphNode.css's own rules, so plain-pill nodes and schema cards read consistently during the same interaction. */
+.oi-schema-card.is-on-path {
+    box-shadow: 0 0 0 2px var(--slds-g-color-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+.oi-schema-card.is-dimmed {
+    opacity: 1;
+}
+
+.oi-schema-card:hover,
+.oi-schema-card:focus-within {
+    transform: translateY(-2px) scale(1.015);
+    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+}
+
+.oi-schema-card-open {
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--slds-g-color-accent-1, #0176d3);
+    cursor: pointer;
+    padding: 0.1rem 0.25rem;
 }
 
 .oi-schema-card-header {
@@ -92,6 +119,29 @@
     color: var(--slds-g-color-on-surface-2, #706e6b);
     font-size: 0.65rem;
     flex: 1;
+}
+
+/** The card's own "why is this here" answer — same visual language as oiGraphNode's chip so the two node shapes read as one system. */
+.oi-schema-card-relationship-chip {
+    margin: 0 0.55rem 0.35rem;
+    display: inline-block;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.65rem;
+    background: var(--oi-node-chip-bg);
+    color: var(--oi-node-chip-color);
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 1.1rem);
+}
+
+.oi-schema-card-hop-label {
+    margin: 0 0.55rem 0.35rem;
+    font-size: 0.6rem;
+    color: var(--slds-g-color-on-surface-2, #706e6b);
+    font-style: italic;
 }
 
 /** Hover-reveal, full-text tooltip — identical pattern and rationale to oiGraphNode.css's .oi-graph-node-tooltip. */

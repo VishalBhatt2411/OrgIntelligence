@@ -24,6 +24,134 @@ describe('c-oi-graph-node', () => {
         });
     });
 
+    it('dispatches open without selecting when the external-open action is clicked', async () => {
+        const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+        element.nodeKey = 'n1';
+        element.label = 'Account';
+        document.body.appendChild(element);
+        const openHandler = jest.fn();
+        const selectHandler = jest.fn();
+        element.addEventListener('open', openHandler);
+        element.addEventListener('select', selectHandler);
+        await Promise.resolve();
+
+        element.shadowRoot.querySelector('[data-id="open-node-button"]').click();
+        expect(openHandler.mock.calls[0][0].detail.nodeKey).toBe('n1');
+        expect(selectHandler).not.toHaveBeenCalled();
+    });
+
+    describe('relationship chip ("why is this node here?", this sprint\'s central requirement)', () => {
+        it('renders the relationship role and context as a single compact chip', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'trigger1';
+            element.typeKey = 'SalesforceMetadata.ApexTrigger';
+            element.typeLabel = 'Apex Trigger';
+            element.label = 'AccountTrigger';
+            element.relationshipRole = 'Executes On';
+            element.relationshipContext = 'Account';
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const chip = element.shadowRoot.querySelector('[data-id="node-relationship-chip"]');
+                expect(chip).not.toBeNull();
+                expect(chip.textContent).toBe('Executes On Account');
+            });
+        });
+
+        it('omits the chip entirely (not an empty chip) when the Canvas gives no relationship context — e.g. the centre node itself', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'root';
+            element.label = 'Account';
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                expect(element.shadowRoot.querySelector('[data-id="node-relationship-chip"]')).toBeNull();
+            });
+        });
+
+        it('renders the registry type label, never the raw typeKey', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'n1';
+            element.typeKey = 'SalesforceMetadata.PermissionSet';
+            element.typeLabel = 'Permission Set';
+            element.label = 'Sales_Access';
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const typeLabelEl = element.shadowRoot.querySelector('[data-id="node-type-label"]');
+                expect(typeLabelEl.textContent).toBe('Permission Set');
+                expect(element.shadowRoot.textContent).not.toContain('SalesforceMetadata.');
+            });
+        });
+
+        it('states hop distance only beyond one hop — a direct neighbour needs no distance label', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'n1';
+            element.label = 'Direct';
+            element.hopDistance = 1;
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                expect(element.shadowRoot.querySelector('[data-id="node-hop-label"]')).toBeNull();
+            });
+        });
+
+        it('states hop distance for a multi-hop node so it never reads as if it were directly related', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'n1';
+            element.label = 'Distant';
+            element.hopDistance = 3;
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                expect(element.shadowRoot.querySelector('[data-id="node-hop-label"]').textContent).toBe('3 relationships away');
+            });
+        });
+    });
+
+    describe('path-to-centre highlight', () => {
+        it('applies the on-path class when isOnActivePath is true', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'n1';
+            element.label = 'Account';
+            element.isOnActivePath = true;
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                expect(element.shadowRoot.querySelector('[data-id="graph-node"]').className).toContain('is-on-path');
+            });
+        });
+
+        it('applies the dimmed class when isDimmed is true, without removing the node from the DOM', () => {
+            const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+            element.nodeKey = 'n1';
+            element.label = 'Account';
+            element.isDimmed = true;
+            document.body.appendChild(element);
+
+            return Promise.resolve().then(() => {
+                const node = element.shadowRoot.querySelector('[data-id="graph-node"]');
+                expect(node).not.toBeNull();
+                expect(node.className).toContain('is-dimmed');
+            });
+        });
+    });
+
+    it('never exposes a raw typeKey through the accessible name — screen-reader text is user-facing text too', () => {
+        const element = createElement('c-oi-graph-node', { is: OiGraphNode });
+        element.nodeKey = 'n1';
+        element.typeKey = 'SalesforceMetadata.CustomObject';
+        element.typeLabel = 'Object';
+        element.label = 'Account';
+        document.body.appendChild(element);
+
+        return Promise.resolve().then(() => {
+            const ariaLabel = element.shadowRoot.querySelector('[data-id="graph-node"]').getAttribute('aria-label');
+            expect(ariaLabel).not.toContain('SalesforceMetadata.');
+            expect(ariaLabel).toContain('Object');
+        });
+    });
+
     it('dispatches expandtoggle on the toggle button without also triggering select', () => {
         const element = createElement('c-oi-graph-node', { is: OiGraphNode });
         element.nodeKey = 'n1';

@@ -2,10 +2,10 @@
     <div class="oi-filter-panel" data-id="filter-panel">
         <template lwc:if={hasEdgeTypeOptions}>
             <div class="oi-filter-panel-section" data-id="edge-type-section">
-                <h3 class="oi-filter-panel-section-title">Relationship Types</h3>
+                <h3 class="oi-filter-panel-section-title">Relationship Legend</h3>
                 <ul class="oi-filter-panel-checklist">
                     <template for:each={edgeTypeOptions} for:item="option">
-                        <li key={option.typeKey} class="oi-filter-panel-checkitem">
+                        <li key={option.typeKey} class="oi-filter-panel-checkitem" data-id="legend-item">
                             <label class="oi-filter-panel-checklabel">
                                 <input
                                     type="checkbox"
@@ -17,6 +17,9 @@
                                 <span class={option.swatchClass} data-id="edge-type-swatch"></span>
                                 {option.displayLabel}
                             </label>
+                            <template lwc:if={option.description}>
+                                <p class="oi-filter-panel-legend-description" data-id="legend-description">{option.description}</p>
+                            </template>
                         </li>
                     </template>
                 </ul>

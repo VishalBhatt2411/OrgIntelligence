@@ -25,6 +25,8 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
 
     private Boolean hadFailure = false;
     private Exception failure;
+    /** Accumulated across every scope (Database.Stateful) — each scope only knows its own skips, so the total is written once in finish() rather than contended for per scope. */
+    private Integer skippedRelationships = 0;
 
     public OI_ScanRelationshipIngestBatchable(
         Id scanRunId,
@@ -54,7 +56,11 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
         }
         try {
             OI_DiscoveryBatch chunkBatch = new OI_DiscoveryBatch(scanTaskId, metadataTypeApiName, new List<OI_DiscoveredComponent>(), scope, false, 0);
-            new OI_MutationGenerator().translateAndIngest(chunkBatch);
+            OI_MutationGenerator generator = new OI_MutationGenerator();
+            generator.translateAndIngest(chunkBatch);
+            /** DE-7: this is the phase that matters most for Impact Analysis staleness — an edge change alters impact answers for nodes whose own content never changed (OI_IngestDelta explains the case). */
+            OI_ScanOrchestratorQueueable.invalidateImpactCacheFor(generator.consumeIngestDelta());
+            skippedRelationships += generator.consumeSkippedRelationshipCount();
         } catch (Exception e) {
             hadFailure = true;
             failure = e;
@@ -66,6 +72,8 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
             OI_ScanOrchestratorQueueable.failTaskAndAdvance(scanRunId, scanTaskId, metadataTypeApiName, remainingMetadataTypes, failure);
             return;
         }
+        /** Written before finalization so the count is on the task regardless of what retire-detection does next. */
+        OI_ScanOrchestratorQueueable.addSkippedRelationships(scanTaskId, skippedRelationships);
         OI_ScanOrchestratorQueueable.finalizeTypeAfterIngest(scanRunId, scanTaskId, metadataTypeApiName, observedNodeKeys, isFullSnapshot, remainingMetadataTypes);
     }
 }

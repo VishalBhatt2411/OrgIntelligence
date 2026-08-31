@@ -69,7 +69,21 @@ public inherited sharing class OI_PermissionSetScanner implements OI_IMetadataSc
         relationships.addAll(buildObjectGrants(componentKeyByPermissionSetId));
         relationships.addAll(buildApexClassGrants(componentKeyByPermissionSetId));
 
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1);
+        return new OI_DiscoveryBatch(
+            context.scanTaskId,
+            COMPONENT_KIND,
+            components,
+            relationships,
+            true,
+            1,
+            /** PARTIAL: object and Apex-class grants are exact and complete, but field-level grants are deliberately not scanned (FieldPermissions volume needs Batch Apex chunking). Named explicitly so "which permission sets expose this FIELD" reads as a known gap rather than an empty answer. */
+            OI_ScanCoverage.partial(
+                relationships.size(),
+                'Object-level and Apex-class grants are fully detected. Field-level grants are not scanned yet, so ' +
+                '"which permission sets expose this field" cannot be answered. Profile-owned permission sets are ' +
+                'excluded by design and are reported separately once Profile scanning exists.'
+            )
+        );
     }
 
     /**

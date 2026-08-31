@@ -64,6 +64,36 @@ public with sharing class OI_NodeSelector {
     }
 
     /**
+     * Substring (contains) match on label/secondaryKey — the search a drill-down needs, kept
+     * deliberately separate from the prefix method above rather than replacing it.
+     *
+     * Two different jobs, two different matching rules: `oiSearchBar` looks for a STARTING node
+     * by name, where a prefix match is both faster and more predictable as the user types.
+     * Searching *within* an already-scoped result set is the opposite expectation — typing
+     * "Owner" must find "Account Owner", which a prefix match would miss. Changing the shared
+     * prefix method to satisfy this would silently alter global search behaviour, so this is
+     * additive.
+     *
+     * Honest cost note: a leading wildcard cannot use an index, so this is a scan bounded by
+     * maxResults. Acceptable because it only ever runs on an explicit user search inside one
+     * drill-down (never during graph rendering or scanning), and the caller reports the outcome
+     * as a filtered result rather than a complete one.
+     */
+    public List<OI_Graph_Node__c> selectCurrentByLabelOrSecondaryKeyContains(String queryTerm, Integer maxResults) {
+        if (String.isBlank(queryTerm)) {
+            return new List<OI_Graph_Node__c>();
+        }
+        String likeTerm = '%' + String.escapeSingleQuotes(queryTerm.trim()) + '%';
+        Integer effectiveMax = maxResults == null ? 200 : maxResults;
+        String query =
+            'SELECT ' +
+            String.join(DETAIL_FIELDS, ', ') +
+            ' FROM OI_Graph_Node__c WHERE Is_Current__c = true AND (Label__c LIKE :likeTerm OR Secondary_Key__c LIKE :likeTerm) ' +
+            'ORDER BY Label__c ASC LIMIT :effectiveMax';
+        return Database.query(query);
+    }
+
+    /**
      * Keyset-paginated, key-only projection of every currently-Active key for a given
      * typeKey — the enumeration retire-detection needs (GraphRepository.md §2, §9, §12).
      * Deliberately field-minimal: no Attributes_Json__c, no Label__c.

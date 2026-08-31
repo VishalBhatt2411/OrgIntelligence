@@ -194,6 +194,10 @@ const CLUSTER_THRESHOLD = 8;
  * every node then has exactly one inner-ring neighbor and no reordering is possible), so this
  * only bounds the pathological case of a deep chain of nested hub references. */
 const RELAXATION_SWEEPS = 6;
+/** Extra clearance beyond the curve's own bow for a visible edge label, so text never sits directly on the stroke it describes. */
+const EDGE_LABEL_OFFSET_PX = 10;
+/** How far apart two edges sharing the same resolved endpoints fan out from each other (buildParallelEdgeIndex) — enough to read as two distinct lines/labels at normal zoom without the group ballooning into its own separate layout concern. */
+const PARALLEL_EDGE_SEPARATION_PX = 16;
 const CLUSTER_PREFIX = '__cluster__::';
 const DRAG_THRESHOLD_PX = 3;
 const MINIMAP_WIDTH = 150;
@@ -224,6 +228,12 @@ export default class OiGraphCanvas extends LightningElement {
     @track panY = 0;
     @track zoom = 1;
     @track expandedClusters = new Set();
+    /** Path-to-centre highlight focus (GraphUI.md-adjacent, this sprint's explainability requirement) — transient hover state, deliberately not part of the memoized layout. */
+    @track hoveredNodeKey = null;
+    /** Maximize + export — toolbar/canvas chrome only, mirroring oiRelationshipCanvas's own identical controls (audit #07/#08: this toolbar never had them at all, not merely a dead handler). Never affects the fetched working set or the layout/virtualization math above. */
+    @track isMaximized = false;
+    @track exportHref = null;
+    exportFileName = 'graph.svg';
 
     manualOffsets = new Map();
     isPanning = false;
@@ -239,9 +249,56 @@ export default class OiGraphCanvas extends LightningElement {
     _centerNodeKey;
     _baseLayoutCache = null;
     _layoutCache = null;
+    _pendingExportClick = false;
 
     renderedCallback() {
         this.syncSvgDefReferences();
+        if (this._pendingExportClick) {
+            this._pendingExportClick = false;
+            const link = this.template.querySelector('[data-id="export-link"]');
+            if (link) {
+                link.click();
+            }
+        }
+    }
+
+    disconnectedCallback() {
+        if (this.exportHref) {
+            URL.revokeObjectURL(this.exportHref);
+        }
+    }
+
+    get hostClass() {
+        return 'oi-graph-canvas-container' + (this.isMaximized ? ' oi-graph-canvas-is-maximized' : '');
+    }
+
+    handleToggleMaximize() {
+        this.isMaximized = !this.isMaximized;
+    }
+
+    get maximizeIconName() {
+        return this.isMaximized ? 'utility:contract' : 'utility:expand_alt';
+    }
+
+    get maximizeButtonLabel() {
+        return this.isMaximized ? 'Restore canvas size' : 'Maximize canvas';
+    }
+
+    /** Client-side export, identical pattern to oiRelationshipCanvas.js's handleExportDiagram (see that method's own doc comment for why application/octet-stream + a template-declared anchor, not image/svg+xml or a document.createElement'd one, is the correct/only choice under Lightning Web Security). */
+    handleExportDiagram() {
+        const svg = this.template.querySelector('[data-id="canvas-svg"]');
+        if (!svg) {
+            return;
+        }
+        if (this.exportHref) {
+            URL.revokeObjectURL(this.exportHref);
+        }
+        const clone = svg.cloneNode(true);
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        const source = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([source], { type: 'application/octet-stream' });
+        this.exportHref = URL.createObjectURL(blob);
+        this._pendingExportClick = true;
     }
 
     @api
@@ -366,9 +423,105 @@ export default class OiGraphCanvas extends LightningElement {
      * other consumer of `positionedNodes` (mini-map, fit-to-screen, center-on-selected,
      * reset-layout) intentionally keeps reading the full, unfiltered set.
      */
+    /**
+     * The path-to-centre highlight target: whatever is currently hovered, falling back to the
+     * selection when nothing is hovered. Hover wins because it is the transient, exploratory
+     * gesture the "why is this connected?" question is actually asked from; the selection stays
+     * highlighted the rest of the time so the answer doesn't disappear the moment the pointer
+     * moves away.
+     */
+    get activeFocusNodeKey() {
+        return this.hoveredNodeKey || this.selectedNodeKey || null;
+    }
+
+    /** The BFS parent chain, exposed for path walking — topology only, so it is read straight off the memoized base layout and never recomputed per hover. */
+    get pathAncestryMap() {
+        return this.getBaseLayout().parentByKey || new Map();
+    }
+
+    /**
+     * Every node key on the route from the current focus back to the centre, inclusive — null
+     * when nothing is focused, which callers must treat as "no highlighting active" rather than
+     * an empty path. Bounded by a guard against a malformed/cyclic ancestry map (should not
+     * occur — parentByKey is built by a BFS that never revisits a key — but a rendering path
+     * must never infinite-loop even on unexpected input).
+     */
+    get activePathKeySet() {
+        const focus = this.activeFocusNodeKey;
+        if (!focus) {
+            return null;
+        }
+        const parentByKey = this.pathAncestryMap;
+        const path = new Set([focus]);
+        let current = focus;
+        let guard = 0;
+        while (parentByKey.has(current) && guard++ < 1000) {
+            current = parentByKey.get(current);
+            path.add(current);
+        }
+        return path;
+    }
+
+    /**
+     * The virtualized render list (ADR-0020, GraphUI.md §4/§26, see the class doc comment's
+     * own "Virtualization" section): the subset of `positionedNodes` whose full footprint
+     * (not just its center point — a wide schema card can have an in-view edge while its
+     * center sits just outside the window) overlaps the current virtualization window. This
+     * is the ONLY place the full working set gets narrowed down for rendering purposes; every
+     * other consumer of `positionedNodes` (mini-map, fit-to-screen, center-on-selected,
+     * reset-layout) intentionally keeps reading the full, unfiltered set.
+     *
+     * Also where path-to-centre highlight state is stamped on: transient UI state (what is
+     * currently hovered/selected), so it belongs at render time, not in the memoized topology
+     * pass — hovering must never invalidate/recompute the layout itself.
+     */
     get renderableNodes() {
         const window = this.getVirtualizationWindow();
-        return this.positionedNodes.filter((node) => boxIntersectsWindow(node, window));
+        const visible = this.positionedNodes.filter((node) => boxIntersectsWindow(node, window));
+        const pathKeys = this.activePathKeySet;
+        if (!pathKeys) {
+            return visible;
+        }
+        return visible.map((node) => ({
+            ...node,
+            isOnActivePath: pathKeys.has(node.nodeKey),
+            isDimmed: !pathKeys.has(node.nodeKey)
+        }));
+    }
+
+    /**
+     * Groups edges (after field-absorption's resolveDisplayKey) by their resolved
+     * (sourceKey, targetKey) pair — two distinct relationships that happen to connect the same
+     * two cards (e.g. two different lookup fields on the same object both referencing the same
+     * target object, a real, common case once fields absorb into their owning object) resolve to
+     * literally identical endpoints, and curvedPath/edgeLabelPosition are pure functions of
+     * nothing but those endpoints — without this, they'd render as one indistinguishable
+     * overlapping line with one label silently overwriting the other. Returns a Map from edgeKey
+     * to {index, count} so renderableEdges can fan each member of a group out to its own,
+     * non-overlapping parallel curve (see PARALLEL_EDGE_SEPARATION_PX).
+     */
+    buildParallelEdgeIndex(edges, resolveDisplayKey) {
+        const groups = new Map();
+        for (const edge of edges || []) {
+            if (edge.isFieldMembership) {
+                continue;
+            }
+            const sourceKey = resolveDisplayKey(edge.sourceNodeKey);
+            const targetKey = resolveDisplayKey(edge.targetNodeKey);
+            if (sourceKey === targetKey) {
+                continue;
+            }
+            const groupKey = sourceKey + '::' + targetKey;
+            if (!groups.has(groupKey)) {
+                groups.set(groupKey, []);
+            }
+            groups.get(groupKey).push(edge.edgeKey);
+        }
+        const indexByEdgeKey = new Map();
+        for (const memberKeys of groups.values()) {
+            memberKeys.forEach((edgeKey, index) => indexByEdgeKey.set(edgeKey, { index, count: memberKeys.length }));
+        }
+        return indexByEdgeKey;
     }
 
     get renderableEdges() {
@@ -381,6 +534,8 @@ export default class OiGraphCanvas extends LightningElement {
         const fieldOwnerByFieldKey = layout.fieldOwnerByFieldKey || new Map();
         const treeEdgeKeys = layout.treeEdgeKeys || new Set();
         const resolveDisplayKey = (key) => fieldOwnerByFieldKey.get(key) || key;
+        const pathKeys = this.activePathKeySet;
+        const parallelIndex = this.buildParallelEdgeIndex(this.edges, resolveDisplayKey);
         const rendered = [];
         for (const edge of this.edges || []) {
             /** A field-membership edge (HAS_FIELD) is absorbed into the card's inline field list, never drawn as its own line — dropping the field node from `positioned` already achieves this, this check just makes the intent explicit. */
@@ -398,6 +553,9 @@ export default class OiGraphCanvas extends LightningElement {
             if (!source || !target) {
                 continue;
             }
+            /** Symmetric around the base curve: a lone edge (count 1) gets offset 0 — pixel-identical to before this fix — and only a genuine duplicate pair/group fans out. */
+            const parallel = parallelIndex.get(edge.edgeKey) || { index: 0, count: 1 };
+            const parallelOffset = (parallel.index - (parallel.count - 1) / 2) * PARALLEL_EDGE_SEPARATION_PX;
             /** Virtualization (ADR-0020, §26): render as long as at least one endpoint is currently materialized — a line leading toward a just-off-screen node should stay visible up to the margin's edge, never vanish mid-canvas one frame before its own node would. Only an edge whose BOTH endpoints are outside the window gets skipped. */
             if (!renderableKeys.has(sourceKey) && !renderableKeys.has(targetKey)) {
                 continue;
@@ -410,12 +568,36 @@ export default class OiGraphCanvas extends LightningElement {
              * reduced opacity) so the primary radial structure reads clearly first. Still fully
              * drawn, never hidden: this only changes how it looks, not whether it renders. */
             const isSecondary = !treeEdgeKeys.has(`${sourceKey}::${targetKey}`);
+            /**
+             * Path-to-centre highlight for edges: both endpoints must be on the current path,
+             * not just present in the path set independently — otherwise a lookup between two
+             * unrelated ancestors that both happen to sit on the chain (rare, but possible in a
+             * dense graph) would light up as if it were the traversed link. Good enough for a
+             * tree-shaped path (the common case, since the path is exactly the chain of BFS
+             * parents) without needing to track the literal sequence of edges walked.
+             */
+            const isOnActivePath = !!pathKeys && pathKeys.has(sourceKey) && pathKeys.has(targetKey);
+            const isPathDimmed = !!pathKeys && !isOnActivePath;
+            /** A visible label only for primary/tree edges by default (GraphUI.md's "intelligent hierarchy": concise labels on direct connections, secondary edges stay label-less until hover/selection reveals the full <title> tooltip already wired below) — showing a label on every secondary edge in a dense graph is exactly the clutter this sprint is required not to create. Path highlighting always shows its label, since a highlighted edge is by definition the one thing the user is currently asking about. */
+            const showLabel = !isSecondary || isOnActivePath;
+            /** Empty string, never null — the <text> element renders unconditionally now (see the template's own comment on why), so its content must always be a safe, definite value rather than something that merely happens to render as blank. */
+            const shortLabel = showLabel ? this.buildEdgeShortLabel(edge) : '';
+            const labelPosition = shortLabel ? edgeLabelPosition(source.cx, source.cy, target.cx, target.cy, parallelOffset) : null;
             rendered.push({
                 edgeKey: edge.edgeKey,
                 typeKey: edge.typeKey,
                 displayLabel: edge.displayLabel || edge.typeKey,
-                pathD: curvedPath(source.cx, source.cy, target.cx, target.cy),
-                cssClass: 'oi-graph-edge oi-graph-edge-' + lineStyle + (isSecondary ? ' oi-graph-edge-secondary' : '')
+                pathD: curvedPath(source.cx, source.cy, target.cx, target.cy, parallelOffset),
+                cssClass:
+                    'oi-graph-edge oi-graph-edge-' +
+                    lineStyle +
+                    (isSecondary ? ' oi-graph-edge-secondary' : '') +
+                    (isOnActivePath ? ' oi-graph-edge-on-path' : '') +
+                    (isPathDimmed ? ' oi-graph-edge-dimmed' : ''),
+                shortLabel,
+                labelKey: edge.edgeKey + '-label',
+                labelX: labelPosition ? labelPosition.x : 0,
+                labelY: labelPosition ? labelPosition.y : 0
             });
         }
         for (const clusterEdge of layout.clusterEdges) {
@@ -427,15 +609,27 @@ export default class OiGraphCanvas extends LightningElement {
             if (!renderableKeys.has(clusterEdge.sourceNodeKey) && !renderableKeys.has(clusterEdge.targetNodeKey)) {
                 continue;
             }
+            const labelPosition = edgeLabelPosition(source.cx, source.cy, target.cx, target.cy);
             rendered.push({
                 edgeKey: clusterEdge.edgeKey,
                 typeKey: clusterEdge.typeKey,
                 displayLabel: clusterEdge.displayLabel,
                 pathD: curvedPath(source.cx, source.cy, target.cx, target.cy),
-                cssClass: 'oi-graph-edge oi-graph-edge-solid oi-graph-edge-cluster'
+                cssClass: 'oi-graph-edge oi-graph-edge-solid oi-graph-edge-cluster',
+                /** A cluster edge already carries an honest, non-technical summary ("68 × Object") — shown as its visible label directly, the same "concise, not raw" bar every other edge label meets. */
+                shortLabel: clusterEdge.displayLabel,
+                labelKey: clusterEdge.edgeKey + '-label',
+                labelX: labelPosition.x,
+                labelY: labelPosition.y
             });
         }
         return rendered;
+    }
+
+    /** The concise, on-canvas edge label — relationship name alone, or "field · relationship" when a via-field is known (e.g. "AccountId · Lookup"). Never the raw typeKey: displayLabel is already registry-resolved by the container. */
+    buildEdgeShortLabel(edge) {
+        const relationship = edge.displayLabel || edge.typeKey;
+        return edge.viaFieldApiName ? `${edge.viaFieldApiName} · ${relationship}` : relationship;
     }
 
     /** A small overview thumbnail of every currently-positioned node plus a rectangle marking the current viewport (GraphUI.md §24's Viewport Mini-map half) — pure geometry derived from already-computed positions, zero server cost. */
@@ -683,6 +877,35 @@ export default class OiGraphCanvas extends LightningElement {
             }
         }
 
+        /**
+         * "Why is this node here?" (this sprint's central requirement): every non-center item
+         * gets a relationshipRole/relationshipContext/relationshipVia stamped on it from the
+         * edge that connects it to its BFS parent, plus its hop distance. Built once here, on
+         * the memoized base layout, rather than per-render — this is graph topology, not a
+         * transient UI concern.
+         */
+        const edgeRoleByPair = this.buildEdgeRoleIndex(nodeByKey, resolveDisplayKey);
+        for (const item of displayItems) {
+            item.hopDistance = item.ring;
+            if (item.ring === 0) {
+                continue;
+            }
+            /** A cluster card's parent lives on its own parentKey (stamped in groupIntoClusters) since parentByKey never learns synthetic cluster keys; every other item's parent comes from the real BFS map. */
+            const parentKey = item.parentKey || parentByKey.get(item.nodeKey);
+            if (!parentKey) {
+                continue;
+            }
+            const parentNode = byKey.get(parentKey);
+            item.relationshipContext = parentNode ? parentNode.label : null;
+            /** A cluster resolves its role from one representative member (see groupIntoClusters) — every member shares the grouping typeKey, so one sample's edge is representative. */
+            const roleSourceKey = item.sampleMemberKey || item.nodeKey;
+            const relationship = this.resolveRelationshipContext(roleSourceKey, parentKey, edgeRoleByPair);
+            if (relationship) {
+                item.relationshipRole = relationship.role;
+                item.relationshipVia = relationship.viaFieldApiName;
+            }
+        }
+
         /** Extends real graph adjacency with cluster edges so a clustered hub still
          * participates in relaxation via its one real connection to its parent — built once
          * here rather than special-cased inside the relaxation loop below. */
@@ -801,7 +1024,7 @@ export default class OiGraphCanvas extends LightningElement {
             treeEdgeKeys.add(`${parent}::${child}`);
         }
 
-        return { positioned, clusterEdges, fieldOwnerByFieldKey, treeEdgeKeys };
+        return { positioned, clusterEdges, fieldOwnerByFieldKey, treeEdgeKeys, parentByKey };
     }
 
     /** Stamps a display item's final screen-space box from its already-computed center point and footprint — shared by the ring-0 (dead-center) and per-ring (angular) placement paths so both stay in sync on isSelected. */
@@ -851,6 +1074,7 @@ export default class OiGraphCanvas extends LightningElement {
             displayItems.push({
                 nodeKey: group.groupKey,
                 typeKey: sample.typeKey,
+                typeLabel: sample.typeLabel,
                 label: `${group.members.length} ${sample.typeLabel || sample.typeKey}`,
                 state: '',
                 iconName: sample.iconName,
@@ -858,7 +1082,11 @@ export default class OiGraphCanvas extends LightningElement {
                 isExpanded: false,
                 hasMoreNeighbors: false,
                 isCluster: true,
-                ring: group.ring
+                ring: group.ring,
+                /** Not a real graph node key — needed so the relationship-context pass (computeBaseLayout) can find this card's parent, since parentByKey is keyed by real node keys only and never learns about synthetic cluster keys. */
+                parentKey: group.parentKey,
+                /** One representative member's key, so the relationship role/via-field can be resolved from an actual edge — every member shares this card's grouping typeKey, so one sample's role is representative of the whole group. */
+                sampleMemberKey: sample.nodeKey
             });
             const parentNode = byKey.get(group.parentKey);
             if (parentNode) {
@@ -874,6 +1102,72 @@ export default class OiGraphCanvas extends LightningElement {
         return { displayItems, clusterEdges };
     }
 
+    /**
+     * Indexes every real, non-membership edge by its DISPLAY-resolved endpoint pair (both
+     * directions), so a node's relationship to its BFS parent can be looked up in O(1) rather
+     * than re-scanning `this.edges` per item. Also derives the relationship field's own API
+     * name for a field-sourced edge (LOOKUP_TO/MASTER_DETAIL_TO) directly from the absorbed
+     * field's own scanned identity — see resolveRelationshipContext for why this, not the
+     * edge's own `relationshipName` attribute, is what the chip needs.
+     */
+    buildEdgeRoleIndex(nodeByKey, resolveDisplayKey) {
+        const index = new Map();
+        for (const edge of this.edges || []) {
+            if (edge.isFieldMembership) {
+                continue;
+            }
+            const resolvedSource = resolveDisplayKey(edge.sourceNodeKey);
+            const resolvedTarget = resolveDisplayKey(edge.targetNodeKey);
+            if (resolvedSource === resolvedTarget) {
+                continue;
+            }
+            /**
+             * A field-sourced relationship (LOOKUP_TO/MASTER_DETAIL_TO) resolves its source to
+             * its owning object once absorbed — the raw source key that differs from the
+             * resolved one IS the field, so its own secondaryKey ("Opportunity.AccountId") is
+             * the real field API name, not a guess. edge.viaFieldApiName (the server-provided
+             * `relationshipName` attribute, e.g. "Account") is a lower-priority fallback only —
+             * it is a relationship name, not the field's own API name, and is used only when
+             * the field node itself cannot be found (absorption did not happen for some reason).
+             */
+            let viaFieldApiName = null;
+            if (resolvedSource !== edge.sourceNodeKey) {
+                const fieldNode = nodeByKey.get(edge.sourceNodeKey);
+                const apiNameSegments = fieldNode && fieldNode.secondaryKey ? fieldNode.secondaryKey.split('.') : null;
+                viaFieldApiName = apiNameSegments ? apiNameSegments[apiNameSegments.length - 1] : null;
+            }
+            if (!viaFieldApiName && edge.viaFieldApiName) {
+                viaFieldApiName = edge.viaFieldApiName;
+            }
+            const entry = {
+                sourceKey: resolvedSource,
+                targetKey: resolvedTarget,
+                sourceRoleLabel: edge.sourceRoleLabel,
+                targetRoleLabel: edge.targetRoleLabel,
+                viaFieldApiName
+            };
+            index.set(resolvedSource + '::' + resolvedTarget, entry);
+            index.set(resolvedTarget + '::' + resolvedSource, entry);
+        }
+        return index;
+    }
+
+    /**
+     * The neighbour's role relative to one anchor (its BFS parent), read off the indexed edge —
+     * mirrors presentationRegistry.js's resolveNeighbourRole exactly, but works from the
+     * already-resolved role-label strings the container baked onto each edge, since the Canvas
+     * itself never calls the registry (container/presentational split, GraphUI.md §3).
+     */
+    resolveRelationshipContext(nodeKey, parentKey, edgeRoleByPair) {
+        const entry = edgeRoleByPair.get(nodeKey + '::' + parentKey);
+        if (!entry) {
+            return null;
+        }
+        const anchorIsSource = entry.sourceKey === parentKey;
+        const role = (anchorIsSource ? entry.targetRoleLabel : entry.sourceRoleLabel) || 'Related To';
+        return { role, viaFieldApiName: entry.viaFieldApiName };
+    }
+
     handleNodeSelect(event) {
         if (this.dragMoved) {
             this.dragMoved = false;
@@ -885,6 +1179,10 @@ export default class OiGraphCanvas extends LightningElement {
             return;
         }
         this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey } }));
+    }
+
+    handleNodeOpen(event) {
+        this.dispatchEvent(new CustomEvent('open', { detail: { nodeKey: event.detail.nodeKey } }));
     }
 
     handleNodeExpandToggle(event) {
@@ -1122,6 +1420,21 @@ export default class OiGraphCanvas extends LightningElement {
             }
         };
         this.zoomAnimationHandle = requestAnimationFrame(step);
+    }
+
+    /**
+     * Path-to-centre highlighting (this sprint's explainability requirement): entering a node
+     * focuses the path from it back to the centre; leaving clears the focus back to whatever is
+     * selected (activeFocusNodeKey's own fallback), never to nothing while a selection exists —
+     * the highlight the user was just shown should not vanish entirely the instant the pointer
+     * drifts off the node.
+     */
+    handleNodeHoverStart(event) {
+        this.hoveredNodeKey = event.currentTarget.dataset.nodeKey;
+    }
+
+    handleNodeHoverEnd() {
+        this.hoveredNodeKey = null;
     }
 
     /** Starts a manual node drag (§17's "static re-layout" is a computed default; dragging is a user-driven override on top of it) — stops propagation so the canvas doesn't also start panning underneath it. */
@@ -1423,14 +1736,34 @@ function estimateLabelWidth(label, chromePx, minWidth, maxWidth) {
 }
 
 /** A gentle quadratic curve through the midpoint, offset perpendicular to the source->target line — reads as a deliberate connection rather than a raw wireframe segment, and keeps overlapping radial edges visually distinguishable from one another. */
-function curvedPath(x1, y1, x2, y2) {
+/** parallelOffset (px, signed) separates duplicate relationships sharing the same two endpoints — see buildParallelEdgeIndex's own doc comment for why this is necessary; zero for the common, non-duplicate case, so every existing single-edge curve is pixel-identical to before this parameter existed. */
+function curvedPath(x1, y1, x2, y2, parallelOffset = 0) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const length = Math.hypot(dx, dy) || 1;
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2;
-    const bow = Math.min(length * 0.12, 24);
+    const bow = Math.min(length * 0.12, 24) + parallelOffset;
     const offsetX = (-dy / length) * bow;
     const offsetY = (dx / length) * bow;
     return `M${x1},${y1} Q${midX + offsetX},${midY + offsetY} ${x2},${y2}`;
+}
+
+/**
+ * Where an edge's visible label sits: the same midpoint+perpendicular-offset math curvedPath
+ * uses for its control point (so the label tracks the curve's own bow, parallelOffset included),
+ * pushed out a further fixed distance so the text sits beside the line rather than directly on
+ * top of the stroke.
+ */
+function edgeLabelPosition(x1, y1, x2, y2, parallelOffset = 0) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy) || 1;
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    const bow = Math.min(length * 0.12, 24) + EDGE_LABEL_OFFSET_PX + parallelOffset;
+    return {
+        x: midX + (-dy / length) * bow,
+        y: midY + (dx / length) * bow
+    };
 }

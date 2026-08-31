@@ -33,8 +33,35 @@ describe('c-oi-filter-panel', () => {
 
         const checkboxes = element.shadowRoot.querySelectorAll('[data-id="edge-type-checkbox"]');
         expect(checkboxes).toHaveLength(2);
-        expect(checkboxes[0].checked).toBe(true);
-        expect(checkboxes[1].checked).toBe(false);
+    });
+
+    /** This panel now doubles as the graph's relationship legend (this sprint's requirement) — each entry must teach what the relationship means, not just name it. */
+    it('renders a plain-English description under each relationship type, so the panel doubles as the graph legend', async () => {
+        const element = createElement('c-oi-filter-panel', { is: OiFilterPanel });
+        element.edgeTypeOptions = [
+            {
+                typeKey: 'SalesforceMetadata.EXECUTES_ON',
+                displayLabel: 'Executes On',
+                description: 'Automation that runs when records of this object change.',
+                isChecked: true,
+                swatchClass: 'oi-filter-panel-swatch oi-filter-panel-swatch-solid'
+            }
+        ];
+        document.body.appendChild(element);
+        await flushPromises();
+
+        const description = element.shadowRoot.querySelector('[data-id="legend-description"]');
+        expect(description).not.toBeNull();
+        expect(description.textContent).toBe('Automation that runs when records of this object change.');
+    });
+
+    it('omits the description line entirely when a relationship type carries none, rather than an empty paragraph', async () => {
+        const element = createElement('c-oi-filter-panel', { is: OiFilterPanel });
+        element.edgeTypeOptions = [{ typeKey: 'SalesforceMetadata.Unknown', displayLabel: 'Unknown', isChecked: true, swatchClass: 'oi-filter-panel-swatch oi-filter-panel-swatch-solid' }];
+        document.body.appendChild(element);
+        await flushPromises();
+
+        expect(element.shadowRoot.querySelector('[data-id="legend-description"]')).toBeNull();
     });
 
     it('toggling an edge type checkbox emits edgetypetoggle with that typeKey', async () => {

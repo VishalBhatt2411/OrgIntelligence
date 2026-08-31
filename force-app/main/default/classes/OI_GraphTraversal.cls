@@ -110,7 +110,9 @@ public class OI_GraphTraversal {
         List<OI_EdgeSummary> edges = new List<OI_EdgeSummary>();
         for (OI_Graph_Edge__c edge : edgesByKey.values()) {
             if (visibleKeys.contains(edge.Source_Node_Key__c) && visibleKeys.contains(edge.Target_Node_Key__c)) {
-                edges.add(new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c));
+                edges.add(
+                    new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c, extractViaFieldApiName(edge))
+                );
             }
         }
 
@@ -178,13 +180,66 @@ public class OI_GraphTraversal {
         List<OI_EdgeSummary> edges = new List<OI_EdgeSummary>();
         for (OI_Graph_Edge__c edge : edgesByKey.values()) {
             if (versions.containsKey(edge.Source_Node_Key__c) && versions.containsKey(edge.Target_Node_Key__c)) {
-                edges.add(new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c));
+                edges.add(
+                    new OI_EdgeSummary(edge.Edge_Key__c, edge.Edge_Type__c, edge.Source_Node_Key__c, edge.Target_Node_Key__c, extractViaFieldApiName(edge))
+                );
             }
         }
 
         Set<String> revealedKeySet = new Set<String>(visited);
         revealedKeySet.remove(nodeKey);
         return new OI_GraphFragment(nodeKey, nodes, edges, new List<String>(revealedKeySet), truncated, null);
+    }
+
+    /**
+     * The relationship field an edge travels through, e.g. "AccountId" for a lookup — read from
+     * the edge's own stored attributes (`relationshipName`, set by OI_FieldScanner) rather than
+     * derived or guessed. Null for every edge kind that carries no such attribute (HAS_FIELD,
+     * REFERENCES, EXECUTES_ON, GRANTS_ACCESS_TO) — the graph explorer's "why is this here?" chip
+     * must never invent a field name that was not actually scanned.
+     */
+    private String extractViaFieldApiName(OI_Graph_Edge__c edge) {
+        if (String.isBlank(edge.Attributes_Json__c)) {
+            return null;
+        }
+        try {
+            Map<String, Object> attributes = (Map<String, Object>) JSON.deserializeUntyped(edge.Attributes_Json__c);
+            Object relationshipName = attributes.get('relationshipName');
+            return relationshipName == null ? null : String.valueOf(relationshipName);
+        } catch (Exception malformedAttributes) {
+            /** Malformed stored attributes must never break graph traversal — the edge still renders, just without its optional "via field" context. */
+            return null;
+        }
+    }
+
+    /**
+     * Every node within one hop of ANY key in nodeKeys, either direction, as a single bulk
+     * pair of reads — the input set itself is included in the result.
+     *
+     * Exists specifically for scan-delta cache invalidation (DE-7), which needs the 1-hop
+     * neighborhood of a whole changed-key SET at once. The obvious alternative — calling a
+     * single-node traversal once per changed key — costs 2 SOQL queries PER KEY and blows the
+     * per-transaction query limit well before a normal scan chunk's worth of changes (60 keys
+     * would issue 120 queries against a ceiling of 100). This costs exactly 2 queries no matter
+     * how many keys are passed, which is the same bulk discipline collectRing already uses for
+     * an ordinary BFS ring.
+     *
+     * Deliberately returns only KEYS, not hydrated nodes: the caller evicts cache rows by key
+     * and never needs node content, so fetching it would be pure waste.
+     */
+    public Set<String> getOneHopNeighborKeys(Set<String> nodeKeys) {
+        Set<String> neighborKeys = new Set<String>();
+        if (nodeKeys == null || nodeKeys.isEmpty()) {
+            return neighborKeys;
+        }
+        neighborKeys.addAll(nodeKeys);
+        for (OI_Graph_Edge__c edge : edgeSelector.selectCurrentBySourceKeys(nodeKeys)) {
+            neighborKeys.add(edge.Target_Node_Key__c);
+        }
+        for (OI_Graph_Edge__c edge : edgeSelector.selectCurrentByTargetKeys(nodeKeys)) {
+            neighborKeys.add(edge.Source_Node_Key__c);
+        }
+        return neighborKeys;
     }
 
     /** One BFS ring: every edge touching currentRing, bulk-selected both directions. */

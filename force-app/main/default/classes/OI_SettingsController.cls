@@ -27,7 +27,10 @@ public with sharing class OI_SettingsController {
             nodeTypes.add(new OI_NodeTypeDescriptorDTO(descriptor));
         }
         List<OI_EdgeTypeDescriptorDTO> edgeTypes = new List<OI_EdgeTypeDescriptorDTO>();
-        for (OI_Edge_Type_Descriptor__mdt descriptor : [SELECT Type_Key__c, Display_Label__c, Line_Style__c, Is_Field_Membership__c FROM OI_Edge_Type_Descriptor__mdt]) {
+        for (OI_Edge_Type_Descriptor__mdt descriptor : [
+            SELECT Type_Key__c, Display_Label__c, Line_Style__c, Is_Field_Membership__c, Source_Role_Label__c, Target_Role_Label__c, Description__c
+            FROM OI_Edge_Type_Descriptor__mdt
+        ]) {
             edgeTypes.add(new OI_EdgeTypeDescriptorDTO(descriptor));
         }
         return new OI_PresentationRegistryDTO(nodeTypes, edgeTypes);
