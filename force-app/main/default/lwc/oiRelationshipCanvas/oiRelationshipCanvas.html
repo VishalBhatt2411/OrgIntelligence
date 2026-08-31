@@ -1,341 +1,691 @@
 <template>
-    <div class={hostClass}>
-        <div class="oi-orc-toolbar">
-            <template lwc:if={hasRootObject}>
-                <div class="oi-orc-analyzing" data-id="analyzing-object">
-                    <span class="oi-orc-analyzing-label">{analyzingLabel}</span>
-                    <div class="oi-orc-analyzing-chip">
-                        <lightning-icon icon-name={rootObject.iconName} size="x-small" class="oi-orc-analyzing-icon"></lightning-icon>
-                        <div class="oi-orc-analyzing-labels">
-                            <span class="oi-orc-analyzing-name">{rootObject.label}</span>
-                            <span class="oi-orc-analyzing-type">{analyzingObjectSubtitle}</span>
-                        </div>
-                    </div>
-                </div>
-            </template>
-            <div class="oi-orc-toolbar-spacer"></div>
-            <template lwc:if={showVisibilityToggle}>
-                <div class="oi-orc-toolbar-divider"></div>
-                <span class="oi-orc-toolbar-label" id="oi-orc-visibility-label">Relationship View</span>
-                <div class="oi-orc-visibility-toggle-group" role="group" aria-labelledby="oi-orc-visibility-label">
-                    <button type="button" class={businessToggleClass} data-mode="business" aria-pressed={isBusinessMode} onclick={handleVisibilityChange}>Business</button>
-                    <button type="button" class={systemToggleClass} data-mode="system" aria-pressed={isSystemMode} onclick={handleVisibilityChange}>System</button>
-                    <button type="button" class={allToggleClass} data-mode="all" aria-pressed={isAllMode} onclick={handleVisibilityChange}>All</button>
-                </div>
-            </template>
-            <div class="oi-orc-toolbar-divider"></div>
-            <span class="oi-orc-toolbar-label" id="oi-orc-view-options-label">View Options</span>
-            <div class="oi-orc-view-options-wrap">
-                <button
-                    type="button"
-                    class="oi-orc-view-options-trigger"
-                    data-id="view-options-trigger"
-                    aria-haspopup="listbox"
-                    aria-expanded={isViewOptionsOpen}
-                    aria-labelledby="oi-orc-view-options-label"
-                    onclick={handleToggleViewOptions}
-                >
-                    <span>{viewOptionsLabel}</span>
-                    <lightning-icon icon-name="utility:chevrondown" size="xx-small"></lightning-icon>
-                </button>
-                <template lwc:if={isViewOptionsOpen}>
-                    <ul class="oi-orc-view-options-menu" data-id="view-options-menu" role="listbox">
-                        <template for:each={viewOptionChoices} for:item="choice">
-                            <li key={choice.value} role="presentation">
-                                <button type="button" class={choice.buttonClass} data-option={choice.value} role="option" onclick={handleSelectViewOption}>{choice.label}</button>
-                            </li>
-                        </template>
-                    </ul>
-                </template>
+  <div class={hostClass}>
+    <div class="oi-orc-toolbar">
+      <template lwc:if={hasRootObject}>
+        <div class="oi-orc-analyzing" data-id="analyzing-object">
+          <span class="oi-orc-analyzing-label">{analyzingLabel}</span>
+          <div class="oi-orc-analyzing-chip">
+            <lightning-icon
+              icon-name={rootObject.iconName}
+              size="x-small"
+              class="oi-orc-analyzing-icon"
+            ></lightning-icon>
+            <div class="oi-orc-analyzing-labels">
+              <span class="oi-orc-analyzing-name">{rootObject.label}</span>
+              <span class="oi-orc-analyzing-type"
+                >{analyzingObjectSubtitle}</span
+              >
             </div>
-            <button type="button" class="oi-orc-icon-button" data-id="fit-to-screen-button" title="Fit to Screen" aria-label="Fit to Screen" onclick={handleFitToScreen}>
-                <lightning-icon icon-name="utility:contract_alt" size="x-small"></lightning-icon>
-            </button>
-            <button type="button" class="oi-orc-icon-button" data-id="export-button" title="Export diagram as SVG" aria-label="Export diagram as SVG" onclick={handleExportDiagram}>
-                <lightning-icon icon-name="utility:download" size="x-small"></lightning-icon>
-            </button>
-            <!-- A real anchor that is genuinely part of this component's own template/shadow tree — see handleExportDiagram's doc comment for why the download is triggered here rather than via a document.createElement'd, out-of-band element. -->
-            <a data-id="export-link" class="oi-orc-visually-hidden" href={exportHref} download={exportFileName} tabindex="-1" aria-hidden="true"></a>
+          </div>
         </div>
-
-        <template lwc:if={hasRootObject}>
-            <div class="oi-orc-lane-headers">
-                <div class="oi-orc-lane-header oi-orc-lane-header-incoming">
-                    <span class="oi-orc-lane-title">{incomingLaneTitle}</span>
-                    <span class="oi-orc-lane-subtitle">
-                        Incoming Relationships
-                        <lightning-icon icon-name="utility:info" size="xx-small" class="oi-orc-lane-info-icon" title={incomingLaneInfoText}></lightning-icon>
-                    </span>
-                </div>
-                <div class="oi-orc-lane-header oi-orc-lane-header-outgoing">
-                    <span class="oi-orc-lane-title">{outgoingLaneTitle}</span>
-                    <span class="oi-orc-lane-subtitle">
-                        Outgoing Relationships
-                        <lightning-icon icon-name="utility:info" size="xx-small" class="oi-orc-lane-info-icon" title={outgoingLaneInfoText}></lightning-icon>
-                    </span>
-                </div>
-            </div>
-
-            <div class="oi-orc-canvas-body">
-                <div class="oi-orc-diagram-wrapper" data-id="diagram-wrapper">
-                <svg
-                    data-id="orc-svg"
-                    class="oi-orc-svg"
-                    viewBox={diagramViewBox}
-                    width={svgRenderWidth}
-                    height={svgRenderHeight}
-                    preserveAspectRatio="xMidYMid meet"
+      </template>
+      <div class="oi-orc-toolbar-spacer"></div>
+      <template lwc:if={showVisibilityToggle}>
+        <div class="oi-orc-toolbar-divider"></div>
+        <span class="oi-orc-toolbar-label" id="oi-orc-visibility-label"
+          >Relationship View</span
+        >
+        <div
+          class="oi-orc-visibility-toggle-group"
+          role="group"
+          aria-labelledby="oi-orc-visibility-label"
+        >
+          <button
+            type="button"
+            class={businessToggleClass}
+            data-mode="business"
+            aria-pressed={isBusinessMode}
+            onclick={handleVisibilityChange}
+          >
+            Business
+          </button>
+          <button
+            type="button"
+            class={systemToggleClass}
+            data-mode="system"
+            aria-pressed={isSystemMode}
+            onclick={handleVisibilityChange}
+          >
+            System
+          </button>
+          <button
+            type="button"
+            class={allToggleClass}
+            data-mode="all"
+            aria-pressed={isAllMode}
+            onclick={handleVisibilityChange}
+          >
+            All
+          </button>
+        </div>
+      </template>
+      <div class="oi-orc-toolbar-divider"></div>
+      <span class="oi-orc-toolbar-label" id="oi-orc-view-options-label"
+        >View Options</span
+      >
+      <div class="oi-orc-view-options-wrap">
+        <button
+          type="button"
+          class="oi-orc-view-options-trigger"
+          data-id="view-options-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={isViewOptionsOpen}
+          aria-labelledby="oi-orc-view-options-label"
+          onclick={handleToggleViewOptions}
+        >
+          <span>{viewOptionsLabel}</span>
+          <lightning-icon
+            icon-name="utility:chevrondown"
+            size="xx-small"
+          ></lightning-icon>
+        </button>
+        <template lwc:if={isViewOptionsOpen}>
+          <ul
+            class="oi-orc-view-options-menu"
+            data-id="view-options-menu"
+            role="listbox"
+          >
+            <template for:each={viewOptionChoices} for:item="choice">
+              <li key={choice.value} role="presentation">
+                <button
+                  type="button"
+                  class={choice.buttonClass}
+                  data-option={choice.value}
+                  role="option"
+                  onclick={handleSelectViewOption}
                 >
-                    <defs>
-                        <marker data-id="orc-arrow-marker" id="oi-orc-arrow" markerWidth="8" markerHeight="8" orient="auto">
-                            <path d="M0,0 L8,4 L0,8 Z" class="oi-orc-arrowhead"></path>
-                        </marker>
-                    </defs>
+                  {choice.label}
+                </button>
+              </li>
+            </template>
+          </ul>
+        </template>
+      </div>
+      <button
+        type="button"
+        class="oi-orc-icon-button"
+        data-id="fit-to-screen-button"
+        title="Fit to Screen"
+        aria-label="Fit to Screen"
+        onclick={handleFitToScreen}
+      >
+        <lightning-icon
+          icon-name="utility:contract_alt"
+          size="x-small"
+        ></lightning-icon>
+      </button>
+      <button
+        type="button"
+        class="oi-orc-icon-button"
+        data-id="export-button"
+        title="Export diagram as SVG"
+        aria-label="Export diagram as SVG"
+        onclick={handleExportDiagram}
+      >
+        <lightning-icon
+          icon-name="utility:download"
+          size="x-small"
+        ></lightning-icon>
+      </button>
+      <!-- A real anchor that is genuinely part of this component's own template/shadow tree — see handleExportDiagram's doc comment for why the download is triggered here rather than via a document.createElement'd, out-of-band element. -->
+      <a
+        data-id="export-link"
+        class="oi-orc-visually-hidden"
+        href={exportHref}
+        download={exportFileName}
+        tabindex="-1"
+        aria-hidden="true"
+      ></a>
+    </div>
 
-                    <!-- Incoming lane: branches + shared trunk + one final approach into the center -->
-                    <template for:each={diagram.incomingCards} for:item="card">
-                        <path key={card.rowKey} class={card.lineClass} d={card.branchPath}></path>
-                    </template>
-                    <template lwc:if={diagram.incomingTrunkPath}>
-                        <path class="oi-orc-connector-line oi-orc-connector-line-incoming is-trunk" d={diagram.incomingTrunkPath}></path>
-                    </template>
-                    <template lwc:if={diagram.incomingFinalPath}>
-                        <path data-id="orc-arrow-path" class="oi-orc-connector-line oi-orc-connector-line-incoming is-trunk-final" d={diagram.incomingFinalPath}></path>
-                    </template>
+    <template lwc:if={hasRootObject}>
+      <div class="oi-orc-lane-headers">
+        <div class="oi-orc-lane-header oi-orc-lane-header-incoming">
+          <span class="oi-orc-lane-title">{incomingLaneTitle}</span>
+          <span class="oi-orc-lane-subtitle">
+            Incoming Relationships
+            <lightning-icon
+              icon-name="utility:info"
+              size="xx-small"
+              class="oi-orc-lane-info-icon"
+              title={incomingLaneInfoText}
+            ></lightning-icon>
+          </span>
+        </div>
+        <div class="oi-orc-lane-header oi-orc-lane-header-outgoing">
+          <span class="oi-orc-lane-title">{outgoingLaneTitle}</span>
+          <span class="oi-orc-lane-subtitle">
+            Outgoing Relationships
+            <lightning-icon
+              icon-name="utility:info"
+              size="xx-small"
+              class="oi-orc-lane-info-icon"
+              title={outgoingLaneInfoText}
+            ></lightning-icon>
+          </span>
+        </div>
+      </div>
 
-                    <!-- Outgoing lane: one branch off the center + shared trunk + a branch (with its own arrow) into each target -->
-                    <template lwc:if={diagram.outgoingFinalPath}>
-                        <path class="oi-orc-connector-line oi-orc-connector-line-outgoing is-trunk-final" d={diagram.outgoingFinalPath}></path>
-                    </template>
-                    <template lwc:if={diagram.outgoingTrunkPath}>
-                        <path class="oi-orc-connector-line oi-orc-connector-line-outgoing is-trunk" d={diagram.outgoingTrunkPath}></path>
-                    </template>
-                    <template for:each={diagram.outgoingCards} for:item="card">
-                        <path key={card.rowKey} data-id="orc-arrow-path" class={card.lineClass} d={card.branchPath}></path>
-                    </template>
+      <div class="oi-orc-canvas-body">
+        <div class="oi-orc-diagram-wrapper" data-id="diagram-wrapper">
+          <svg
+            data-id="orc-svg"
+            class="oi-orc-svg"
+            viewBox={diagramViewBox}
+            width={svgRenderWidth}
+            height={svgRenderHeight}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <defs>
+              <marker
+                data-id="orc-arrow-marker"
+                id="oi-orc-arrow"
+                markerWidth="8"
+                markerHeight="8"
+                orient="auto"
+              >
+                <path d="M0,0 L8,4 L0,8 Z" class="oi-orc-arrowhead"></path>
+              </marker>
+            </defs>
 
-                    <!-- Self relationships: a loop down off the center into its own "(Self)" card -->
-                    <template for:each={diagram.selfEntries} for:item="entry">
-                        <path key={entry.downPathKey} class={entry.lineClass} d={entry.downPath}></path>
-                        <path key={entry.upPathKey} data-id="orc-arrow-path" class={entry.lineClass} d={entry.upPath}></path>
-                    </template>
+            <!-- Incoming lane: one rounded-elbow path per card, card row -> shared trunk -> center (buildElbowPath) -->
+            <template for:each={diagram.incomingCards} for:item="card">
+              <path
+                key={card.rowKey}
+                data-id="orc-arrow-path"
+                class={card.lineClass}
+                d={card.branchPath}
+              ></path>
+            </template>
 
-                    <!-- Connector labels — HTML badges via foreignObject so the label visually belongs to the line -->
-                    <template for:each={diagram.incomingCards} for:item="card">
-                        <foreignObject key={card.rowKey} x={card.labelX} y={card.labelY} width="300" height="24" class="oi-orc-label-slot">
-                            <div
-                                class={card.labelClass}
-                                data-id="incoming-connector"
-                                data-connector-key={card.connectorKey}
-                                title={card.connectorLabel}
-                                role="button"
-                                tabindex="0"
-                                onclick={handleConnectorClick}
-                                onkeydown={handleConnectorKeydown}
-                                onmouseenter={handleConnectorMouseEnter}
-                                onmouseleave={handleConnectorMouseLeave}
-                            >{card.connectorLabel}</div>
-                        </foreignObject>
-                    </template>
-                    <template for:each={diagram.outgoingCards} for:item="card">
-                        <foreignObject key={card.rowKey} x={card.labelX} y={card.labelY} width="300" height="24" class="oi-orc-label-slot oi-orc-label-slot-right">
-                            <div
-                                class={card.labelClass}
-                                data-id="outgoing-connector"
-                                data-connector-key={card.connectorKey}
-                                title={card.connectorLabel}
-                                role="button"
-                                tabindex="0"
-                                onclick={handleConnectorClick}
-                                onkeydown={handleConnectorKeydown}
-                                onmouseenter={handleConnectorMouseEnter}
-                                onmouseleave={handleConnectorMouseLeave}
-                            >{card.connectorLabel}</div>
-                        </foreignObject>
-                    </template>
-                    <template for:each={diagram.selfEntries} for:item="entry">
-                        <foreignObject key={entry.connectorKey} x={entry.captionX} y={entry.captionY} width={entry.captionWidth} height="40" class="oi-orc-self-caption-slot">
-                            <div class="oi-orc-self-caption">
-                                <span class="oi-orc-self-caption-title">Self Relationship</span>
-                                <span class="oi-orc-self-caption-subtitle">{entry.selfCaptionSubtitle}</span>
-                            </div>
-                        </foreignObject>
-                        <foreignObject key={entry.upPathKey} x={entry.labelX} y={entry.labelY} width={entry.labelWidth} height="24" class="oi-orc-label-slot oi-orc-label-slot-self">
-                            <div
-                                class={entry.labelClass}
-                                data-id="self-connector"
-                                data-connector-key={entry.connectorKey}
-                                role="button"
-                                tabindex="0"
-                                onclick={handleConnectorClick}
-                                onkeydown={handleConnectorKeydown}
-                                onmouseenter={handleConnectorMouseEnter}
-                                onmouseleave={handleConnectorMouseLeave}
-                            >{entry.connectorLabel}</div>
-                        </foreignObject>
-                    </template>
+            <!-- Outgoing lane: one rounded-elbow path per card, center -> shared trunk -> card row, arrow into the target -->
+            <template for:each={diagram.outgoingCards} for:item="card">
+              <path
+                key={card.rowKey}
+                data-id="orc-arrow-path"
+                class={card.lineClass}
+                d={card.branchPath}
+              ></path>
+            </template>
 
-                    <!-- Incoming neighbor cards -->
-                    <template for:each={diagram.incomingCards} for:item="card">
-                        <foreignObject key={card.rowKey} x={card.x} y={card.y} width={card.width} height={card.height}>
-                            <div
-                                class={card.cardClass}
-                                data-id="incoming-card"
-                                data-node-key={card.counterpartObject.nodeKey}
-                                data-connector-key={card.connectorKey}
-                                role="button"
-                                tabindex="0"
-                                aria-label={card.cardAriaLabel}
-                                onclick={handleCardSelect}
-                                onkeydown={handleCardKeydown}
-                                onmouseenter={handleCardMouseEnter}
-                                onmouseleave={handleCardMouseLeave}
-                            >
-                                <div class="oi-orc-card-main">
-                                    <lightning-icon icon-name={card.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
-                                    <div class="oi-orc-card-labels">
-                                        <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
-                                        <span class="oi-orc-card-subtitle">{card.counterpartTypeLabel}</span>
-                                    </div>
-                                    <button type="button" class="oi-orc-card-open" data-id="open-card" data-node-key={card.counterpartObject.nodeKey} title="Open in Salesforce" aria-label="Open in Salesforce" onclick={handleCardOpen}>&#8599;</button>
-                                </div>
-                                <div class="oi-orc-card-divider"></div>
-                                <div class="oi-orc-card-footer" title={card.connectorLabel}>{card.connectorLabel}</div>
-                            </div>
-                        </foreignObject>
-                    </template>
+            <!-- Self relationships: a loop down off the center into its own "(Self)" card -->
+            <template for:each={diagram.selfEntries} for:item="entry">
+              <path
+                key={entry.downPathKey}
+                class={entry.lineClass}
+                d={entry.downPath}
+              ></path>
+              <path
+                key={entry.upPathKey}
+                data-id="orc-arrow-path"
+                class={entry.lineClass}
+                d={entry.upPath}
+              ></path>
+            </template>
 
-                    <!-- Outgoing neighbor cards -->
-                    <template for:each={diagram.outgoingCards} for:item="card">
-                        <foreignObject key={card.rowKey} x={card.x} y={card.y} width={card.width} height={card.height}>
-                            <div
-                                class={card.cardClass}
-                                data-id="outgoing-card"
-                                data-node-key={card.counterpartObject.nodeKey}
-                                data-connector-key={card.connectorKey}
-                                role="button"
-                                tabindex="0"
-                                aria-label={card.cardAriaLabel}
-                                onclick={handleCardSelect}
-                                onkeydown={handleCardKeydown}
-                                onmouseenter={handleCardMouseEnter}
-                                onmouseleave={handleCardMouseLeave}
-                            >
-                                <div class="oi-orc-card-main">
-                                    <lightning-icon icon-name={card.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
-                                    <div class="oi-orc-card-labels">
-                                        <span class="oi-orc-card-title" title={card.counterpartObject.label}>{card.counterpartObject.label}</span>
-                                        <span class="oi-orc-card-subtitle">{card.counterpartTypeLabel}</span>
-                                    </div>
-                                    <button type="button" class="oi-orc-card-open" data-id="open-card" data-node-key={card.counterpartObject.nodeKey} title="Open in Salesforce" aria-label="Open in Salesforce" onclick={handleCardOpen}>&#8599;</button>
-                                </div>
-                                <div class="oi-orc-card-divider"></div>
-                                <div class="oi-orc-card-footer" title={card.connectorLabel}>{card.connectorLabel}</div>
-                            </div>
-                        </foreignObject>
-                    </template>
+            <!-- Connector labels — HTML badges via foreignObject so the label visually belongs to the line -->
+            <template for:each={diagram.incomingCards} for:item="card">
+              <foreignObject
+                key={card.rowKey}
+                x={card.labelX}
+                y={card.labelY}
+                width="300"
+                height="24"
+                class="oi-orc-label-slot"
+              >
+                <div
+                  class={card.labelClass}
+                  data-id="incoming-connector"
+                  data-connector-key={card.connectorKey}
+                  title={card.connectorLabel}
+                  role="button"
+                  tabindex="0"
+                  onclick={handleConnectorClick}
+                  onkeydown={handleConnectorKeydown}
+                  onmouseenter={handleConnectorMouseEnter}
+                  onmouseleave={handleConnectorMouseLeave}
+                >
+                  {card.connectorLabel}
+                </div>
+              </foreignObject>
+            </template>
+            <template for:each={diagram.outgoingCards} for:item="card">
+              <foreignObject
+                key={card.rowKey}
+                x={card.labelX}
+                y={card.labelY}
+                width="300"
+                height="24"
+                class="oi-orc-label-slot oi-orc-label-slot-right"
+              >
+                <div
+                  class={card.labelClass}
+                  data-id="outgoing-connector"
+                  data-connector-key={card.connectorKey}
+                  title={card.connectorLabel}
+                  role="button"
+                  tabindex="0"
+                  onclick={handleConnectorClick}
+                  onkeydown={handleConnectorKeydown}
+                  onmouseenter={handleConnectorMouseEnter}
+                  onmouseleave={handleConnectorMouseLeave}
+                >
+                  {card.connectorLabel}
+                </div>
+              </foreignObject>
+            </template>
+            <template for:each={diagram.selfEntries} for:item="entry">
+              <foreignObject
+                key={entry.connectorKey}
+                x={entry.captionX}
+                y={entry.captionY}
+                width={entry.captionWidth}
+                height="40"
+                class="oi-orc-self-caption-slot"
+              >
+                <div class="oi-orc-self-caption">
+                  <span class="oi-orc-self-caption-title"
+                    >Self Relationship</span
+                  >
+                  <span class="oi-orc-self-caption-subtitle"
+                    >{entry.selfCaptionSubtitle}</span
+                  >
+                </div>
+              </foreignObject>
+              <foreignObject
+                key={entry.upPathKey}
+                x={entry.labelX}
+                y={entry.labelY}
+                width={entry.labelWidth}
+                height="24"
+                class="oi-orc-label-slot oi-orc-label-slot-self"
+              >
+                <div
+                  class={entry.labelClass}
+                  data-id="self-connector"
+                  data-connector-key={entry.connectorKey}
+                  role="button"
+                  tabindex="0"
+                  onclick={handleConnectorClick}
+                  onkeydown={handleConnectorKeydown}
+                  onmouseenter={handleConnectorMouseEnter}
+                  onmouseleave={handleConnectorMouseLeave}
+                >
+                  {entry.connectorLabel}
+                </div>
+              </foreignObject>
+            </template>
 
-                    <!--
+            <!-- Incoming neighbor cards -->
+            <template for:each={diagram.incomingCards} for:item="card">
+              <foreignObject
+                key={card.rowKey}
+                x={card.x}
+                y={card.y}
+                width={card.width}
+                height={card.height}
+              >
+                <div
+                  class={card.cardClass}
+                  data-id="incoming-card"
+                  data-node-key={card.counterpartObject.nodeKey}
+                  data-connector-key={card.connectorKey}
+                  role="button"
+                  tabindex="0"
+                  aria-label={card.cardAriaLabel}
+                  onclick={handleCardSelect}
+                  onkeydown={handleCardKeydown}
+                  onmouseenter={handleCardMouseEnter}
+                  onmouseleave={handleCardMouseLeave}
+                >
+                  <div class="oi-orc-card-main">
+                    <lightning-icon
+                      icon-name={card.counterpartObject.iconName}
+                      size="small"
+                      class="oi-orc-card-icon"
+                    ></lightning-icon>
+                    <div class="oi-orc-card-labels">
+                      <span
+                        class="oi-orc-card-title"
+                        title={card.counterpartObject.label}
+                        >{card.counterpartObject.label}</span
+                      >
+                      <span class="oi-orc-card-subtitle"
+                        >{card.counterpartTypeLabel}</span
+                      >
+                    </div>
+                    <button
+                      type="button"
+                      class="oi-orc-card-open"
+                      data-id="open-card"
+                      data-node-key={card.counterpartObject.nodeKey}
+                      title="Open in Salesforce"
+                      aria-label="Open in Salesforce"
+                      onclick={handleCardOpen}
+                    >
+                      &#8599;
+                    </button>
+                  </div>
+                  <div class="oi-orc-card-divider"></div>
+                  <div class="oi-orc-card-footer" title={card.connectorLabel}>
+                    {card.connectorLabel}
+                  </div>
+                </div>
+              </foreignObject>
+            </template>
+
+            <!-- Outgoing neighbor cards -->
+            <template for:each={diagram.outgoingCards} for:item="card">
+              <foreignObject
+                key={card.rowKey}
+                x={card.x}
+                y={card.y}
+                width={card.width}
+                height={card.height}
+              >
+                <div
+                  class={card.cardClass}
+                  data-id="outgoing-card"
+                  data-node-key={card.counterpartObject.nodeKey}
+                  data-connector-key={card.connectorKey}
+                  role="button"
+                  tabindex="0"
+                  aria-label={card.cardAriaLabel}
+                  onclick={handleCardSelect}
+                  onkeydown={handleCardKeydown}
+                  onmouseenter={handleCardMouseEnter}
+                  onmouseleave={handleCardMouseLeave}
+                >
+                  <div class="oi-orc-card-main">
+                    <lightning-icon
+                      icon-name={card.counterpartObject.iconName}
+                      size="small"
+                      class="oi-orc-card-icon"
+                    ></lightning-icon>
+                    <div class="oi-orc-card-labels">
+                      <span
+                        class="oi-orc-card-title"
+                        title={card.counterpartObject.label}
+                        >{card.counterpartObject.label}</span
+                      >
+                      <span class="oi-orc-card-subtitle"
+                        >{card.counterpartTypeLabel}</span
+                      >
+                    </div>
+                    <button
+                      type="button"
+                      class="oi-orc-card-open"
+                      data-id="open-card"
+                      data-node-key={card.counterpartObject.nodeKey}
+                      title="Open in Salesforce"
+                      aria-label="Open in Salesforce"
+                      onclick={handleCardOpen}
+                    >
+                      &#8599;
+                    </button>
+                  </div>
+                  <div class="oi-orc-card-divider"></div>
+                  <div class="oi-orc-card-footer" title={card.connectorLabel}>
+                    {card.connectorLabel}
+                  </div>
+                </div>
+              </foreignObject>
+            </template>
+
+            <!--
                         Self-relationship shadow cards — render the CONNECTOR's own counterpart,
                         not the root object, since in Record mode a self connector's counterpart
                         is a genuinely different record of the same object type (ADR-0024); in
                         Object mode the counterpart is always the root object itself, so this is
                         visually identical to before there too.
                     -->
-                    <template for:each={diagram.selfEntries} for:item="entry">
-                        <foreignObject key={entry.connectorKey} x={entry.cardX} y={entry.cardY} width={entry.cardWidth} height={entry.cardHeight}>
-                            <div class="oi-orc-card oi-orc-card-self" data-id="self-card">
-                                <div class="oi-orc-card-main">
-                                    <lightning-icon icon-name={entry.counterpartObject.iconName} size="small" class="oi-orc-card-icon"></lightning-icon>
-                                    <div class="oi-orc-card-labels">
-                                        <span class="oi-orc-card-title">{entry.counterpartObject.label} (Self)</span>
-                                        <span class="oi-orc-card-subtitle">{entry.counterpartTypeLabel}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </foreignObject>
-                    </template>
-
-                    <!-- "Show N more" — lives in its own lane's column, never floating outside the composition -->
-                    <template lwc:if={diagram.incomingShowMore}>
-                        <foreignObject x={diagram.incomingShowMore.x} y={diagram.incomingShowMore.y} width={diagram.incomingShowMore.width} height={diagram.incomingShowMore.height}>
-                            <button type="button" class="oi-orc-show-more" data-id="show-more-incoming" onclick={handleShowMoreIncoming}>{diagram.incomingShowMore.label}</button>
-                        </foreignObject>
-                    </template>
-                    <template lwc:if={diagram.outgoingShowMore}>
-                        <foreignObject x={diagram.outgoingShowMore.x} y={diagram.outgoingShowMore.y} width={diagram.outgoingShowMore.width} height={diagram.outgoingShowMore.height}>
-                            <button type="button" class="oi-orc-show-more" data-id="show-more-outgoing" onclick={handleShowMoreOutgoing}>{diagram.outgoingShowMore.label}</button>
-                        </foreignObject>
-                    </template>
-
-                    <!-- Contextual "Explore From Here" — appears only once a neighbor is selected, never a permanent per-card link -->
-                    <template lwc:if={diagram.exploreAction}>
-                        <foreignObject x={diagram.exploreAction.x} y={diagram.exploreAction.y} width={diagram.exploreAction.width} height={diagram.exploreAction.height}>
-                            <button type="button" class="oi-orc-explore-button" data-id="explore-from-here" data-node-key={diagram.exploreAction.nodeKey} onclick={handleExploreFromHere}>Explore From Here →</button>
-                        </foreignObject>
-                    </template>
-
-                    <!-- The center card — the visual anchor -->
-                    <foreignObject x={diagram.centerBox.x} y={diagram.centerBox.y} width={diagram.centerBox.width} height={diagram.centerBox.height}>
-                        <div class="oi-orc-center-card" data-id="center-card" aria-label={rootObjectAriaLabel}>
-                            <lightning-icon icon-name={rootObject.iconName} size="medium" class="oi-orc-center-card-icon"></lightning-icon>
-                            <span class="oi-orc-center-card-label">{rootObject.label}</span>
-                            <span class="oi-orc-center-card-type">{rootObjectTypeLabel}</span>
-                            <span class="oi-orc-center-card-status" data-id="center-card-status">&#9679; Analyzing</span>
-                        </div>
-                    </foreignObject>
-                </svg>
-
-                <button type="button" class="oi-orc-maximize-button" data-id="maximize-toggle" aria-label={maximizeButtonLabel} title={maximizeButtonLabel} onclick={handleToggleMaximize}>
-                    <lightning-icon icon-name={maximizeIconName} size="x-small"></lightning-icon>
-                </button>
-            </div>
-
-            <template lwc:if={isOutgoingEmptyByBusinessFilter}>
-                <div class="oi-orc-lane-empty oi-orc-lane-empty-outgoing" data-id="outgoing-empty">
-                    <span>No business relationships from {rootObject.label}.</span>
-                    <button type="button" class="oi-orc-show-system-link" data-mode="all" onclick={handleVisibilityChange}>Show system relationships</button>
+            <template for:each={diagram.selfEntries} for:item="entry">
+              <foreignObject
+                key={entry.connectorKey}
+                x={entry.cardX}
+                y={entry.cardY}
+                width={entry.cardWidth}
+                height={entry.cardHeight}
+              >
+                <div class="oi-orc-card oi-orc-card-self" data-id="self-card">
+                  <div class="oi-orc-card-main">
+                    <lightning-icon
+                      icon-name={entry.counterpartObject.iconName}
+                      size="small"
+                      class="oi-orc-card-icon"
+                    ></lightning-icon>
+                    <div class="oi-orc-card-labels">
+                      <span class="oi-orc-card-title"
+                        >{entry.counterpartObject.label} (Self)</span
+                      >
+                      <span class="oi-orc-card-subtitle"
+                        >{entry.counterpartTypeLabel}</span
+                      >
+                    </div>
+                  </div>
                 </div>
+              </foreignObject>
             </template>
-            <template lwc:elseif={hasOutgoing}></template>
-            <template lwc:else>
-                <div class="oi-orc-lane-empty oi-orc-lane-empty-outgoing" data-id="outgoing-empty">{outgoingEmptyMessage}</div>
-            </template>
-            <template lwc:if={hasIncoming}></template>
-            <template lwc:else>
-                <div class="oi-orc-lane-empty oi-orc-lane-empty-incoming" data-id="incoming-empty">{incomingEmptyMessage}</div>
-            </template>
-            <!-- the two empty lwc:if/elseif branches above are intentional: they suppress the paired lwc:else from firing when the lane genuinely has content, without rendering anything themselves -->
-            </div>
 
-            <!--
+            <!-- "Show N more" — lives in its own lane's column, never floating outside the composition -->
+            <template lwc:if={diagram.incomingShowMore}>
+              <foreignObject
+                x={diagram.incomingShowMore.x}
+                y={diagram.incomingShowMore.y}
+                width={diagram.incomingShowMore.width}
+                height={diagram.incomingShowMore.height}
+              >
+                <button
+                  type="button"
+                  class="oi-orc-show-more"
+                  data-id="show-more-incoming"
+                  onclick={handleShowMoreIncoming}
+                >
+                  {diagram.incomingShowMore.label}
+                </button>
+              </foreignObject>
+            </template>
+            <template lwc:if={diagram.outgoingShowMore}>
+              <foreignObject
+                x={diagram.outgoingShowMore.x}
+                y={diagram.outgoingShowMore.y}
+                width={diagram.outgoingShowMore.width}
+                height={diagram.outgoingShowMore.height}
+              >
+                <button
+                  type="button"
+                  class="oi-orc-show-more"
+                  data-id="show-more-outgoing"
+                  onclick={handleShowMoreOutgoing}
+                >
+                  {diagram.outgoingShowMore.label}
+                </button>
+              </foreignObject>
+            </template>
+
+            <!-- Contextual "Explore From Here" — appears only once a neighbor is selected, never a permanent per-card link -->
+            <template lwc:if={diagram.exploreAction}>
+              <foreignObject
+                x={diagram.exploreAction.x}
+                y={diagram.exploreAction.y}
+                width={diagram.exploreAction.width}
+                height={diagram.exploreAction.height}
+              >
+                <button
+                  type="button"
+                  class="oi-orc-explore-button"
+                  data-id="explore-from-here"
+                  data-node-key={diagram.exploreAction.nodeKey}
+                  onclick={handleExploreFromHere}
+                >
+                  Explore From Here →
+                </button>
+              </foreignObject>
+            </template>
+
+            <!-- The center card — the visual anchor -->
+            <foreignObject
+              x={diagram.centerBox.x}
+              y={diagram.centerBox.y}
+              width={diagram.centerBox.width}
+              height={diagram.centerBox.height}
+            >
+              <div
+                class="oi-orc-center-card"
+                data-id="center-card"
+                aria-label={rootObjectAriaLabel}
+              >
+                <lightning-icon
+                  icon-name={rootObject.iconName}
+                  size="medium"
+                  class="oi-orc-center-card-icon"
+                ></lightning-icon>
+                <span class="oi-orc-center-card-label">{rootObject.label}</span>
+                <span class="oi-orc-center-card-type"
+                  >{rootObjectTypeLabel}</span
+                >
+                <span
+                  class="oi-orc-center-card-status"
+                  data-id="center-card-status"
+                  >&#9679; Analyzing</span
+                >
+              </div>
+            </foreignObject>
+          </svg>
+
+          <button
+            type="button"
+            class="oi-orc-maximize-button"
+            data-id="maximize-toggle"
+            aria-label={maximizeButtonLabel}
+            title={maximizeButtonLabel}
+            onclick={handleToggleMaximize}
+          >
+            <lightning-icon
+              icon-name={maximizeIconName}
+              size="x-small"
+            ></lightning-icon>
+          </button>
+        </div>
+
+        <template lwc:if={isOutgoingEmptyByBusinessFilter}>
+          <div
+            class="oi-orc-lane-empty oi-orc-lane-empty-outgoing"
+            data-id="outgoing-empty"
+          >
+            <span>No business relationships from {rootObject.label}.</span>
+            <button
+              type="button"
+              class="oi-orc-show-system-link"
+              data-mode="all"
+              onclick={handleVisibilityChange}
+            >
+              Show system relationships
+            </button>
+          </div>
+        </template>
+        <template lwc:elseif={hasOutgoing}></template>
+        <template lwc:else>
+          <div
+            class="oi-orc-lane-empty oi-orc-lane-empty-outgoing"
+            data-id="outgoing-empty"
+          >
+            {outgoingEmptyMessage}
+          </div>
+        </template>
+        <template lwc:if={hasIncoming}></template>
+        <template lwc:else>
+          <div
+            class="oi-orc-lane-empty oi-orc-lane-empty-incoming"
+            data-id="incoming-empty"
+          >
+            {incomingEmptyMessage}
+          </div>
+        </template>
+        <!-- the two empty lwc:if/elseif branches above are intentional: they suppress the paired lwc:else from firing when the lane genuinely has content, without rendering anything themselves -->
+      </div>
+
+      <!--
                 Persistent footer (VisualDesignSpecification.md §3.4): legend docked lower-left,
                 zoom controls docked lower-right, both in the SAME bordered footer region — never
                 scrolled away with the diagram (oi-orc-canvas-body is the scrollable region above;
                 this footer is a sibling, always visible within the canvas viewport) and never
                 floating detached over the diagram content the way the zoom controls previously did.
             -->
-            <div class="oi-orc-canvas-footer" data-id="canvas-footer">
-                <div class="oi-orc-legend" data-id="legend">
-                    <span class="oi-orc-legend-title">Legend</span>
-                    <template lwc:if={isRecordMode}>
-                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"></span>Related Record</span>
-                    </template>
-                    <template lwc:else>
-                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"></span>Lookup</span>
-                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-master-detail"></span>Master-Detail</span>
-                    </template>
-                    <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-self"></span>Self Relationship</span>
-                    <template lwc:if={showVisibilityToggle}>
-                        <span class="oi-orc-legend-item"><span class="oi-orc-legend-swatch oi-orc-legend-swatch-system"></span>System Relationship</span>
-                    </template>
-                </div>
-                <div class="oi-orc-zoom-controls" data-id="zoom-controls" role="group" aria-label="Zoom">
-                    <button type="button" class="oi-orc-zoom-button" data-id="zoom-out" aria-label="Zoom out" onclick={handleZoomOut}>&#8722;</button>
-                    <button type="button" class="oi-orc-zoom-reset" data-id="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%" onclick={handleZoomReset}>{zoomPercentLabel}</button>
-                    <button type="button" class="oi-orc-zoom-button" data-id="zoom-in" aria-label="Zoom in" onclick={handleZoomIn}>&#43;</button>
-                </div>
-            </div>
-        </template>
-    </div>
+      <div class="oi-orc-canvas-footer" data-id="canvas-footer">
+        <div class="oi-orc-legend" data-id="legend">
+          <span class="oi-orc-legend-title">Legend</span>
+          <template lwc:if={isRecordMode}>
+            <span class="oi-orc-legend-item"
+              ><span
+                class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"
+              ></span
+              >Related Record</span
+            >
+          </template>
+          <template lwc:else>
+            <span class="oi-orc-legend-item"
+              ><span
+                class="oi-orc-legend-swatch oi-orc-legend-swatch-lookup"
+              ></span
+              >Lookup</span
+            >
+            <span class="oi-orc-legend-item"
+              ><span
+                class="oi-orc-legend-swatch oi-orc-legend-swatch-master-detail"
+              ></span
+              >Master-Detail</span
+            >
+          </template>
+          <span class="oi-orc-legend-item"
+            ><span class="oi-orc-legend-swatch oi-orc-legend-swatch-self"></span
+            >Self Relationship</span
+          >
+          <template lwc:if={showVisibilityToggle}>
+            <span class="oi-orc-legend-item"
+              ><span
+                class="oi-orc-legend-swatch oi-orc-legend-swatch-system"
+              ></span
+              >System Relationship</span
+            >
+          </template>
+        </div>
+        <div
+          class="oi-orc-zoom-controls"
+          data-id="zoom-controls"
+          role="group"
+          aria-label="Zoom"
+        >
+          <button
+            type="button"
+            class="oi-orc-zoom-button"
+            data-id="zoom-out"
+            aria-label="Zoom out"
+            onclick={handleZoomOut}
+          >
+            &#8722;
+          </button>
+          <button
+            type="button"
+            class="oi-orc-zoom-reset"
+            data-id="zoom-reset"
+            aria-label="Reset zoom to 100%"
+            title="Reset zoom to 100%"
+            onclick={handleZoomReset}
+          >
+            {zoomPercentLabel}
+          </button>
+          <button
+            type="button"
+            class="oi-orc-zoom-button"
+            data-id="zoom-in"
+            aria-label="Zoom in"
+            onclick={handleZoomIn}
+          >
+            &#43;
+          </button>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
