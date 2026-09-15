@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Run Org Health Compute</label>
+    <description
+  >Trigger an async Org Health computation (currently: Data Health's recompute action). Mirrors the OI_View_Graph / OI_Run_Scan split — granted to Power User and Administrator only, not Viewer.</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

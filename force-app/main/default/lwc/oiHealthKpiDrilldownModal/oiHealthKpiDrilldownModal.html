@@ -1,0 +1,57 @@
+<template>
+  <section
+    role="dialog"
+    tabindex="-1"
+    aria-modal="true"
+    aria-labelledby="oi-kpi-drilldown-heading"
+    class="slds-modal slds-fade-in-open slds-modal_large oi-kpi-drilldown-modal"
+    onkeydown={handleKeyDown}
+  >
+    <div class="slds-modal__container">
+      <header class="slds-modal__header oi-kpi-drilldown-header">
+        <button
+          class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+          title="Close"
+          onclick={handleClose}
+        >
+          <lightning-icon
+            icon-name="utility:close"
+            size="small"
+            alternative-text="Close"
+            variant="inverse"
+          ></lightning-icon>
+        </button>
+        <h2 id="oi-kpi-drilldown-heading" class="slds-modal__title">{title}</h2>
+      </header>
+
+      <div
+        class="slds-modal__content slds-p-around_medium oi-kpi-drilldown-body"
+      >
+        <template if:true={isLoading}>
+          <c-oi-skeleton lines="6" label="Loading objects"></c-oi-skeleton>
+        </template>
+
+        <template if:true={hasError}>
+          <c-oi-state-banner
+            state="error"
+            title="Couldn't load this list"
+            message={loadError}
+            onretry={handleRetry}
+          ></c-oi-state-banner>
+        </template>
+
+        <template if:true={hasDrilldown}>
+          <c-oi-health-breakdown-list
+            title={title}
+            coverage-caption={drilldown.coverageCaption}
+            metric-column-labels={drilldown.metricColumnLabels}
+            rows={rows}
+            clickable
+            onrowselect={handleRowSelect}
+          ></c-oi-health-breakdown-list>
+        </template>
+      </div>
+    </div>
+  </section>
+  <div class="slds-backdrop slds-backdrop_open" onclick={handleClose}></div>
+</template>

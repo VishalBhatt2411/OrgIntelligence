@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Score__c</fullName>
+    <label>Score</label>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>1</scale>
+    <required>false</required>
+    <description
+  >OI_HealthScoringEngine's combined multi-signal badness score for this finding, 0-100, higher = worse. Null for a rule not yet ported onto the shared scoring engine (ADR-0027 correction) — a null score must never be displayed as zero/healthy.</description>
+</CustomField>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Component_Key__c</fullName>
+    <label>Component Key</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <description
+  >The graph Node_Key__c, record Id, or other stable identifier of the affected component — never a raw label, since labels can change while identity must not.</description>
+</CustomField>

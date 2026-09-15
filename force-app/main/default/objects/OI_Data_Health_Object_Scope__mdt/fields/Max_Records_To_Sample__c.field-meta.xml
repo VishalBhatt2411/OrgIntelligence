@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Records_To_Sample__c</fullName>
+    <label>Max Records To Sample</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>true</required>
+    <description
+  >Hard ceiling on records profiled per run for this object — the bounded-sampling mechanism itself.</description>
+</CustomField>

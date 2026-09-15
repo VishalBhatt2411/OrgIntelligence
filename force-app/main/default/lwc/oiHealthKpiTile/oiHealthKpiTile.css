@@ -1,0 +1,64 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. This also corrects three defects that were live
+ * before the migration, all caused by consuming SLDS on-surface tiers directly with inverted
+ * assumptions about which tier is strongest:
+ *   - the eyebrow label resolved to #03234d (dark navy) and the value it labels to #5c5c5c (mid
+ *     grey), so the label outweighed its own number. --slds-g-color-on-surface-1 is the WEAKEST
+ *     tier and -3 the strongest; the previous rules had them backwards.
+ *   - the border resolved to #5c5c5c rather than the intended near-white, because
+ *     --slds-g-color-border-2 is SLDS 2's strong border, not its subtle one.
+ *   - 'IBM Plex Mono' / 'Manrope' were declared but never loaded (no static resource in the
+ *     package), so the tile silently rendered in the platform fallback.
+ */
+
+.oi-health-kpi-tile {
+  box-sizing: border-box;
+  height: 100%;
+  padding: var(--oi-space-3);
+  font-family: var(--oi-font-family-sans);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+}
+
+/* An aggregate number is only worth clicking when there is a real object list behind it —
+   oiHealthKpiTile.js only applies this class when the caller supplied a metricKey. */
+.oi-health-kpi-tile_clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.oi-health-kpi-tile_clickable:hover {
+  border-color: var(--oi-color-accent);
+}
+
+.oi-health-kpi-tile_clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+.oi-health-kpi-eyebrow {
+  margin-bottom: var(--oi-space-1);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-kpi-value {
+  font-size: var(--oi-font-size-display);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+/* Counts are computed data: tabular figures so digits do not reflow as values change. */
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}

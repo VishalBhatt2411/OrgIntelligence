@@ -1,0 +1,19 @@
+<template>
+  <details class="oi-health-formula" open={isOpenByDefault}>
+    <summary class="oi-health-formula-summary">
+      How this score is calculated
+      <span class="oi-health-formula-chev" aria-hidden="true">⌄</span>
+    </summary>
+    <div class="oi-health-formula-body">
+      <div>{summary}</div>
+      <ul>
+        <template for:each={components} for:item="component">
+          <li key={component.label}>
+            {component.label}
+            <span class="num">{component.detail}</span>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </details>
+</template>

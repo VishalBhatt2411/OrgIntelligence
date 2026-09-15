@@ -1,0 +1,27 @@
+@import "c/oiDesignTokens";
+
+/**
+ * The panel's first stylesheet. It had none at all, so every visual decision came from the
+ * `slds-*` utility classes in its markup and from lightning-card. Those are left in place —
+ * ADR-0028 §7 is a state-layer change, not a redesign of this widget — and the only styling added
+ * here is what the new busy affordance needs, expressed entirely in --oi-* tokens.
+ *
+ * Why a busy label rather than a spinner or a skeleton for the action path: the button is still on
+ * screen and still the thing the user is waiting on, so the content is present, not absent. A
+ * skeleton would be a lie (nothing is being placed there) and an overlay spinner would hide the
+ * control it describes. The initial fetch is the opposite case — the status line genuinely has no
+ * value yet — and that one does get a skeleton.
+ */
+
+.oi-scan-status-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-3);
+}
+
+.oi-scan-status-panel-busy {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-secondary);
+}

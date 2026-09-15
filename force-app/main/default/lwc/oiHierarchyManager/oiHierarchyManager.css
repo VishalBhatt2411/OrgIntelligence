@@ -1,185 +1,212 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary, then lifted off the bare-form treatment it shipped
+ * with: it now sits on a card surface and states its own text baseline instead of inheriting
+ * whatever the host FlexiPage supplies.
+ *
+ * Deliberately NOT added: an in-component page header. Lightning already renders the tab label
+ * ("Hierarchy Manager") as this App Page's header, so a title here would print the page name
+ * twice — the same duplication being removed from the other two surfaces.
+ *
+ * Buttons now come from c/oiButtonStyles. Three local button rules were deleted, and the four
+ * form buttons that carried no class at all — and so rendered as raw browser chrome next to
+ * styled siblings — joined the shared vocabulary. The accent fill was also narrowed to the two
+ * actions that actually commit a form: "New", "Add Level" and "Assign Relationship" merely open
+ * one, so four filled accent buttons had been competing on a single screen with no hierarchy.
+ *
+ * Defects corrected, all of them SLDS tiers consumed against their own literal fallbacks:
+ *   - the sidebar/section titles and the list-item name asked for --slds-g-color-on-surface-1
+ *     with a near-black #181818 fallback. In SLDS 2 on-surface-1 is the WEAKEST tier (#5c5c5c),
+ *     so every heading on this surface rendered mid-grey instead of the intended primary black.
+ *     They now resolve --oi-color-text-primary (#03234d via on-surface-3).
+ *   - the list-item meta, table headers, empty state, picker label, and inline error asked for
+ *     --slds-g-color-on-surface-2 with a muted #706e6b fallback; the intent is the muted tier,
+ *     so they now resolve --oi-color-text-muted.
+ *   - --slds-g-color-neutral-base-95 (a legacy SLDS 1 ramp token, not part of the SLDS 2 semantic
+ *     set) backed the hover, picker, and history surfaces with #f3f3f3; that intent is the sunken
+ *     surface, now --oi-color-surface-sunken.
+ *   - the error color's #ba0517 literal is the Health family's red while the rest of the
+ *     oiHierarchy* family carries the Graph family's #c23934. ADR-0028 unifies both on
+ *     --oi-color-severity-critical.
+ *
+ * font-family is declared on the root so this surface stops inheriting whatever the host page
+ * supplies. Fixed component dimensions (16rem sidebar, 30rem form) stay literal: they are layout
+ * geometry, not spacing steps.
+ */
+
 .oi-hierarchy-manager {
-    display: flex;
-    gap: 1rem;
-    height: 100%;
-    box-sizing: border-box;
+  display: flex;
+  gap: var(--oi-space-4);
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--oi-space-4);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body-lg);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
 }
 
 .oi-hierarchy-manager-sidebar {
-    width: 16rem;
-    flex-shrink: 0;
-    border-right: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    padding-right: 1rem;
+  width: 16rem;
+  flex-shrink: 0;
+  border-right: var(--oi-border-width) solid var(--oi-color-border);
+  padding-right: var(--oi-space-4);
 }
 
 .oi-hierarchy-manager-detail {
-    flex: 1;
-    min-width: 0;
-    overflow-y: auto;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
 }
 
 .oi-hierarchy-manager-sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--oi-space-3);
 }
 
 .oi-hierarchy-manager-title,
 .oi-hierarchy-manager-section-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--slds-g-color-on-surface-1, #181818);
-    margin: 0;
-}
-
-.oi-hierarchy-manager-new-button {
-    border: 1px solid var(--slds-g-color-accent-1, #0176d3);
-    background: var(--slds-g-color-accent-1, #0176d3);
-    color: var(--slds-g-color-on-accent-1, #ffffff);
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+  margin: 0;
 }
 
 .oi-hierarchy-manager-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .oi-hierarchy-manager-list-item {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    border: none;
-    background: transparent;
-    text-align: left;
-    padding: 0.5rem 0.4rem;
-    cursor: pointer;
-    border-radius: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: var(--oi-space-2);
+  cursor: pointer;
+  border-radius: var(--oi-radius-sm);
 }
 
 .oi-hierarchy-manager-list-item:hover {
-    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  background: var(--oi-color-surface-sunken);
 }
 
 .oi-hierarchy-manager-list-item-name {
-    font-weight: 600;
-    color: var(--slds-g-color-on-surface-1, #181818);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
 }
 
 .oi-hierarchy-manager-list-item-meta {
-    font-size: 0.7rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
 }
 
 .oi-hierarchy-manager-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    max-width: 30rem;
-    margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-3);
+  max-width: 30rem;
+  margin-bottom: var(--oi-space-5);
 }
 
-.oi-hierarchy-manager-save-button {
-    align-self: flex-start;
-    border: 1px solid var(--slds-g-color-accent-1, #0176d3);
-    background: var(--slds-g-color-accent-1, #0176d3);
-    color: var(--slds-g-color-on-accent-1, #ffffff);
-    border-radius: 0.25rem;
-    padding: 0.4rem 1rem;
-    font-weight: 600;
-    cursor: pointer;
+/*
+ * The forms are flex columns, so a button that is a DIRECT child stretches to the full 30rem
+ * measure — which is how "Save Hierarchy" first rendered as a full-width blue bar once its local
+ * rule (which had carried align-self) moved to the shared vocabulary. c/oiButtonStyles
+ * deliberately does not set align-self: in the Org Health header's flex ROW the same declaration
+ * would drag the Refresh button off centre. So the column geometry is stated here, where the
+ * column actually is. Buttons inside -form-actions are in a row and need nothing.
+ */
+.oi-hierarchy-manager-form > .oi-btn {
+  align-self: flex-start;
 }
 
 .oi-hierarchy-manager-form-actions {
-    display: flex;
-    gap: 0.5rem;
+  display: flex;
+  gap: var(--oi-space-2);
 }
 
 .oi-hierarchy-manager-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-    margin-bottom: 1rem;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--oi-font-size-body);
+  margin-bottom: var(--oi-space-4);
 }
 
 .oi-hierarchy-manager-table th {
-    text-align: left;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-weight: 600;
-    padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+  text-align: left;
+  color: var(--oi-color-text-muted);
+  font-weight: var(--oi-font-weight-semibold);
+  padding: var(--oi-space-2);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
 }
 
 .oi-hierarchy-manager-table td {
-    padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
+  padding: var(--oi-space-2);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
 }
 
 .oi-hierarchy-manager-row-actions {
-    display: flex;
-    gap: 0.5rem;
+  display: flex;
+  gap: var(--oi-space-2);
 }
 
-.oi-hierarchy-manager-link-button {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    cursor: pointer;
-    padding: 0;
-    font-size: 0.75rem;
-}
-
-.oi-hierarchy-manager-link-button:hover {
-    text-decoration: underline;
-}
-
-.oi-hierarchy-manager-error {
-    color: var(--slds-g-color-error-1, #ba0517);
-}
-
-.oi-hierarchy-manager-empty {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-style: italic;
-}
+/*
+ * .oi-hierarchy-manager-error and .oi-hierarchy-manager-empty were deleted rather than
+ * retokenized: all seven error paragraphs and all three empty paragraphs now render through
+ * c/oiStateBanner, and the four loading spinners through c/oiSkeleton, per ADR-0028 §7.
+ */
 
 .oi-hierarchy-manager-picker-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-2);
 }
 
 .oi-hierarchy-manager-picker-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
 }
 
 .oi-hierarchy-manager-picker-selected {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    border-radius: 0.25rem;
-    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  padding: var(--oi-space-2);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-sm);
+  background: var(--oi-color-surface-sunken);
 }
 
 .oi-hierarchy-manager-history {
-    padding: 0.5rem;
-    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
-    border-radius: 0.25rem;
+  padding: var(--oi-space-2);
+  background: var(--oi-color-surface-sunken);
+  border-radius: var(--oi-radius-sm);
 }
 
 .oi-hierarchy-manager-history-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    font-size: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-2);
 }

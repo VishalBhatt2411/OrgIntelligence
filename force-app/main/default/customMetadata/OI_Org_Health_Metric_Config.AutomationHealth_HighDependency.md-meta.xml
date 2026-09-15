@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomMetadata
+  xmlns="http://soap.sforce.com/2006/04/metadata"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+>
+    <label>AutomationHealth HighDependency</label>
+    <protected>false</protected>
+    <values>
+        <field>Section_Key__c</field>
+        <value xsi:type="xsd:string">AutomationHealth</value>
+    </values>
+    <values>
+        <field>Metric_Key__c</field>
+        <value xsi:type="xsd:string">HighDependency</value>
+    </values>
+    <values>
+        <field>Threshold_Value__c</field>
+        <value xsi:type="xsd:double">10</value>
+    </values>
+    <values>
+        <field>Formula_Description__c</field>
+        <value
+      xsi:type="xsd:string"
+    >High fan-in/fan-out — automation components (triggers, flows) with 10 or more combined incoming and outgoing dependency edges are flagged for attention. Facts-only section: this threshold drives row-level severity coloring only, never a composite score.</value>
+    </values>
+    <values>
+        <field>Is_Active__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+</CustomMetadata>

@@ -1,0 +1,70 @@
+@import "c/oiDesignTokens";
+
+/**
+ * The card-panel shell here matches oiHealthBreakdownList's own .oi-health-panel /
+ * .oi-health-panel-head rules exactly (LWC's shadow DOM means a shared class name buys no shared
+ * styling across components, so this is a deliberate, matching copy — the same choice
+ * oiHealthHeatmapGrid already made under its own class name). All values are tokens, never
+ * literals.
+ */
+
+.oi-health-panel {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  overflow: hidden;
+}
+
+.oi-health-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--oi-space-3) var(--oi-space-4);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+}
+
+.oi-health-panel-head h3 {
+  font-family: var(--oi-font-family-sans);
+  margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-glossary-list {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) 1fr;
+  gap: var(--oi-space-2) var(--oi-space-4);
+  margin: 0;
+  padding: var(--oi-space-4);
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+}
+
+.oi-health-glossary-entry {
+  display: contents;
+}
+
+.oi-health-glossary-entry dt {
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-glossary-entry dd {
+  margin: 0;
+  color: var(--oi-color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .oi-health-glossary-list {
+    grid-template-columns: 1fr;
+    gap: var(--oi-space-1) var(--oi-space-4);
+  }
+
+  .oi-health-glossary-entry dd {
+    margin-bottom: var(--oi-space-2);
+  }
+}

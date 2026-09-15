@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Compute_Run_Id__c</fullName>
+    <label>Compute Run Id</label>
+    <type>Text</type>
+    <length>36</length>
+    <required>true</required>
+    <description
+  >Groups every row written by one triggered computation — mirrors OI_Scan_Run__c/OI_Scan_Task__c's run/task grouping convention.</description>
+</CustomField>

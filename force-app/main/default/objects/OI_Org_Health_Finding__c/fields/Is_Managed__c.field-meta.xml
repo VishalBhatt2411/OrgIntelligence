@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Managed__c</fullName>
+    <label>Is Managed</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >True when the affected component belongs to a managed package — remediation guidance must not tell an administrator to directly edit metadata they cannot modify.</description>
+</CustomField>

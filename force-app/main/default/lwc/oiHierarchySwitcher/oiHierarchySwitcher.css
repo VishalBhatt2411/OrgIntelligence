@@ -1,18 +1,18 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Structure unchanged.
+ *
+ * .oi-hierarchy-switcher-error and .oi-hierarchy-switcher-empty were deleted rather than
+ * retokenized: both states now render through c/oiStateBanner (state="error" and state="true-zero"
+ * respectively) and the loading state through c/oiSkeleton, per ADR-0028 §7.
+ *
+ * min-width: 12rem stays literal — it is the control's own footprint, not a spacing step.
+ */
+
 .oi-hierarchy-switcher {
-    display: flex;
-    align-items: center;
-    min-width: 12rem;
-}
-
-.oi-hierarchy-switcher-error {
-    color: var(--slds-g-color-error-1, #ba0517);
-    font-size: 0.8rem;
-    margin: 0;
-}
-
-.oi-hierarchy-switcher-empty {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-size: 0.8rem;
-    font-style: italic;
-    margin: 0;
+  display: flex;
+  align-items: center;
+  min-width: 12rem;
+  font-family: var(--oi-font-family-sans);
 }

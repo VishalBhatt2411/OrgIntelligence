@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Risk_Acceptance_Expiry__c</fullName>
+    <label>Risk Acceptance Expiry</label>
+    <type>Date</type>
+    <required>false</required>
+    <trackHistory>true</trackHistory>
+    <description
+  >Administrator-set date a Risk Accepted decision should be re-reviewed by. Not enforced by any automation — the Remediation Management workspace and finding drawer surface "accepted risks nearing/past expiry" as a review prompt, never an automatic status change, since only a person can re-affirm or revise an accepted risk.</description>
+</CustomField>

@@ -20,122 +20,137 @@
  *              component (e.g. oiHierarchyTree, which has no label source of its own for the
  *              record it's rooted on) can reuse it instead of issuing its own query.
  */
-import { LightningElement, api } from 'lwc';
-import getPath from '@salesforce/apex/OI_HierarchyQueryController.getPath';
+import { LightningElement, api } from "lwc";
+import getPath from "@salesforce/apex/OI_HierarchyQueryController.getPath";
 
 export default class OiHierarchyPath extends LightningElement {
-    path = [];
-    isLoading = false;
-    errorMessage = null;
-    _definitionId;
-    _objectApiName;
-    _recordId;
+  path = [];
+  isLoading = false;
+  errorMessage = null;
+  _definitionId;
+  _objectApiName;
+  _recordId;
 
-    @api currentRecordLabel;
+  @api currentRecordLabel;
 
-    @api
-    get definitionId() {
-        return this._definitionId;
+  @api
+  get definitionId() {
+    return this._definitionId;
+  }
+
+  set definitionId(value) {
+    this._definitionId = value;
+    this.maybeLoadPath();
+  }
+
+  @api
+  get objectApiName() {
+    return this._objectApiName;
+  }
+
+  set objectApiName(value) {
+    this._objectApiName = value;
+    this.maybeLoadPath();
+  }
+
+  @api
+  get recordId() {
+    return this._recordId;
+  }
+
+  set recordId(value) {
+    this._recordId = value;
+    this.maybeLoadPath();
+  }
+
+  async maybeLoadPath() {
+    if (!this._definitionId || !this._objectApiName || !this._recordId) {
+      this.path = [];
+      return;
     }
-
-    set definitionId(value) {
-        this._definitionId = value;
-        this.maybeLoadPath();
+    this.isLoading = true;
+    this.errorMessage = null;
+    try {
+      this.path = await getPath({
+        definitionId: this._definitionId,
+        childObjectApiName: this._objectApiName,
+        childRecordId: this._recordId
+      });
+      this.emitCurrentRecordLabelIfKnown();
+    } catch (error) {
+      this.path = [];
+      this.errorMessage =
+        (error && error.body && error.body.message) ||
+        "Something went wrong loading the hierarchy path. Please try again.";
+    } finally {
+      this.isLoading = false;
     }
+  }
 
-    @api
-    get objectApiName() {
-        return this._objectApiName;
+  get crumbs() {
+    const ancestorCrumbs = this.path.map((relationship) => ({
+      key: relationship.relationshipId,
+      recordId: relationship.parentRecordId,
+      objectApiName: relationship.parentObjectApiName,
+      label: relationship.parentLabel || "(not visible)",
+      isCurrent: false
+    }));
+    if (this.path.length > 0) {
+      const last = this.path[this.path.length - 1];
+      ancestorCrumbs.push({
+        key: "current",
+        recordId: last.childRecordId,
+        objectApiName: last.childObjectApiName,
+        label: last.childLabel || this.currentRecordLabel || "(not visible)",
+        isCurrent: true
+      });
+    } else if (this.currentRecordLabel) {
+      ancestorCrumbs.push({
+        key: "current",
+        recordId: this._recordId,
+        objectApiName: this._objectApiName,
+        label: this.currentRecordLabel,
+        isCurrent: true
+      });
     }
+    return ancestorCrumbs;
+  }
 
-    set objectApiName(value) {
-        this._objectApiName = value;
-        this.maybeLoadPath();
-    }
+  get hasCrumbs() {
+    return this.crumbs.length > 0;
+  }
 
-    @api
-    get recordId() {
-        return this._recordId;
-    }
+  get hasError() {
+    return !!this.errorMessage;
+  }
 
-    set recordId(value) {
-        this._recordId = value;
-        this.maybeLoadPath();
-    }
+  get showRootNote() {
+    return !this.isLoading && !this.hasError && this.path.length === 0;
+  }
 
-    async maybeLoadPath() {
-        if (!this._definitionId || !this._objectApiName || !this._recordId) {
-            this.path = [];
-            return;
-        }
-        this.isLoading = true;
-        this.errorMessage = null;
-        try {
-            this.path = await getPath({ definitionId: this._definitionId, childObjectApiName: this._objectApiName, childRecordId: this._recordId });
-            this.emitCurrentRecordLabelIfKnown();
-        } catch (error) {
-            this.path = [];
-            this.errorMessage = (error && error.body && error.body.message) || 'Something went wrong loading the hierarchy path. Please try again.';
-        } finally {
-            this.isLoading = false;
-        }
+  /** The current record's own resolved name is only ever available as a side effect of the last path entry's childLabel — there is no query dedicated to fetching it, so this only fires when the record actually has an ancestor. */
+  emitCurrentRecordLabelIfKnown() {
+    if (this.path.length === 0) {
+      return;
     }
+    const label = this.path[this.path.length - 1].childLabel;
+    if (label) {
+      this.dispatchEvent(
+        new CustomEvent("currentrecordlabel", { detail: { label } })
+      );
+    }
+  }
 
-    get crumbs() {
-        const ancestorCrumbs = this.path.map((relationship) => ({
-            key: relationship.relationshipId,
-            recordId: relationship.parentRecordId,
-            objectApiName: relationship.parentObjectApiName,
-            label: relationship.parentLabel || '(not visible)',
-            isCurrent: false
-        }));
-        if (this.path.length > 0) {
-            const last = this.path[this.path.length - 1];
-            ancestorCrumbs.push({
-                key: 'current',
-                recordId: last.childRecordId,
-                objectApiName: last.childObjectApiName,
-                label: last.childLabel || this.currentRecordLabel || '(not visible)',
-                isCurrent: true
-            });
-        } else if (this.currentRecordLabel) {
-            ancestorCrumbs.push({
-                key: 'current',
-                recordId: this._recordId,
-                objectApiName: this._objectApiName,
-                label: this.currentRecordLabel,
-                isCurrent: true
-            });
-        }
-        return ancestorCrumbs;
-    }
+  /** Retry is meaningful here: every input to the fetch is already held in state, so re-running it is the whole recovery. */
+  handleRetry() {
+    this.maybeLoadPath();
+  }
 
-    get hasCrumbs() {
-        return this.crumbs.length > 0;
-    }
-
-    get hasError() {
-        return !!this.errorMessage;
-    }
-
-    get showRootNote() {
-        return !this.isLoading && !this.hasError && this.path.length === 0;
-    }
-
-    /** The current record's own resolved name is only ever available as a side effect of the last path entry's childLabel — there is no query dedicated to fetching it, so this only fires when the record actually has an ancestor. */
-    emitCurrentRecordLabelIfKnown() {
-        if (this.path.length === 0) {
-            return;
-        }
-        const label = this.path[this.path.length - 1].childLabel;
-        if (label) {
-            this.dispatchEvent(new CustomEvent('currentrecordlabel', { detail: { label } }));
-        }
-    }
-
-    handleCrumbClick(event) {
-        const recordId = event.currentTarget.dataset.recordId;
-        const objectApiName = event.currentTarget.dataset.objectApiName;
-        this.dispatchEvent(new CustomEvent('recordselect', { detail: { objectApiName, recordId } }));
-    }
+  handleCrumbClick(event) {
+    const recordId = event.currentTarget.dataset.recordId;
+    const objectApiName = event.currentTarget.dataset.objectApiName;
+    this.dispatchEvent(
+      new CustomEvent("recordselect", { detail: { objectApiName, recordId } })
+    );
+  }
 }

@@ -1,175 +1,214 @@
+@import "c/oiDesignTokens";
+
 /**
- * Every color below is an SLDS global styling hook (--slds-g-color-*) with the original
- * literal hex as its fallback — var(--slds-g-color-X, #hex) — so this card adapts to Lightning
- * Experience's SLDS 2 dark mode where available and renders exactly as before where it isn't.
- * See oiGraphNode.css's own doc comment for the same rationale applied to the plain-pill node.
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * --oi-node-accent reconciliation: this file and oiGraphNode.css defaulted the same property to
+ * conflicting values (accent-1 blue here, --slds-g-color-border-2 there). Both now default to
+ * --oi-color-accent — see oiGraphNode.css's header for the full rationale. This card keeps the
+ * value it effectively had; the plain-pill node is the one that moves.
+ *
+ * Other defects corrected:
+ *   - .oi-schema-card-title resolved --slds-g-color-on-surface-1, SLDS 2's WEAKEST text tier
+ *     (#5c5c5c), while its own fallback asked for #181818. The card's own title therefore
+ *     rendered a full tier lighter than intended. Now --oi-color-text-primary.
+ *   - the subheader/field-count/hop captions resolved --slds-g-color-on-surface-2 while asking
+ *     for the muted #706e6b; now --oi-color-text-muted.
+ *   - the selection and path rings DISAGREED inside this one file (line 38 used
+ *     --slds-g-color-border-accent-1, line 43 --slds-g-color-accent-1) for what is one treatment.
+ *     Both now use --oi-focus-ring.
+ *   - --slds-g-color-border-1 appeared twice with two different fallbacks (#e2e1df on the card,
+ *     #f0efed on the header divider) — one token doing two jobs. Both are the subtle border role,
+ *     so both now resolve --oi-color-border; the header divider darkens slightly as a result.
+ *   - the private --oi-node-chip-bg / --oi-node-chip-color pair is removed: it existed only to
+ *     hold literals past the SLDS accent-container collision, which oiDesignTokens.css now
+ *     documents once and --oi-color-accent-wash / --oi-color-accent resolve correctly.
+ *   - font-weight 500 (tooltip) is retired by ADR-0028 §4 (C11) onto semibold.
+ *
+ * Left literal deliberately: the 4px accent stripe, the tooltip's 260px max-width and its
+ * calc()/translate() positioning, transition durations, z-index, and .is-dimmed's opacity — all
+ * local geometry. The chip's max-width calc is rewritten in terms of --oi-space-2 so it keeps
+ * tracking its own side margins rather than a now-stale 1.1rem constant.
+ *
+ * NOTE for visual verification: the relationship chip's vertical padding was 0.05rem (0.8px),
+ * below the smallest spacing step, and now resolves --oi-space-1 (4px), so the chip grows ~6px
+ * taller inside a card box the canvas fixes. Worth a look at the reference viewport.
  */
 .oi-schema-card {
-    --oi-node-accent: var(--slds-g-color-accent-1, #0176d3);
-    /** Deliberately literal, not var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified live in a real org (audit #09): those two distinct SLDS tokens resolve to the exact same color under this org's actual theme, which made the relationship-role chip below a solid color block with invisible text. Same fix as oiGraphNode.css's identical collision. */
-    --oi-node-chip-bg: rgba(1, 118, 211, 0.1);
-    --oi-node-chip-color: #0176d3;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    background: var(--slds-g-color-surface-container-1, #ffffff);
-    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    border-top: 4px solid var(--oi-node-accent);
-    border-radius: 0.5rem;
-    box-sizing: border-box;
-    /** Was `hidden` — see oiGraphNode.css's identical change for the full rationale: the title/subheader already self-clip, and the outer box must stay open for the hover tooltip (.oi-schema-card-tooltip) to render outside its bounds. */
-    overflow: visible;
-    box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08));
-    transition: box-shadow 0.18s ease, transform 0.18s ease;
-    font-size: 0.72rem;
-    /** Matches oiGraphNode.css's rationale — a drag starting on the card's title/subheader text should move the card, not paint the browser's native text-selection highlight. */
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
+  --oi-node-accent: var(--oi-color-accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-top: 4px solid var(--oi-node-accent);
+  border-radius: var(--oi-radius-lg);
+  box-sizing: border-box;
+  /** Was `hidden` — see oiGraphNode.css's identical change for the full rationale: the title/subheader already self-clip, and the outer box must stay open for the hover tooltip (.oi-schema-card-tooltip) to render outside its bounds. */
+  overflow: visible;
+  box-shadow: var(--oi-shadow-card);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+  font-size: var(--oi-font-size-caption);
+  /** Matches oiGraphNode.css's rationale — a drag starting on the card's title/subheader text should move the card, not paint the browser's native text-selection highlight. */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
 }
 
 .oi-schema-card:hover {
-    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.1));
+  box-shadow: var(--oi-shadow-raised);
 }
 
 .oi-schema-card.is-selected {
-    box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--oi-focus-ring), var(--oi-shadow-raised);
 }
 
 /** Path-to-centre highlight and de-emphasis — identical treatment to oiGraphNode.css's own rules, so plain-pill nodes and schema cards read consistently during the same interaction. */
 .oi-schema-card.is-on-path {
-    box-shadow: 0 0 0 2px var(--slds-g-color-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--oi-focus-ring), var(--oi-shadow-raised);
 }
 
 .oi-schema-card.is-dimmed {
-    opacity: 1;
+  opacity: 1;
 }
 
 .oi-schema-card:hover,
 .oi-schema-card:focus-within {
-    transform: translateY(-2px) scale(1.015);
-    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: var(--oi-shadow-raised);
 }
 
 .oi-schema-card-open {
-    border: 0;
-    border-radius: 0.25rem;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    cursor: pointer;
-    padding: 0.1rem 0.25rem;
+  border: 0;
+  border-radius: var(--oi-radius-sm);
+  background: transparent;
+  color: var(--oi-color-accent);
+  cursor: pointer;
+  padding: var(--oi-space-1) var(--oi-space-1);
 }
 
 .oi-schema-card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.55rem;
-    cursor: pointer;
-    background: var(--slds-g-color-surface-container-2, #fafaf9);
-    border-bottom: 1px solid var(--slds-g-color-border-1, #f0efed);
-    /** Now that the card no longer clips its own overflow (see .oi-schema-card), this flush top section's own opaque background needs its own matching corner radius — it used to get rounded off "for free" by the parent's overflow:hidden. */
-    border-radius: 0.5rem 0.5rem 0 0;
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  padding: var(--oi-space-2) var(--oi-space-2);
+  cursor: pointer;
+  background: var(--oi-color-surface-sunken);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+  /** Now that the card no longer clips its own overflow (see .oi-schema-card), this flush top section's own opaque background needs its own matching corner radius — it used to get rounded off "for free" by the parent's overflow:hidden. */
+  border-radius: var(--oi-radius-lg) var(--oi-radius-lg) 0 0;
+  flex-shrink: 0;
 }
 
 .oi-schema-card-icon {
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .oi-schema-card-title {
-    flex: 1;
-    font-weight: 700;
-    color: var(--slds-g-color-on-surface-1, #181818);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  flex: 1;
+  font-weight: var(--oi-font-weight-bold);
+  color: var(--oi-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .oi-schema-card-expand-toggle {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    font-size: 0.68rem;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0 0.15rem;
-    flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  cursor: pointer;
+  padding: 0 var(--oi-space-1);
+  flex-shrink: 0;
 }
 
 .oi-schema-card-expand-toggle:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .oi-schema-card-subheader {
-    padding: 0.15rem 0.55rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-size: 0.62rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-shrink: 0;
+  padding: var(--oi-space-1) var(--oi-space-2);
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-micro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 /** Replaces the old inline field list — see the class doc comment: fields are browsed in the Detail Panel now, this is just a count. */
 .oi-schema-card-field-count {
-    padding: 0.2rem 0.55rem 0.35rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-size: 0.65rem;
-    flex: 1;
+  padding: var(--oi-space-1) var(--oi-space-2) var(--oi-space-2);
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-micro);
+  flex: 1;
 }
 
-/** The card's own "why is this here" answer — same visual language as oiGraphNode's chip so the two node shapes read as one system. */
+/**
+ * The card's own "why is this here" answer — same visual language as oiGraphNode's chip so the
+ * two node shapes read as one system. Accent, not --oi-color-rel-*: the chip names a relationship
+ * ROLE in words for whatever kind the edge is, so it is the interaction accent with its own wash,
+ * not the outgoing-kind swatch.
+ */
 .oi-schema-card-relationship-chip {
-    margin: 0 0.55rem 0.35rem;
-    display: inline-block;
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.65rem;
-    background: var(--oi-node-chip-bg);
-    color: var(--oi-node-chip-color);
-    font-size: 0.62rem;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: calc(100% - 1.1rem);
+  margin: 0 var(--oi-space-2) var(--oi-space-2);
+  display: inline-block;
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+  background: var(--oi-color-accent-wash);
+  color: var(--oi-color-accent);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - var(--oi-space-2) * 2);
 }
 
 .oi-schema-card-hop-label {
-    margin: 0 0.55rem 0.35rem;
-    font-size: 0.6rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-style: italic;
+  margin: 0 var(--oi-space-2) var(--oi-space-2);
+  font-size: var(--oi-font-size-micro);
+  color: var(--oi-color-text-muted);
+  font-style: italic;
 }
 
-/** Hover-reveal, full-text tooltip — identical pattern and rationale to oiGraphNode.css's .oi-graph-node-tooltip. */
+/**
+ * Hover-reveal, full-text tooltip — identical pattern and rationale to oiGraphNode.css's
+ * .oi-graph-node-tooltip, including the deliberate ink/paper inversion of its ground and text.
+ */
 .oi-schema-card-tooltip {
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 0.4rem);
-    transform: translate(-50%, 4px);
-    background: var(--slds-g-color-neutral-base-10, #16171a);
-    color: var(--slds-g-color-neutral-base-100, #ffffff);
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.3rem;
-    font-size: 0.68rem;
-    font-weight: 500;
-    line-height: 1.3;
-    white-space: normal;
-    width: max-content;
-    max-width: 260px;
-    text-align: center;
-    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.25));
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s ease, transform 0.12s ease;
-    z-index: 20;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  transform: translate(-50%, 4px);
+  background: var(--oi-color-text-primary);
+  color: var(--oi-color-surface);
+  padding: var(--oi-space-2) var(--oi-space-2);
+  border-radius: var(--oi-radius-md);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  white-space: normal;
+  width: max-content;
+  max-width: 260px;
+  text-align: center;
+  box-shadow: var(--oi-shadow-overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+  z-index: 20;
 }
 
 .oi-schema-card:hover .oi-schema-card-tooltip,
 .oi-schema-card:focus-within .oi-schema-card-tooltip {
-    opacity: 1;
-    transform: translate(-50%, 0);
+  opacity: 1;
+  transform: translate(-50%, 0);
 }

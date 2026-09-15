@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Compensating_Control__c</fullName>
+    <label>Compensating Control</label>
+    <length>1024</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>4</visibleLines>
+    <description
+  >An administrator-recorded mitigation that already reduces this risk without resolving the underlying condition (e.g. "access reviewed quarterly by Security") — surfaced alongside Risk Accepted status so the acceptance reasoning isn't lost.</description>
+</CustomField>

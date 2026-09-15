@@ -1,0 +1,18 @@
+<template>
+  <div
+    class={containerClass}
+    data-id="skeleton"
+    role="status"
+    aria-live="polite"
+    aria-label={label}
+  >
+    <template for:each={lineItems} for:item="line">
+      <div
+        key={line.key}
+        class="oi-skeleton-line"
+        style={line.style}
+        aria-hidden="true"
+      ></div>
+    </template>
+  </div>
+</template>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI View Org Health</label>
+    <description
+  >Read every Org Health section (DataModel.md §6-style gating, ADR-0026). Mirrors OI_View_Graph's role as the one permission covering an entire tab's reads.</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

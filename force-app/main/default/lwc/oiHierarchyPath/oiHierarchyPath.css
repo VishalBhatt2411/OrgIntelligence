@@ -1,61 +1,73 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Breadcrumb structure unchanged.
+ *
+ * Defects corrected:
+ *   - .oi-hierarchy-path-current asked for --slds-g-color-on-surface-1 with a near-black #181818
+ *     fallback. on-surface-1 is SLDS 2's WEAKEST tier (#5c5c5c), so the current crumb — the one
+ *     element in the trail that should read strongest — rendered mid-grey. Now
+ *     --oi-color-text-primary.
+ *   - the separator asked for --slds-g-color-on-surface-2 with a muted #706e6b fallback; muted is
+ *     --oi-color-text-muted, which also keeps the separator visibly weaker than the crumbs it
+ *     divides.
+ *
+ * The 14rem/12rem truncation widths stay literal — they are ellipsis geometry, not spacing.
+ *
+ * .oi-hierarchy-path-error and .oi-hierarchy-path-note were deleted rather than retokenized: the
+ * error and root-note states now render through c/oiStateBanner and the loading state through
+ * c/oiSkeleton, per ADR-0028 §7's one-state-vocabulary decision.
+ */
+
 .oi-hierarchy-path {
-    font-size: 0.8rem;
+  font-size: var(--oi-font-size-body);
+  font-family: var(--oi-font-family-sans);
+  line-height: var(--oi-line-height-body);
 }
 
 .oi-hierarchy-path-trail {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    gap: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: var(--oi-space-1);
 }
 
 .oi-hierarchy-path-crumb-item {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    max-width: 14rem;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-1);
+  max-width: 14rem;
 }
 
 .oi-hierarchy-path-crumb {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    cursor: pointer;
-    padding: 0;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 12rem;
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--oi-font-size-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
 }
 
 .oi-hierarchy-path-crumb:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .oi-hierarchy-path-current {
-    font-weight: 600;
-    color: var(--slds-g-color-on-surface-1, #181818);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 12rem;
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
 }
 
 .oi-hierarchy-path-separator {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-}
-
-.oi-hierarchy-path-error {
-    color: var(--slds-g-color-error-1, #ba0517);
-    margin: 0;
-}
-
-.oi-hierarchy-path-note {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-style: italic;
-    margin: 0;
+  color: var(--oi-color-text-muted);
 }

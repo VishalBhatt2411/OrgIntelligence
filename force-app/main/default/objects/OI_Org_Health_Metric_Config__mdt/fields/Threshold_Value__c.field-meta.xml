@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Threshold_Value__c</fullName>
+    <label>Threshold Value</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>2</scale>
+    <required>false</required>
+    <description
+  >Generic numeric knob, meaning defined by Metric_Key__c (e.g. "high field count &#8805; N", "stale if last-modified &gt; N days").</description>
+</CustomField>

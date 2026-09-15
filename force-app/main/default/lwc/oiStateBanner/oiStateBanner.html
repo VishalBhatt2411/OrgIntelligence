@@ -1,0 +1,24 @@
+<template>
+  <div class="oi-state-banner" role={ariaRole}>
+    <div class={iconClass} aria-hidden="true">{icon}</div>
+    <div class="oi-state-banner-body">
+      <div class="oi-state-banner-title">{title}</div>
+      <div class="oi-state-banner-sub">
+        {message}
+        <template lwc:if={hasCorrelationId}>
+          Ref <span class="num">{correlationId}</span>.
+        </template>
+        <template lwc:if={isRetryable}>
+          <button
+            type="button"
+            data-id="state-banner-retry"
+            class="oi-state-banner-retry"
+            onclick={handleRetry}
+          >
+            Retry
+          </button>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>

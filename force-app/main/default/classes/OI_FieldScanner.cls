@@ -23,147 +23,234 @@
  *              "Batch Apex within their own scanner" allowance) is flagged as a Sprint 9
  *              follow-up, not built here. Polymorphic reference fields (e.g. OwnerId ->
  *              User/Group) emit one relationship per referenced object, all captured
- *              faithfully — none invented beyond what getReferenceTo() actually returns.
+ *              faithfully — none invented beyond what getReferenceTo() actually returns. A
+ *              field can be present in an object's field map yet still throw SObjectException
+ *              on getDescribe() itself, observed on certain licensed industry-cloud standard
+ *              objects (e.g. Public Sector Solutions' BenefitDisbursement.StartDate) whose full
+ *              describe requires a license/permission this org's running user does not hold,
+ *              even though the object itself is in scope. That single field is skipped so the
+ *              rest of its object still scans, per this project's "design for missing metadata
+ *              gracefully" standard.
  */
 public class OI_FieldScanner implements OI_IMetadataScanner {
-    private static final String COMPONENT_KIND = 'CustomField';
-    private static final String PARENT_KIND = 'CustomObject';
-    private static final String HAS_FIELD_RELATIONSHIP_KIND = 'HAS_FIELD';
-    private static final Integer DESCRIBE_CHUNK_SIZE = 100;
+  private static final String COMPONENT_KIND = 'CustomField';
+  private static final String PARENT_KIND = 'CustomObject';
+  private static final String HAS_FIELD_RELATIONSHIP_KIND = 'HAS_FIELD';
+  private static final Integer DESCRIBE_CHUNK_SIZE = 100;
 
-    public OI_DiscoveryBatch scan(OI_ScanContext context) {
-        List<String> apiNames = new List<String>(Schema.getGlobalDescribe().keySet());
-        if (context.scopedApiNames != null) {
-            apiNames = filterToScope(apiNames, context.scopedApiNames);
-        }
-        apiNames.sort();
-
-        List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
-        List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
-        Integer apiCallsConsumed = 0;
-
-        for (Integer startIndex = 0; startIndex < apiNames.size(); startIndex += DESCRIBE_CHUNK_SIZE) {
-            Integer endIndex = Math.min(startIndex + DESCRIBE_CHUNK_SIZE, apiNames.size());
-            List<String> chunk = new List<String>();
-            for (Integer i = startIndex; i < endIndex; i++) {
-                chunk.add(apiNames[i]);
-            }
-            for (Schema.DescribeSObjectResult objectDescribe : Schema.describeSObjects(chunk)) {
-                if (OI_ObjectScopeFilter.isInScope(objectDescribe)) {
-                    scanFieldsForObject(objectDescribe, components, relationships);
-                }
-            }
-            apiCallsConsumed++;
-        }
-
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, apiCallsConsumed);
+  public OI_DiscoveryBatch scan(OI_ScanContext context) {
+    List<String> apiNames = new List<String>(
+      Schema.getGlobalDescribe().keySet()
+    );
+    if (context.scopedApiNames != null) {
+      apiNames = filterToScope(apiNames, context.scopedApiNames);
     }
+    apiNames.sort();
 
-    /** Case-insensitive narrowing of the global describe key set to a caller-supplied scope (OI_ScanContext.scopedApiNames) — the only path that skips the full org-wide Describe, so no real orchestrator call (which always leaves scopedApiNames null) is affected. */
-    private List<String> filterToScope(List<String> apiNames, Set<String> scopedApiNames) {
-        Set<String> scopeLower = new Set<String>();
-        for (String scopedName : scopedApiNames) {
-            scopeLower.add(scopedName.toLowerCase());
-        }
-        List<String> filtered = new List<String>();
-        for (String apiName : apiNames) {
-            if (scopeLower.contains(apiName.toLowerCase())) {
-                filtered.add(apiName);
-            }
-        }
-        return filtered;
-    }
+    List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
+    List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
+    Integer apiCallsConsumed = 0;
 
-    private void scanFieldsForObject(
-        Schema.DescribeSObjectResult objectDescribe,
-        List<OI_DiscoveredComponent> components,
-        List<OI_DiscoveredRelationship> relationships
+    for (
+      Integer startIndex = 0;
+      startIndex < apiNames.size();
+      startIndex += DESCRIBE_CHUNK_SIZE
     ) {
-        String objectApiName = objectDescribe.getName();
-        String objectNamespace = objectDescribe.isCustom() ? OI_ComponentKeyUtil.extractNamespaceFromApiName(objectApiName) : null;
-        String objectComponentKey = OI_ComponentKeyUtil.build(PARENT_KIND, objectNamespace, objectApiName);
-
-        for (Schema.SObjectField field : objectDescribe.fields.getMap().values()) {
-            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-            String fullyQualifiedName = objectApiName + '.' + fieldDescribe.getName();
-            String fieldNamespace = fieldDescribe.isCustom() ? OI_ComponentKeyUtil.extractNamespaceFromApiName(fieldDescribe.getName()) : objectNamespace;
-            String fieldComponentKey = OI_ComponentKeyUtil.build(COMPONENT_KIND, fieldNamespace, fullyQualifiedName);
-
-            List<Schema.SObjectType> referenceTo = fieldDescribe.getReferenceTo();
-            Map<String, Object> attributes = new Map<String, Object>{
-                'label' => fieldDescribe.getLabel(),
-                'type' => String.valueOf(fieldDescribe.getType()),
-                'length' => fieldDescribe.getLength(),
-                'precision' => fieldDescribe.getPrecision(),
-                'scale' => fieldDescribe.getScale(),
-                'custom' => fieldDescribe.isCustom(),
-                'nillable' => fieldDescribe.isNillable(),
-                'unique' => fieldDescribe.isUnique(),
-                'externalId' => fieldDescribe.isExternalId(),
-                'calculated' => fieldDescribe.isCalculated(),
-                'createable' => fieldDescribe.isCreateable(),
-                'updateable' => fieldDescribe.isUpdateable()
-            };
-            if (!referenceTo.isEmpty()) {
-                List<String> referencedObjectNames = new List<String>();
-                for (Schema.SObjectType referencedType : referenceTo) {
-                    referencedObjectNames.add(referencedType.getDescribe().getName());
-                }
-                attributes.put('referenceTo', referencedObjectNames);
-                attributes.put('relationshipName', fieldDescribe.getRelationshipName());
-            }
-
-            components.add(
-                new OI_DiscoveredComponent(
-                    fieldComponentKey,
-                    COMPONENT_KIND,
-                    fullyQualifiedName,
-                    fieldNamespace,
-                    'Describe',
-                    attributes,
-                    OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, fullyQualifiedName, attributes),
-                    null,
-                    objectComponentKey
-                )
-            );
-
-            relationships.add(
-                new OI_DiscoveredRelationship(
-                    OI_HashUtil.hash(objectComponentKey + '::' + HAS_FIELD_RELATIONSHIP_KIND + '::' + fieldComponentKey),
-                    HAS_FIELD_RELATIONSHIP_KIND,
-                    objectComponentKey,
-                    fieldComponentKey,
-                    new Map<String, Object>()
-                )
-            );
-
-            if (fieldDescribe.getType() == Schema.DisplayType.REFERENCE) {
-                addReferenceRelationships(fieldDescribe, fieldComponentKey, referenceTo, relationships);
-            }
+      Integer endIndex = Math.min(
+        startIndex + DESCRIBE_CHUNK_SIZE,
+        apiNames.size()
+      );
+      List<String> chunk = new List<String>();
+      for (Integer i = startIndex; i < endIndex; i++) {
+        chunk.add(apiNames[i]);
+      }
+      for (
+        Schema.DescribeSObjectResult objectDescribe : Schema.describeSObjects(
+          chunk
+        )
+      ) {
+        if (OI_ObjectScopeFilter.isInScope(objectDescribe)) {
+          scanFieldsForObject(objectDescribe, components, relationships);
         }
+      }
+      apiCallsConsumed++;
     }
 
-    private void addReferenceRelationships(
-        Schema.DescribeFieldResult fieldDescribe,
-        String fieldComponentKey,
-        List<Schema.SObjectType> referenceTo,
-        List<OI_DiscoveredRelationship> relationships
-    ) {
-        String relationshipKind = fieldDescribe.getRelationshipOrder() != null ? 'MASTER_DETAIL_TO' : 'LOOKUP_TO';
+    return new OI_DiscoveryBatch(
+      context.scanTaskId,
+      COMPONENT_KIND,
+      components,
+      relationships,
+      true,
+      apiCallsConsumed
+    );
+  }
+
+  /** Case-insensitive narrowing of the global describe key set to a caller-supplied scope (OI_ScanContext.scopedApiNames) — the only path that skips the full org-wide Describe, so no real orchestrator call (which always leaves scopedApiNames null) is affected. */
+  private List<String> filterToScope(
+    List<String> apiNames,
+    Set<String> scopedApiNames
+  ) {
+    Set<String> scopeLower = new Set<String>();
+    for (String scopedName : scopedApiNames) {
+      scopeLower.add(scopedName.toLowerCase());
+    }
+    List<String> filtered = new List<String>();
+    for (String apiName : apiNames) {
+      if (scopeLower.contains(apiName.toLowerCase())) {
+        filtered.add(apiName);
+      }
+    }
+    return filtered;
+  }
+
+  private void scanFieldsForObject(
+    Schema.DescribeSObjectResult objectDescribe,
+    List<OI_DiscoveredComponent> components,
+    List<OI_DiscoveredRelationship> relationships
+  ) {
+    String objectApiName = objectDescribe.getName();
+    String objectNamespace = objectDescribe.isCustom()
+      ? OI_ComponentKeyUtil.extractNamespaceFromApiName(objectApiName)
+      : null;
+    String objectComponentKey = OI_ComponentKeyUtil.build(
+      PARENT_KIND,
+      objectNamespace,
+      objectApiName
+    );
+
+    for (Schema.SObjectField field : objectDescribe.fields.getMap().values()) {
+      Schema.DescribeFieldResult fieldDescribe;
+      try {
+        fieldDescribe = field.getDescribe();
+      } catch (System.SObjectException describeException) {
+        System.debug(
+          LoggingLevel.WARN,
+          'OI_FieldScanner: skipping a field on ' +
+            objectApiName +
+            ' whose describe threw ' +
+            describeException.getMessage()
+        );
+        continue;
+      }
+      String fullyQualifiedName = objectApiName + '.' + fieldDescribe.getName();
+      String fieldNamespace = fieldDescribe.isCustom()
+        ? OI_ComponentKeyUtil.extractNamespaceFromApiName(
+            fieldDescribe.getName()
+          )
+        : objectNamespace;
+      String fieldComponentKey = OI_ComponentKeyUtil.build(
+        COMPONENT_KIND,
+        fieldNamespace,
+        fullyQualifiedName
+      );
+
+      List<Schema.SObjectType> referenceTo = fieldDescribe.getReferenceTo();
+      Map<String, Object> attributes = new Map<String, Object>{
+        'label' => fieldDescribe.getLabel(),
+        'type' => String.valueOf(fieldDescribe.getType()),
+        'length' => fieldDescribe.getLength(),
+        'precision' => fieldDescribe.getPrecision(),
+        'scale' => fieldDescribe.getScale(),
+        'custom' => fieldDescribe.isCustom(),
+        'nillable' => fieldDescribe.isNillable(),
+        'unique' => fieldDescribe.isUnique(),
+        'externalId' => fieldDescribe.isExternalId(),
+        'calculated' => fieldDescribe.isCalculated(),
+        'createable' => fieldDescribe.isCreateable(),
+        'updateable' => fieldDescribe.isUpdateable()
+      };
+      if (!referenceTo.isEmpty()) {
+        List<String> referencedObjectNames = new List<String>();
         for (Schema.SObjectType referencedType : referenceTo) {
-            Schema.DescribeSObjectResult referencedDescribe = referencedType.getDescribe();
-            String referencedApiName = referencedDescribe.getName();
-            String referencedNamespace = referencedDescribe.isCustom() ? OI_ComponentKeyUtil.extractNamespaceFromApiName(referencedApiName) : null;
-            String referencedComponentKey = OI_ComponentKeyUtil.build(PARENT_KIND, referencedNamespace, referencedApiName);
-            relationships.add(
-                new OI_DiscoveredRelationship(
-                    OI_HashUtil.hash(fieldComponentKey + '::' + relationshipKind + '::' + referencedComponentKey),
-                    relationshipKind,
-                    fieldComponentKey,
-                    referencedComponentKey,
-                    new Map<String, Object>{ 'relationshipName' => fieldDescribe.getRelationshipName() }
-                )
-            );
+          referencedObjectNames.add(referencedType.getDescribe().getName());
         }
+        attributes.put('referenceTo', referencedObjectNames);
+        attributes.put('relationshipName', fieldDescribe.getRelationshipName());
+      }
+
+      components.add(
+        new OI_DiscoveredComponent(
+          fieldComponentKey,
+          COMPONENT_KIND,
+          fullyQualifiedName,
+          fieldNamespace,
+          'Describe',
+          attributes,
+          OI_ChecksumUtil.computeChecksum(
+            COMPONENT_KIND,
+            fullyQualifiedName,
+            attributes
+          ),
+          null,
+          objectComponentKey
+        )
+      );
+
+      relationships.add(
+        new OI_DiscoveredRelationship(
+          OI_HashUtil.hash(
+            objectComponentKey +
+              '::' +
+              HAS_FIELD_RELATIONSHIP_KIND +
+              '::' +
+              fieldComponentKey
+          ),
+          HAS_FIELD_RELATIONSHIP_KIND,
+          objectComponentKey,
+          fieldComponentKey,
+          new Map<String, Object>()
+        )
+      );
+
+      if (fieldDescribe.getType() == Schema.DisplayType.REFERENCE) {
+        addReferenceRelationships(
+          fieldDescribe,
+          fieldComponentKey,
+          referenceTo,
+          relationships
+        );
+      }
     }
+  }
+
+  private void addReferenceRelationships(
+    Schema.DescribeFieldResult fieldDescribe,
+    String fieldComponentKey,
+    List<Schema.SObjectType> referenceTo,
+    List<OI_DiscoveredRelationship> relationships
+  ) {
+    String relationshipKind = fieldDescribe.getRelationshipOrder() != null
+      ? 'MASTER_DETAIL_TO'
+      : 'LOOKUP_TO';
+    for (Schema.SObjectType referencedType : referenceTo) {
+      Schema.DescribeSObjectResult referencedDescribe = referencedType.getDescribe();
+      String referencedApiName = referencedDescribe.getName();
+      String referencedNamespace = referencedDescribe.isCustom()
+        ? OI_ComponentKeyUtil.extractNamespaceFromApiName(referencedApiName)
+        : null;
+      String referencedComponentKey = OI_ComponentKeyUtil.build(
+        PARENT_KIND,
+        referencedNamespace,
+        referencedApiName
+      );
+      relationships.add(
+        new OI_DiscoveredRelationship(
+          OI_HashUtil.hash(
+            fieldComponentKey +
+              '::' +
+              relationshipKind +
+              '::' +
+              referencedComponentKey
+          ),
+          relationshipKind,
+          fieldComponentKey,
+          referencedComponentKey,
+          new Map<String, Object>{
+            'relationshipName' => fieldDescribe.getRelationshipName()
+          }
+        )
+      );
+    }
+  }
 }

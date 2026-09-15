@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Fingerprint__c</fullName>
+    <label>Fingerprint</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <unique>true</unique>
+    <externalId>true</externalId>
+    <caseSensitive>true</caseSensitive>
+    <description
+  >Computed by OI_OrgHealthFindingRepository as a hash of Section_Key__c :: Rule_Id__c :: Component_Key__c — the stable identity a finding keeps across every re-scan, enforced at the database level via Unique/External ID so upsert-by-fingerprint is idempotent and safe to retry.</description>
+</CustomField>

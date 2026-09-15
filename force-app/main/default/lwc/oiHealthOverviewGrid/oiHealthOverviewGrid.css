@@ -1,0 +1,180 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Defects corrected:
+ *   - .oi-health-category-card's border read --slds-g-color-border-2 while its literal fallback
+ *     asked for the near-white #edf0f4. --slds-g-color-border-2 is SLDS 2's STRONG border
+ *     (#5c5c5c), so every category card rendered a heavy mid-grey outline instead of the hairline
+ *     the design specifies. Now --oi-color-border (#c9c9c9 via border-1).
+ *   - .oi-health-category-title and .oi-health-category-kpi-row .num read
+ *     --slds-g-color-on-surface-1 (the WEAKEST tier, #5c5c5c) while intending #12161f, and
+ *     .oi-health-category-sub / .oi-health-coming-soon read --slds-g-color-on-surface-3 (the
+ *     STRONGEST, #03234d) while intending the muted #8892a0. The tiers were inverted: card titles
+ *     and KPI numerals rendered weaker than the sub-labels beneath them. Now text-primary and
+ *     text-muted respectively.
+ *
+ * 'Manrope' / 'IBM Plex Sans' / 'IBM Plex Mono' are deleted — never loaded (no static resource in
+ * the package). Weight 800 is retired to --oi-font-weight-bold (700) per ADR-0028 §4 C11.
+ *
+ * Breakpoints restated onto ADR-0028 §6's single 1280 / 1024 / 768 ladder. The 620px and 640px
+ * lines this file implemented are deleted, and the 980px category line becomes 1024px:
+ *   KPI strip     8-up >=1280px, 4-up 768-1279px, 2-up below 768px
+ *   Category grid 3-up >=1280px, 2-up 1024-1279px, 1-up below 1024px
+ * The old 1100px KPI line sat between two rungs of that ladder and is superseded by 1280px.
+ *
+ * The category icon adopts --oi-icon-tile (2rem), which is ADR-0028 §4 C2's explicit resolution of
+ * the 30-32px vs 2.1rem conflict between the two visual specifications.
+ */
+
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}
+
+.oi-health-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(96px, 1fr));
+  gap: var(--oi-space-3);
+  margin-bottom: var(--oi-space-5);
+}
+@media (max-width: 1279px) {
+  .oi-health-kpi-strip {
+    grid-template-columns: repeat(4, minmax(96px, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .oi-health-kpi-strip {
+    grid-template-columns: repeat(2, minmax(96px, 1fr));
+  }
+}
+
+.oi-health-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--oi-space-4);
+}
+@media (max-width: 1279px) {
+  .oi-health-category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 1023px) {
+  .oi-health-category-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oi-health-category-card {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-3);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+  cursor: pointer;
+}
+.oi-health-category-card:hover {
+  box-shadow: var(--oi-shadow-raised);
+  transform: translateY(-1px);
+}
+.oi-health-category-card:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+.oi-health-category-card_stub {
+  cursor: default;
+  opacity: 0.65;
+}
+.oi-health-category-card_stub:hover {
+  box-shadow: var(--oi-shadow-card);
+  transform: none;
+}
+
+.oi-health-category-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--oi-space-3);
+}
+
+.oi-health-category-icon {
+  width: var(--oi-icon-tile);
+  height: var(--oi-icon-tile);
+  border-radius: var(--oi-radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-tight);
+  flex-shrink: 0;
+}
+
+.oi-health-category-title {
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  margin-top: var(--oi-space-2);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-category-sub {
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+  margin-top: var(--oi-space-1);
+}
+
+.oi-health-category-kpis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-2);
+}
+
+.oi-health-category-kpi-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--oi-space-3);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-tight);
+}
+.oi-health-category-kpi-row .num {
+  color: var(--oi-color-text-primary);
+  font-weight: var(--oi-font-weight-semibold);
+}
+.oi-health-category-kpi-label {
+  color: var(--oi-color-text-secondary);
+}
+
+.oi-health-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--oi-space-1);
+}
+
+.oi-health-view-link {
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-accent);
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-1);
+}
+
+.oi-health-coming-soon {
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+}

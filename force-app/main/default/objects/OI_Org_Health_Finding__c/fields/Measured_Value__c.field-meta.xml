@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Measured_Value__c</fullName>
+    <label>Measured Value</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <description
+  >The actual measured value behind this finding (e.g. "142 fields"), kept as display text since units vary by rule.</description>
+</CustomField>

@@ -1,0 +1,83 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Two defects corrected, both from consuming SLDS on-surface tiers with inverted assumptions
+ * about which tier is strongest:
+ *   - the score numeral resolved to #5c5c5c (--slds-g-color-on-surface-1, SLDS 2's WEAKEST text
+ *     tier) where its literal fallback #12161f asked for the strongest — the headline number of
+ *     the component rendered as mid grey. Now --oi-color-text-primary.
+ *   - the "not available" numeral resolved to #03234d (--slds-g-color-on-surface-3, the
+ *     STRONGEST tier) where its fallback #8892a0 asked for a muted grey, so the em-dash placeholder
+ *     rendered darker than a real score. Now --oi-color-text-muted.
+ *
+ * Severity ring color is emitted from oiHealthScoreRing.js and now resolves through
+ * --oi-color-severity-*; it previously used the SLDS success/warning/error families, which
+ * ADR-0028's live audit measured as teal/brown/magenta in this org.
+ *
+ * Ring geometry (3.1rem / 5.4rem box, stroke-width 4, the -90deg start rotation and the
+ * dash transition) is spec-bound and left as literals.
+ */
+
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}
+
+.oi-health-ring-wrap {
+  position: relative;
+  width: 3.1rem;
+  height: 3.1rem;
+  flex-shrink: 0;
+}
+
+.oi-health-ring-wrap_lg {
+  width: 5.4rem;
+  height: 5.4rem;
+}
+
+.oi-health-ring-wrap svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.oi-health-ring-track {
+  fill: none;
+  stroke: var(--oi-color-border);
+  stroke-width: 4;
+}
+
+.oi-health-ring-value {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.oi-health-ring-value_empty {
+  opacity: 0.55;
+}
+
+.oi-health-ring-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--oi-font-family-sans);
+  font-weight: var(--oi-font-weight-semibold);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-ring-wrap_lg .oi-health-ring-num {
+  font-size: var(--oi-font-size-display);
+}
+
+.oi-health-ring-num_empty {
+  color: var(--oi-color-text-muted);
+}

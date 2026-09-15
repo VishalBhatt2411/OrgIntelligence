@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Color_Token__c</fullName>
+    <label>Color Token</label>
+    <type>Text</type>
+    <length>80</length>
+    <required>true</required>
+    <description
+  >Design-token reference (e.g. success-1, warning-base-40, error-1 — OrgHealthVisualDesignSpecification.md §4). Reuses existing SLDS semantic tokens already audited for this meaning elsewhere in the codebase (oiNodeDetailPanel.css's .is-security/.is-code/.is-automation) rather than inventing a parallel palette.</description>
+</CustomField>

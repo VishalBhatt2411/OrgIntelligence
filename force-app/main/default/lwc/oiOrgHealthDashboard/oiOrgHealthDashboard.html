@@ -1,0 +1,153 @@
+<template>
+  <div class="oi-health-app">
+    <div class="oi-health-header">
+      <!--
+                No <h1> here. Lightning renders this App Page's tab label ("Org Health") as the
+                page header immediately above, so a title in the component printed the page name
+                twice — verified in the org. The lede keeps the description, which the platform
+                header does not carry.
+            -->
+      <div>
+        <p class="oi-health-lede">
+          Metadata, automation, code, security, data, and storage health for
+          this org — derived from the current graph and bounded live queries.
+        </p>
+      </div>
+      <div class="oi-health-header-meta">
+        <div class="oi-health-last-run">
+          Last full scan
+          <span class="num">{lastScannedLabel}</span>
+        </div>
+        <button
+          type="button"
+          class="oi-btn"
+          onclick={handleRefresh}
+          disabled={isLoading}
+        >
+          ↻ Refresh
+        </button>
+      </div>
+    </div>
+
+    <template if:true={isLoading}>
+      <c-oi-skeleton lines="6" label="Loading Org Health"></c-oi-skeleton>
+    </template>
+
+    <template if:true={hasError}>
+      <c-oi-state-banner
+        state="error"
+        title="Couldn't load Org Health"
+        message={loadError}
+        onretry={handleRefresh}
+      ></c-oi-state-banner>
+    </template>
+
+    <template if:true={hasSummary}>
+      <c-oi-health-section-nav
+        sections={navSections}
+        active-section-key={activeSectionKey}
+        onselect={handleSectionSelect}
+      ></c-oi-health-section-nav>
+
+      <template if:true={isOverviewActive}>
+        <c-oi-health-overview-grid
+          overview={overview}
+          sections={sections}
+          onselectsection={handleSectionSelect}
+        ></c-oi-health-overview-grid>
+      </template>
+
+      <template if:true={isStorageActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-storage></c-oi-health-storage>
+      </template>
+
+      <template if:true={isMetadataHealthActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-metadata></c-oi-health-metadata>
+      </template>
+
+      <template if:true={isAutomationHealthActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-automation></c-oi-health-automation>
+      </template>
+
+      <template if:true={isCodeHealthActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-code></c-oi-health-code>
+      </template>
+
+      <template if:true={isSecurityHealthActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-security></c-oi-health-security>
+      </template>
+
+      <template if:true={isDataHealthActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-data></c-oi-health-data>
+      </template>
+
+      <template if:true={isRemediationActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-health-remediation></c-oi-health-remediation>
+      </template>
+
+      <template if:true={isUnimplementedSectionActive}>
+        <button
+          type="button"
+          class="oi-health-detail-back"
+          onclick={handleBackToOverview}
+        >
+          ← Back to Org Health
+        </button>
+        <c-oi-state-banner
+          state="not-obtainable"
+          title={activeSectionLabel}
+          message="Not yet available in this package version."
+        ></c-oi-state-banner>
+      </template>
+    </template>
+  </div>
+</template>

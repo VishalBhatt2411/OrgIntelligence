@@ -1,0 +1,131 @@
+@import "c/oiDesignTokens";
+
+/**
+ * oiComboboxStyles — the shared "search box with a floating suggestion panel" pattern.
+ *
+ * Purpose
+ *   `oiSearchBar` and `oiRecordPicker` render the same control with the same anatomy: an input,
+ *   a Search button, and an absolutely-positioned panel below holding either a spinner, an error,
+ *   or a result list. Their stylesheets were near-verbatim clones — identical values, differing
+ *   only in class prefix — and were the only two components in the app with zero design-token
+ *   usage and 100% bare literals.
+ *
+ * Why the components stay separate
+ *   They are NOT merged, because ADR-0017 deliberately keeps record search outside the graph:
+ *   `oiSearchBar` calls `OI_SearchController.search` over graph metadata nodes, `oiRecordPicker`
+ *   calls `OI_RecordSearchController.searchRecords` over records. Collapsing them into one
+ *   component would erase an intentional architectural boundary to save a few lines of markup.
+ *   What was genuinely duplicated was the *presentation*, so only the presentation is shared.
+ *
+ * Consumption
+ *   A second CSS-only LWC module, imported the same way as the token module (and note it imports
+ *   the tokens itself, so a consumer needs only this one line):
+ *
+ *       @import 'c/oiComboboxStyles';
+ *
+ *   Consumers use the `oi-combobox*` class vocabulary below rather than component-specific names.
+ */
+
+.oi-combobox {
+  position: relative;
+  font-family: var(--oi-font-family-sans);
+}
+
+.oi-combobox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--oi-space-2);
+}
+
+.oi-combobox-input {
+  flex: 1;
+}
+
+.oi-combobox-button {
+  padding: var(--oi-space-1) var(--oi-space-3);
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--oi-color-on-accent);
+  background: var(--oi-color-accent);
+  border: var(--oi-border-width) solid var(--oi-color-accent);
+  border-radius: var(--oi-radius-md);
+}
+
+.oi-combobox-button:hover {
+  background: var(--oi-color-accent-strong);
+  border-color: var(--oi-color-accent-strong);
+}
+
+.oi-combobox-button:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+/**
+ * The floating panel. `results` and `status` share this so a spinner, an error and a result list
+ * all occupy the same box — previously each component declared the box twice, once per state,
+ * and the two copies could drift.
+ */
+.oi-combobox-panel {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: var(--oi-space-1);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-md);
+  box-shadow: var(--oi-shadow-overlay);
+}
+
+.oi-combobox-results {
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oi-combobox-status {
+  padding: var(--oi-space-2);
+  font-size: var(--oi-font-size-body);
+  color: var(--oi-color-text-secondary);
+}
+
+.oi-combobox-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--oi-space-2);
+  width: 100%;
+  padding: var(--oi-space-2);
+  font-family: inherit;
+  font-size: var(--oi-font-size-body);
+  text-align: left;
+  cursor: pointer;
+  color: var(--oi-color-text-primary);
+  background: transparent;
+  border: none;
+}
+
+.oi-combobox-option:hover {
+  background: var(--oi-color-surface-sunken);
+}
+
+.oi-combobox-option:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+.oi-combobox-option-type {
+  flex-shrink: 0;
+  font-size: var(--oi-font-size-caption);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-combobox-error {
+  color: var(--oi-color-severity-critical);
+  border-color: var(--oi-color-severity-critical);
+}

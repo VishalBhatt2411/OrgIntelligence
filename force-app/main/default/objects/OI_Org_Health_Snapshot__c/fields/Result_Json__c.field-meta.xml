@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Result_Json__c</fullName>
+    <label>Result Json</label>
+    <length>131072</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>10</visibleLines>
+    <description
+  >Serialized section DTO — the full per-metric breakdown, each metric's formula text included, so the UI's formula disclosure can never drift from the number actually computed.</description>
+</CustomField>

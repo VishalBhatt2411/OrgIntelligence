@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Resolved_Date__c</fullName>
+    <label>Resolved Date</label>
+    <type>DateTime</type>
+    <required>false</required>
+    <description
+  >When Status__c actually transitioned to Resolved — stamped once, by whichever path resolved it (auto-resolve on disappearance or an administrator's explicit action). Distinct from Last_Detected__c, which keeps advancing on every scan regardless of status. Cleared if the finding later reopens on recurrence (ADR-0027), since it is no longer true that this finding is resolved.</description>
+</CustomField>

@@ -1,0 +1,120 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. This stylesheet is the Automation section's copy of
+ * the shared Org Health detail-section chrome, so it carried the same four defect classes as
+ * oiHealthMetadata.css and they are corrected identically here:
+ *   - .oi-health-detail-header's border read --slds-g-color-border-2 (SLDS 2's STRONG border,
+ *     #5c5c5c) while its fallback asked for the near-white #edf0f4, rendering a heavy mid-grey
+ *     outline instead of a hairline. Now --oi-color-border.
+ *   - the on-surface text tiers were inverted: .oi-health-eyebrow, .oi-health-detail-coverage and
+ *     .oi-health-selection-note read --slds-g-color-on-surface-3 (STRONGEST, #03234d) while
+ *     intending the muted #8892a0, and the h2 read --slds-g-color-on-surface-1 (WEAKEST, #5c5c5c)
+ *     while intending #12161f — so the uppercase eyebrow outweighed the section title beneath it.
+ *     Now text-muted and text-primary.
+ *   - .oi-health-coverage-pill bound --slds-g-color-success-1 / -container-1, measured as a dark
+ *     teal #056764 rather than the green #2e844a its fallback intended (and colliding with the
+ *     graph canvas's master-detail teal). Now --oi-color-severity-good / -good-wash.
+ *
+ * 'Manrope' / 'IBM Plex Sans' are deleted (never loaded — no static resource in the package), and
+ * weight 800 is retired to --oi-font-weight-bold (700) per ADR-0028 §4 C11.
+ *
+ * Breakpoints moved onto ADR-0028 §6's 1280 / 1024 / 768 ladder: the two 980px lines become
+ * 1023px and the 760px line becomes 767px. The 5/3/2-up KPI grid-template counts are unchanged.
+ */
+
+.oi-health-automation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-4);
+}
+
+.oi-health-detail-header {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-5);
+  display: flex;
+  gap: var(--oi-space-5);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.oi-health-eyebrow {
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-detail-header-title h2 {
+  margin: var(--oi-space-1) 0 0;
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-detail-coverage {
+  margin-left: auto;
+  text-align: right;
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+  align-items: flex-end;
+}
+
+.oi-health-coverage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  line-height: var(--oi-line-height-tight);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+}
+
+.oi-health-detail-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--oi-space-3);
+}
+@media (max-width: 1023px) {
+  .oi-health-detail-kpi-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .oi-health-detail-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.oi-health-detail-split {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: var(--oi-space-4);
+  align-items: start;
+}
+@media (max-width: 1023px) {
+  .oi-health-detail-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oi-health-selection-note {
+  margin: 0;
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+}

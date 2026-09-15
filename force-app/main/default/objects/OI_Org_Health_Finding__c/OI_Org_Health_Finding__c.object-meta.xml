@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Org Health Finding</label>
+    <pluralLabel>OI Org Health Findings</pluralLabel>
+    <nameField>
+        <label>Finding Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>FIND-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>true</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description
+  >The unified Org Health finding: one durable, identity-stable row per (Section_Key__c, Rule_Id__c, Component_Key__c) — the fingerprint — surviving from the scan that first detected it through every later re-scan (ADR-0027). Owned exclusively by OI_OrgHealthFindingRepository, which upserts by Fingerprint__c and never overwrites the lifecycle fields (Status__c, OwnerId, Due_Date__c, Notes__c, Compensating_Control__c, Resolution_Evidence__c) on re-detection — only the evidence/severity fields refresh. When a condition a prior scan found is no longer detected, the finding is marked Resolved rather than deleted, preserving history (ProductSpecs.md: "when a finding disappears, mark it resolved rather than deleting its history").</description>
+</CustomObject>

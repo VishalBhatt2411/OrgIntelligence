@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Section_Key__c</fullName>
+    <label>Section Key</label>
+    <type>Text</type>
+    <length>40</length>
+    <required>true</required>
+    <description
+  >e.g. OrgOverview, MetadataHealth, AutomationHealth, CodeHealth, SecurityHealth, DataHealth, Storage — the value OI_Org_Health_Snapshot__c.Section_Key__c and OI_Org_Health_Metric_Config__mdt.Section_Key__c key against.</description>
+</CustomField>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Manage Finding Workflow</label>
+    <description
+  >Change an Org Health finding's remediation lifecycle: status, owner, due date, notes, compensating control (ADR-0027). Narrower than OI_View_Org_Health/OI_Run_Org_Health_Compute. Granted to Administrator and Power User only, not Viewer.</description>
+    <isLicensed>false</isLicensed>
+</CustomPermission>

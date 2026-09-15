@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Severity_Contributors_Json__c</fullName>
+    <label>Severity Contributors JSON</label>
+    <length>32768</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>4</visibleLines>
+    <description
+  >JSON-serialized List&lt;OI_HealthScoreContributor&gt; — every signal OI_HealthScoringEngine combined into Score__c/Severity__c, with each one's magnitude, confidence, impact, exposure, and resulting contribution. Powers the finding drawer's "why this severity" breakdown. Refreshed on every re-scan alongside the other evidence fields, never treated as lifecycle data.</description>
+</CustomField>

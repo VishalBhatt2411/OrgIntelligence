@@ -1,0 +1,118 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Same defect set as its sibling detail sections, each
+ * caused by an SLDS tier chosen opposite to the literal fallback written beside it:
+ *   - header card border: --slds-g-color-border-2 (STRONG, #5c5c5c) where the #edf0f4 fallback
+ *     intended a hairline -> --oi-color-border.
+ *   - eyebrow, coverage caption and selection note: --slds-g-color-on-surface-3 (STRONGEST tier,
+ *     #03234d) where the #8892a0 fallback intended muted grey -> --oi-color-text-muted.
+ *   - section title and button label: --slds-g-color-on-surface-1 (WEAKEST tier, #5c5c5c) where
+ *     the #12161f fallback intended primary text -> --oi-color-text-primary. Before this, muted
+ *     labels rendered darker than the title they label.
+ *   - coverage pill: the SLDS success family measures dark teal (#056764) in this org, not the
+ *     green #2e844a intended -> --oi-color-severity-good / -good-wash (ADR-0028 §2 exception 2).
+ *   - sync error: --slds-g-color-error-base-40 measures magenta (#b60554), not red
+ *     -> --oi-color-severity-critical.
+ *   - 'Manrope' / 'IBM Plex Sans' never loaded (no static resources in the package).
+ * Weight 800 retired in favour of 700 (ADR-0028 §4 C11). Breakpoints restated on the shared
+ * 1280/1024/768 ladder: 980px -> 1024px, 760px -> 768px (ADR-0028 §6).
+ */
+
+.oi-health-security {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-4);
+}
+
+.oi-health-detail-header {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-5);
+  display: flex;
+  gap: var(--oi-space-5);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.oi-health-eyebrow {
+  font-family: var(--oi-font-family-sans);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-detail-header-title h2 {
+  font-family: var(--oi-font-family-sans);
+  margin: var(--oi-space-1) 0 0;
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-detail-coverage {
+  margin-left: auto;
+  text-align: right;
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+  align-items: flex-end;
+}
+
+.oi-health-coverage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  font-variant-numeric: var(--oi-font-numeric);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+}
+
+.oi-health-detail-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--oi-space-3);
+}
+@media (max-width: 1024px) {
+  .oi-health-detail-kpi-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .oi-health-detail-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.oi-health-detail-split {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: var(--oi-space-4);
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .oi-health-detail-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oi-health-selection-note {
+  margin: 0;
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+}

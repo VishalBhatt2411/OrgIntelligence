@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Severity_Key__c</fullName>
+    <label>Severity Key</label>
+    <type>Text</type>
+    <length>40</length>
+    <required>true</required>
+    <description
+  >Good, Warning, or Critical. Non-severity coverage states (Not Scanned, Not Obtainable) are deliberately NOT represented here — they're rendered by the shared state-banner component, not treated as a fourth severity.</description>
+</CustomField>

@@ -1,0 +1,119 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Defects corrected in the process, each one a case of
+ * an SLDS tier being consumed with an assumption opposite to the literal fallback written beside
+ * it — so the rendered color was never the one the rule intended:
+ *   - the header card border asked for --slds-g-color-border-2 with the near-white #edf0f4 as its
+ *     fallback, but border-2 is SLDS 2's STRONG border (#5c5c5c). The card was outlined in mid
+ *     grey instead of a hairline. Now --oi-color-border.
+ *   - the eyebrow and the muted notes asked for --slds-g-color-on-surface-3 with the muted grey
+ *     #8892a0 as fallback, but -3 is the STRONGEST text tier (#03234d), so muted text rendered
+ *     dark navy. Now --oi-color-text-muted.
+ *   - conversely the section title and the button label asked for --slds-g-color-on-surface-1 with
+ *     #12161f as fallback, but -1 is the WEAKEST tier (#5c5c5c), so primary text rendered mid grey
+ *     — weaker than the labels above it. Now --oi-color-text-primary.
+ *   - the coverage pill bound to the SLDS success family, which ADR-0028's live audit measured as
+ *     a dark teal (#056764), not the green #2e844a its fallback intended; the pill rendered
+ *     teal-on-teal-tint. Now the --oi-color-severity-good pair.
+ *   - the sync error bound to --slds-g-color-error-base-40, measured magenta (#b60554) rather than
+ *     the intended red #ba0517. Now --oi-color-severity-critical.
+ *   - 'Manrope' / 'IBM Plex Sans' were declared but have never loaded (the package ships no static
+ *     resources), so this section always rendered in the platform fallback anyway.
+ * Font weight 800 is retired per ADR-0028 §4 C11; these rules now carry weight 700.
+ * Breakpoints restated on the single 1280/1024/768 ladder (ADR-0028 §6): the off-ladder 980px and
+ * 760px lines become 1024px and 768px.
+ */
+
+.oi-health-code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-4);
+}
+
+.oi-health-detail-header {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-5);
+  display: flex;
+  gap: var(--oi-space-5);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.oi-health-eyebrow {
+  font-family: var(--oi-font-family-sans);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-detail-header-title h2 {
+  font-family: var(--oi-font-family-sans);
+  margin: var(--oi-space-1) 0 0;
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-detail-coverage {
+  margin-left: auto;
+  text-align: right;
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+  align-items: flex-end;
+}
+
+.oi-health-coverage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  font-variant-numeric: var(--oi-font-numeric);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+}
+
+.oi-health-detail-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--oi-space-3);
+}
+@media (max-width: 768px) {
+  .oi-health-detail-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.oi-health-detail-split {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: var(--oi-space-4);
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .oi-health-detail-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oi-health-selection-note {
+  margin: 0;
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+}

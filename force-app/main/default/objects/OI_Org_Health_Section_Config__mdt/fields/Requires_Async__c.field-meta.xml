@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Requires_Async__c</fullName>
+    <label>Requires Async</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >True only for a section whose whole computation is Tier 3 (async/persisted, user-triggered) per ADR-0026 — currently Data Health only. Individual Tier-3 sub-metrics inside an otherwise-live section (e.g. Metadata Health's orphan detection) are not represented at this section-level flag.</description>
+</CustomField>

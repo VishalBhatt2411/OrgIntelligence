@@ -1,0 +1,98 @@
+<template>
+  <template if:true={hasRow}>
+    <section
+      role="dialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="oi-live-insight-heading"
+      class="slds-modal slds-fade-in-open slds-modal_medium oi-live-insight-panel"
+      onkeydown={handleKeyDown}
+    >
+      <div class="slds-modal__container">
+        <header class="slds-modal__header oi-live-insight-header">
+          <button
+            class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+            title="Close"
+            onclick={handleClose}
+          >
+            <lightning-icon
+              icon-name="utility:close"
+              size="small"
+              alternative-text="Close"
+              variant="inverse"
+            ></lightning-icon>
+          </button>
+          <h2 id="oi-live-insight-heading" class="slds-modal__title">
+            {row.primaryLabel}
+          </h2>
+          <div class="oi-live-insight-subheader">
+            <c-oi-health-severity-badge
+              severity-key={row.severityKey}
+              label={row.severityLabel}
+            ></c-oi-health-severity-badge>
+            <span class="oi-live-insight-eyebrow"
+              >{sectionLabel} — live signal, not yet synced as a tracked
+              finding</span
+            >
+          </div>
+        </header>
+
+        <div
+          class="slds-modal__content slds-p-around_medium oi-live-insight-body"
+        >
+          <div class="oi-live-insight-section">
+            <h3>Why this severity</h3>
+            <p>{row.explanation}</p>
+          </div>
+
+          <template if:true={hasMetricRows}>
+            <div class="oi-live-insight-section">
+              <h3>Measured</h3>
+              <dl class="oi-live-insight-metrics">
+                <template for:each={metricRows} for:item="metric">
+                  <div class="oi-live-insight-metric" key={metric.key}>
+                    <dt>{metric.label}</dt>
+                    <dd class="num">{metric.value}</dd>
+                  </div>
+                </template>
+              </dl>
+            </div>
+          </template>
+
+          <div class="oi-live-insight-section">
+            <button type="button" class="oi-btn" onclick={handleOpenComponent}>
+              Open object
+            </button>
+            <template if:true={navigationError}>
+              <c-oi-state-banner
+                state={navigationState}
+                title="Couldn't open this object"
+                message={navigationError}
+                data-id="live-insight-navigation-error"
+                onretry={handleOpenComponent}
+              ></c-oi-state-banner>
+            </template>
+          </div>
+
+          <template if:true={canSync}>
+            <div class="oi-live-insight-section oi-live-insight-sync">
+              <p>
+                No finding is on file for this object yet, so there is nothing
+                here to triage, assign, or track over time.
+              </p>
+              <button
+                type="button"
+                class="oi-btn oi-btn_primary"
+                onclick={handleSync}
+                disabled={isSyncing}
+              >
+                {syncButtonLabel}
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open" onclick={handleClose}></div>
+  </template>
+</template>

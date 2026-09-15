@@ -15,107 +15,129 @@
  *       for a permission-gated internal tool would be exactly the premature structural
  *       complexity Sprint 9 was asked to avoid.
  */
-import { LightningElement } from 'lwc';
-import { subscribe, unsubscribe, onError } from 'lightning/empApi';
-import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import startScan from '@salesforce/apex/OI_ScanController.startScan';
-import cancelScan from '@salesforce/apex/OI_ScanController.cancelScan';
-import getScanHistory from '@salesforce/apex/OI_ScanController.getScanHistory';
+import { LightningElement } from "lwc";
+import { subscribe, unsubscribe, onError } from "lightning/empApi";
+import { ShowToastEvent } from "lightning/platformShowToastEvent";
+import startScan from "@salesforce/apex/OI_ScanController.startScan";
+import cancelScan from "@salesforce/apex/OI_ScanController.cancelScan";
+import getScanHistory from "@salesforce/apex/OI_ScanController.getScanHistory";
 
-const PROGRESS_CHANNEL = '/event/OI_Scan_Progress__e';
-const STATUS_RUNNING = 'Running';
+const PROGRESS_CHANNEL = "/event/OI_Scan_Progress__e";
+const STATUS_RUNNING = "Running";
 
 export default class OiScanStatusPanel extends LightningElement {
-    scanRunId;
-    status;
-    message;
-    isLoading = false;
-    subscription;
+  scanRunId;
+  status;
+  message;
+  isLoading = false;
+  /** Distinct from isLoading: the very first fetch has no status to show yet, so rendering "No scans yet" during it would state a falsehood. */
+  isInitialLoading = true;
+  subscription;
 
-    connectedCallback() {
-        this.loadMostRecentScan();
-        this.subscribeToProgress();
-    }
+  connectedCallback() {
+    this.loadMostRecentScan();
+    this.subscribeToProgress();
+  }
 
-    disconnectedCallback() {
-        if (this.subscription) {
-            unsubscribe(this.subscription);
-            this.subscription = undefined;
-        }
+  disconnectedCallback() {
+    if (this.subscription) {
+      unsubscribe(this.subscription);
+      this.subscription = undefined;
     }
+  }
 
-    async loadMostRecentScan() {
-        try {
-            const history = await getScanHistory({ pageSize: 1, pageCursor: null });
-            if (history && history.length > 0) {
-                this.applyStatus(history[0]);
-            }
-        } catch (error) {
-            this.showError(error);
-        }
+  async loadMostRecentScan() {
+    try {
+      const history = await getScanHistory({ pageSize: 1, pageCursor: null });
+      if (history && history.length > 0) {
+        this.applyStatus(history[0]);
+      }
+    } catch (error) {
+      this.showError(error);
+    } finally {
+      this.isInitialLoading = false;
     }
+  }
 
-    subscribeToProgress() {
-        onError((error) => {
-            this.showError(error);
-        });
-        subscribe(PROGRESS_CHANNEL, -1, (event) => this.handleProgressEvent(event)).then((response) => {
-            this.subscription = response;
-        });
-    }
+  subscribeToProgress() {
+    onError((error) => {
+      this.showError(error);
+    });
+    subscribe(PROGRESS_CHANNEL, -1, (event) =>
+      this.handleProgressEvent(event)
+    ).then((response) => {
+      this.subscription = response;
+    });
+  }
 
-    handleProgressEvent(event) {
-        const payload = event.data.payload;
-        if (this.scanRunId && payload.Scan_Run_Id__c && payload.Scan_Run_Id__c !== this.scanRunId) {
-            return;
-        }
-        if (payload.Scan_Run_Id__c) {
-            this.scanRunId = payload.Scan_Run_Id__c;
-        }
-        this.status = payload.Status__c;
-        this.message = payload.Message__c;
+  handleProgressEvent(event) {
+    const payload = event.data.payload;
+    if (
+      this.scanRunId &&
+      payload.Scan_Run_Id__c &&
+      payload.Scan_Run_Id__c !== this.scanRunId
+    ) {
+      return;
     }
+    if (payload.Scan_Run_Id__c) {
+      this.scanRunId = payload.Scan_Run_Id__c;
+    }
+    this.status = payload.Status__c;
+    this.message = payload.Message__c;
+  }
 
-    applyStatus(dto) {
-        this.scanRunId = dto.scanRunId;
-        this.status = dto.status;
-        this.message = null;
-    }
+  applyStatus(dto) {
+    this.scanRunId = dto.scanRunId;
+    this.status = dto.status;
+    this.message = null;
+  }
 
-    get isRunning() {
-        return this.status === STATUS_RUNNING;
-    }
+  get isRunning() {
+    return this.status === STATUS_RUNNING;
+  }
 
-    get statusLabel() {
-        return this.status ? this.status : 'No scans yet';
-    }
+  get statusLabel() {
+    return this.status ? this.status : "No scans yet";
+  }
 
-    async handleStartScan() {
-        this.isLoading = true;
-        try {
-            const dto = await startScan({ scanType: 'Full', metadataTypeOverride: null });
-            this.applyStatus(dto);
-        } catch (error) {
-            this.showError(error);
-        } finally {
-            this.isLoading = false;
-        }
-    }
+  /** Names the action in flight rather than saying "Loading…", so the disabled button stops being the user's only (silent) feedback. */
+  get busyLabel() {
+    return this.isRunning ? "Cancelling scan…" : "Starting scan…";
+  }
 
-    async handleCancelScan() {
-        this.isLoading = true;
-        try {
-            await cancelScan({ scanRunId: this.scanRunId });
-            this.status = 'Cancelled';
-        } catch (error) {
-            this.showError(error);
-        } finally {
-            this.isLoading = false;
-        }
+  async handleStartScan() {
+    this.isLoading = true;
+    try {
+      const dto = await startScan({
+        scanType: "Full",
+        metadataTypeOverride: null
+      });
+      this.applyStatus(dto);
+    } catch (error) {
+      this.showError(error);
+    } finally {
+      this.isLoading = false;
     }
+  }
 
-    showError(error) {
-        const message = (error && error.body && error.body.message) || 'Something went wrong with the scan.';
-        this.dispatchEvent(new ShowToastEvent({ title: 'Scan Error', message, variant: 'error' }));
+  async handleCancelScan() {
+    this.isLoading = true;
+    try {
+      await cancelScan({ scanRunId: this.scanRunId });
+      this.status = "Cancelled";
+    } catch (error) {
+      this.showError(error);
+    } finally {
+      this.isLoading = false;
     }
+  }
+
+  showError(error) {
+    const message =
+      (error && error.body && error.body.message) ||
+      "Something went wrong with the scan.";
+    this.dispatchEvent(
+      new ShowToastEvent({ title: "Scan Error", message, variant: "error" })
+    );
+  }
 }

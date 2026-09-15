@@ -1,0 +1,105 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Defects corrected:
+ *   - every hairline in the panel (card border, head divider, and both table row rules) resolved
+ *     to #5c5c5c, because --slds-g-color-border-2 is SLDS 2's STRONG border while the literal
+ *     fallback #edf0f4 alongside it asked for a near-white line. A four-line table therefore
+ *     rendered as a mid-grey grid. Now --oi-color-border.
+ *   - the panel heading and the emphasised first cell resolved to #5c5c5c
+ *     (--slds-g-color-on-surface-1, the WEAKEST text tier) where their fallback #12161f asked for
+ *     the strongest, so the heading was no darker than the body cells it heads. Now
+ *     --oi-color-text-primary.
+ *   - the eyebrow and the column headers resolved to #03234d (--slds-g-color-on-surface-3, the
+ *     STRONGEST tier) where their fallback #8892a0 asked for a muted grey — the inverse defect,
+ *     making micro-labels the darkest text on the panel. Now --oi-color-text-muted.
+ *   - 'Manrope' / 'IBM Plex Sans' / 'IBM Plex Mono' were declared but have never loaded (no
+ *     static resources in the package), and weight 800 is retired by ADR-0028 §4 C11.
+ *
+ * The two uppercase letter-spacings (0.09em, 0.06em) collapse to --oi-letter-spacing-caps.
+ */
+
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}
+
+.oi-health-panel {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  overflow: hidden;
+}
+
+.oi-health-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--oi-space-3) var(--oi-space-4);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+}
+
+.oi-health-panel-head h3 {
+  font-family: var(--oi-font-family-sans);
+  margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-panel-eyebrow {
+  font-family: var(--oi-font-family-sans);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body);
+}
+
+.oi-health-breakdown th {
+  text-align: left;
+  font-size: var(--oi-font-size-micro);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+  font-weight: var(--oi-font-weight-bold);
+  padding: var(--oi-space-2) var(--oi-space-4);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+}
+
+.oi-health-breakdown td {
+  padding: var(--oi-space-3) var(--oi-space-4);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+  vertical-align: middle;
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-secondary);
+}
+
+.oi-health-breakdown tr:last-child td {
+  border-bottom: 0;
+}
+
+.oi-health-breakdown-primary {
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-breakdown-row_clickable {
+  cursor: pointer;
+}
+.oi-health-breakdown-row_clickable:hover {
+  background: var(--oi-color-surface-sunken);
+}

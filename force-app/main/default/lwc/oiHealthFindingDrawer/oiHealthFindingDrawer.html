@@ -1,0 +1,311 @@
+<template>
+  <template if:true={hasFinding}>
+    <!-- SLDS modal markup rather than lightning-modal, matching oiIntelligenceDrilldown's own
+             precedent for a shared, generic overlay hosted inside the Org Health tab's own layout. -->
+    <section
+      role="dialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="oi-finding-drawer-heading"
+      class="slds-modal slds-fade-in-open slds-modal_medium oi-finding-drawer"
+      onkeydown={handleKeyDown}
+    >
+      <div class="slds-modal__container">
+        <header class="slds-modal__header oi-finding-drawer-header">
+          <button
+            class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+            title="Close"
+            onclick={handleClose}
+          >
+            <lightning-icon
+              icon-name="utility:close"
+              size="small"
+              alternative-text="Close"
+              variant="inverse"
+            ></lightning-icon>
+          </button>
+          <h2 id="oi-finding-drawer-heading" class="slds-modal__title">
+            {finding.title}
+          </h2>
+          <div class="oi-finding-drawer-subheader">
+            <c-oi-health-severity-badge
+              severity-key={finding.severityKey}
+              label={finding.severityKey}
+            ></c-oi-health-severity-badge>
+            <span class="oi-finding-drawer-component"
+              >{finding.componentLabel}</span
+            >
+            <span class="oi-finding-drawer-rule">{finding.ruleId}</span>
+          </div>
+        </header>
+
+        <div
+          class="slds-modal__content slds-p-around_medium oi-finding-drawer-body"
+        >
+          <template if:true={hasEvidence}>
+            <div class="oi-finding-drawer-section">
+              <h3>Evidence</h3>
+              <p class="oi-finding-drawer-evidence">{finding.evidence}</p>
+              <div class="oi-finding-drawer-values">
+                <span><strong>Measured:</strong> {finding.measuredValue}</span>
+                <span><strong>Expected:</strong> {finding.expectedValue}</span>
+              </div>
+            </div>
+          </template>
+
+          <div class="oi-finding-drawer-section">
+            <h3>Why this matters</h3>
+            <p>{finding.explanation}</p>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <h3>Org risk</h3>
+            <p>{finding.orgRisk}</p>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <h3>Potential impact</h3>
+            <p>{finding.potentialImpact}</p>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <h3>Remediation</h3>
+            <p>{finding.remediation}</p>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <h3>Validation steps</h3>
+            <p>{finding.validationSteps}</p>
+          </div>
+
+          <template if:true={hasScore}>
+            <div class="oi-finding-drawer-section">
+              <h3>Severity score</h3>
+              <p>{scoreLabel}</p>
+              <template if:true={hasScoreContributors}>
+                <c-oi-health-formula-disclosure
+                  summary={finding.scoreExplanation}
+                  components={scoreContributorRows}
+                ></c-oi-health-formula-disclosure>
+              </template>
+            </div>
+          </template>
+
+          <template if:true={showResolvedDate}>
+            <div class="oi-finding-drawer-section">
+              <h3>Resolved</h3>
+              <p>{resolvedDateLabel}</p>
+            </div>
+          </template>
+
+          <template if:true={showRiskAcceptanceInfo}>
+            <div class="oi-finding-drawer-section">
+              <h3>Risk acceptance</h3>
+              <p class={riskAcceptanceExpiryBadgeClass}>
+                Expires: {finding.riskAcceptanceExpiry}
+              </p>
+            </div>
+          </template>
+
+          <template if:true={showFalsePositiveJustification}>
+            <div class="oi-finding-drawer-section">
+              <h3>False positive justification</h3>
+              <p>{finding.falsePositiveJustification}</p>
+            </div>
+          </template>
+
+          <div class="oi-finding-drawer-meta">
+            <span>First detected: {firstDetectedLabel}</span>
+            <span>Last detected: {lastDetectedLabel}</span>
+            <span>Owner: {ownerName}</span>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <button type="button" class="oi-btn" onclick={handleOpenComponent}>
+              Open affected component
+            </button>
+            <template if:true={navigationError}>
+              <c-oi-state-banner
+                state={navigationState}
+                title={navigationTitle}
+                message={navigationError}
+                data-id="navigation-error"
+                onretry={handleOpenComponent}
+              ></c-oi-state-banner>
+            </template>
+          </div>
+
+          <div class="oi-finding-drawer-section oi-finding-drawer-triage">
+            <h3>Triage</h3>
+            <template if:true={canManage}>
+              <lightning-combobox
+                label="Status"
+                data-field="status"
+                value={draft.status}
+                options={statusOptions}
+                onchange={handleFieldChange}
+              ></lightning-combobox>
+              <lightning-record-picker
+                label="Owner"
+                object-api-name="User"
+                value={draft.ownerId}
+                onchange={handleOwnerChange}
+              ></lightning-record-picker>
+              <lightning-input
+                type="date"
+                label="Due date"
+                data-field="dueDate"
+                value={draft.dueDate}
+                onchange={handleFieldChange}
+              ></lightning-input>
+              <lightning-textarea
+                label="Notes"
+                data-field="notes"
+                value={draft.notes}
+                onchange={handleFieldChange}
+              ></lightning-textarea>
+              <lightning-textarea
+                label="Compensating control"
+                data-field="compensatingControl"
+                value={draft.compensatingControl}
+                onchange={handleFieldChange}
+              ></lightning-textarea>
+              <template if:true={showRiskAcceptanceExpiryField}>
+                <lightning-input
+                  type="date"
+                  label="Risk acceptance expires"
+                  data-field="riskAcceptanceExpiry"
+                  value={draft.riskAcceptanceExpiry}
+                  onchange={handleFieldChange}
+                ></lightning-input>
+              </template>
+              <template if:true={showFalsePositiveJustificationField}>
+                <lightning-textarea
+                  label="False positive justification"
+                  data-field="falsePositiveJustification"
+                  value={draft.falsePositiveJustification}
+                  onchange={handleFieldChange}
+                ></lightning-textarea>
+              </template>
+              <template if:true={saveError}>
+                <c-oi-state-banner
+                  state="error"
+                  title="Couldn't save this finding"
+                  message={saveError}
+                  data-id="save-error"
+                  onretry={handleSave}
+                ></c-oi-state-banner>
+              </template>
+              <template if:true={saveMessage}>
+                <p class="oi-finding-drawer-success" role="status">
+                  {saveMessage}
+                </p>
+              </template>
+              <button
+                type="button"
+                class="oi-btn oi-btn_primary"
+                onclick={handleSave}
+                disabled={isSaveDisabled}
+              >
+                {saveButtonLabel}
+              </button>
+            </template>
+            <template if:false={canManage}>
+              <p class="oi-finding-drawer-readonly-note">
+                You don't have permission to update Org Health findings.
+              </p>
+              <div class="oi-finding-drawer-readonly-fields">
+                <span><strong>Status:</strong> {finding.status}</span>
+                <span><strong>Notes:</strong> {finding.notes}</span>
+                <span><strong>Due date:</strong> {finding.dueDate}</span>
+                <span
+                  ><strong>Compensating control:</strong>
+                  {finding.compensatingControl}</span
+                >
+              </div>
+            </template>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <h3>Related findings</h3>
+            <template if:true={relatedFindingsError}>
+              <c-oi-state-banner
+                state="error"
+                title="Couldn't load related findings"
+                message={relatedFindingsError}
+                data-id="related-findings-error"
+                onretry={handleRetryRelatedFindings}
+              ></c-oi-state-banner>
+            </template>
+            <template if:true={hasRelatedFindings}>
+              <ul class="oi-finding-drawer-related-list">
+                <template for:each={relatedFindingRows} for:item="related">
+                  <li key={related.key}>
+                    <button
+                      type="button"
+                      class="oi-finding-drawer-related-item"
+                      data-finding-id={related.id}
+                      onclick={handleRelatedFindingSelect}
+                    >
+                      <c-oi-health-severity-badge
+                        severity-key={related.severityKey}
+                        label={related.severityKey}
+                      ></c-oi-health-severity-badge>
+                      <span>{related.title}</span>
+                    </button>
+                  </li>
+                </template>
+              </ul>
+            </template>
+            <template if:true={showNoRelatedFindings}>
+              <c-oi-state-banner
+                data-id="related-findings-empty"
+                state="true-zero"
+                title="No other findings share this component"
+                message="This is the only open finding recorded against it."
+              ></c-oi-state-banner>
+            </template>
+          </div>
+
+          <div class="oi-finding-drawer-section">
+            <h3>History</h3>
+            <template if:true={historyError}>
+              <c-oi-state-banner
+                state="error"
+                title="Couldn't load this finding's history"
+                message={historyError}
+                data-id="history-error"
+                onretry={handleRetryHistory}
+              ></c-oi-state-banner>
+            </template>
+            <template if:true={hasHistory}>
+              <ul class="oi-finding-drawer-history-list">
+                <template for:each={historyRows} for:item="entry">
+                  <li key={entry.key}>
+                    <span class="oi-finding-drawer-history-date"
+                      >{entry.changedDateLabel}</span
+                    >
+                    <span
+                      ><strong>{entry.fieldLabel}</strong> changed by
+                      {entry.changedByName}: {entry.oldValueLabel} →
+                      {entry.newValueLabel}</span
+                    >
+                  </li>
+                </template>
+              </ul>
+            </template>
+            <template if:true={showNoHistory}>
+              <c-oi-state-banner
+                data-id="history-empty"
+                state="true-zero"
+                title="No tracked changes yet"
+                message="Nothing has been changed on this finding since it was first detected."
+              ></c-oi-state-banner>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open" onclick={handleClose}></div>
+  </template>
+</template>

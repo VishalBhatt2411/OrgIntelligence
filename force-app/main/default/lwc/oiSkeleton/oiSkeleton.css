@@ -1,0 +1,56 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Loading placeholder bars.
+ *
+ * The shimmer is a neutral sweep built from the surface tokens — never a severity or accent colour,
+ * because a loading state has no status and no brand meaning to convey. It is also the only
+ * animation on this surface besides the Intelligence Panel's disclosure, and it is disabled
+ * entirely under prefers-reduced-motion, where the bars simply rest at their base tone.
+ */
+
+.oi-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-2);
+  width: 100%;
+}
+
+.oi-skeleton_card {
+  padding: var(--oi-space-3);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+}
+
+.oi-skeleton-line {
+  height: 0.7rem;
+  border-radius: var(--oi-radius-sm);
+  background-color: var(--oi-color-surface-sunken);
+  background-image: linear-gradient(
+    90deg,
+    var(--oi-color-surface-sunken) 0%,
+    var(--oi-color-border) 50%,
+    var(--oi-color-surface-sunken) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: oi-skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes oi-skeleton-sweep {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-skeleton-line {
+    background-image: none;
+    animation: none;
+  }
+}

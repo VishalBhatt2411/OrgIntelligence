@@ -1,103 +1,150 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Tree geometry is deliberately untouched.
+ *
+ * Defects corrected:
+ *   - the toggle's hover/focus background bound --slds-g-color-surface-container-2 — a neutral
+ *     SUNKEN GREY in SLDS 2 — while its literal fallback #eef4ff is a pale blue accent wash. The
+ *     intent was an accent-tinted hover on an accent-colored control, so it now resolves
+ *     --oi-color-accent-wash; before this it rendered grey wherever SLDS 2 tokens are present.
+ *   - .oi-hierarchy-tree-node-label-current asked for --slds-g-color-on-surface-1 with a
+ *     near-black #181818 fallback, but on-surface-1 is SLDS 2's WEAKEST tier (#5c5c5c): the
+ *     current node — the one label that must read strongest — rendered mid-grey and weaker than
+ *     the blue links around it. Now --oi-color-text-primary.
+ *   - the secondary object-API-name label asked for --slds-g-color-on-surface-2 with a muted
+ *     #706e6b fallback; the muted tier is --oi-color-text-muted.
+ *   - both connector strokes already intended the strong border (#c9c7c5) and now say so
+ *     explicitly via --oi-color-border-strong.
+ *
+ * NOT changed, on purpose:
+ *   - --oi-tree-indent / --oi-tree-child-indent and their 0rem / 1.25rem inline fallbacks. These
+ *     are injected per node from oiHierarchyTreeNode.js:74,78 and are genuine JS-driven layout
+ *     geometry, explicitly permitted by ADR-0028 §1 — not color tokens.
+ *   - the connector offsets (+0.55rem, -0.7rem), the 0.8rem stub width, bottom: 1.1rem, the
+ *     1.5rem toggle width, min-height: 2.25rem, and max-width: 16rem. All are drawing/hit-target
+ *     dimensions tuned against that indent, so quantizing them to the spacing scale would break
+ *     the connector alignment.
+ *
+ * Note for the later redesign: the 0.65rem toggle glyph and secondary label collapse onto
+ * --oi-font-size-micro, whose documented role in ADR-0028 §5 is "uppercase labels and pills
+ * only". Neither of these is uppercase. The size step is right; the role pairing should be
+ * revisited when this surface is redesigned.
+ */
+
 .oi-hierarchy-tree-node-row {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-height: 2.25rem;
-    padding: 0.35rem 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  min-height: 2.25rem;
+  padding: var(--oi-space-2) 0;
+  font-family: var(--oi-font-family-sans);
 }
 
 .oi-hierarchy-tree-node-row::before {
-    content: '';
-    position: absolute;
-    left: calc(var(--oi-tree-indent, 0rem) + 0.55rem);
-    top: 50%;
-    width: 0.8rem;
-    border-top: 1px solid var(--slds-g-color-border-2, #c9c7c5);
+  content: "";
+  position: absolute;
+  left: calc(var(--oi-tree-indent, 0rem) + 0.55rem);
+  top: 50%;
+  width: 0.8rem;
+  border-top: var(--oi-border-width) solid var(--oi-color-border-strong);
 }
 
 .oi-hierarchy-tree-node-toggle {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    font-size: 0.65rem;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
-    width: 1.5rem;
-    flex-shrink: 0;
-    text-align: center;
-    border-radius: 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  cursor: pointer;
+  padding: 0;
+  width: 1.5rem;
+  flex-shrink: 0;
+  text-align: center;
+  border-radius: var(--oi-radius-sm);
 }
 
-.oi-hierarchy-tree-node-toggle:hover,
+.oi-hierarchy-tree-node-toggle:hover {
+  background: var(--oi-color-accent-wash);
+}
+
+/*
+ * Focus was previously folded into the :hover rule — outline suppressed, and the ONLY focus signal
+ * a background tint identical to hover. A keyboard user could not tell focus from a stray mouse
+ * position, which VisualDesignSpecification.md §8 makes non-negotiable. The shared focus ring now
+ * carries focus; the tint stays because it costs nothing and reinforces it.
+ */
 .oi-hierarchy-tree-node-toggle:focus-visible {
-    background: var(--slds-g-color-surface-container-2, #eef4ff);
-    outline: none;
+  background: var(--oi-color-accent-wash);
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
 }
 
 .oi-hierarchy-tree-node-toggle-spacer {
-    display: inline-block;
-    width: 1.5rem;
-    flex-shrink: 0;
+  display: inline-block;
+  width: 1.5rem;
+  flex-shrink: 0;
 }
 
 .oi-hierarchy-tree-node-icon {
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .oi-hierarchy-tree-node-labels {
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--oi-space-2);
+  min-width: 0;
 }
 
 .oi-hierarchy-tree-node-label {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    cursor: pointer;
-    padding: 0;
-    font-size: 0.8rem;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 16rem;
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
 }
 
 .oi-hierarchy-tree-node-label:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .oi-hierarchy-tree-node-label-current {
-    cursor: default;
-    color: var(--slds-g-color-on-surface-1, #181818);
+  cursor: default;
+  color: var(--oi-color-text-primary);
 }
 
 .oi-hierarchy-tree-node-label-current:hover {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 .oi-hierarchy-tree-node-secondary {
-    font-size: 0.65rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    white-space: nowrap;
+  font-size: var(--oi-font-size-micro);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+  white-space: nowrap;
 }
 
 .oi-hierarchy-tree-node-children {
-    position: relative;
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .oi-hierarchy-tree-node-children::before {
-    content: '';
-    position: absolute;
-    left: calc(var(--oi-tree-child-indent, 1.25rem) - 0.7rem);
-    top: 0;
-    bottom: 1.1rem;
-    border-left: 1px solid var(--slds-g-color-border-2, #c9c7c5);
+  content: "";
+  position: absolute;
+  left: calc(var(--oi-tree-child-indent, 1.25rem) - 0.7rem);
+  top: 0;
+  bottom: 1.1rem;
+  border-left: var(--oi-border-width) solid var(--oi-color-border-strong);
 }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Data Health Object Scope</label>
+    <pluralLabel>OI Data Health Object Scopes</pluralLabel>
+    <visibility>Public</visibility>
+    <description
+  >Which objects Data Health's Tier-3 batch (Phase 5) profiles, and how many records to sample per object — the concrete mechanism that keeps Data Health "bounded" rather than scanning every object in the org, per ProductSpecs.md's Data Health rule. No records shipped in Phase 1 — populated when Data Health (Phase 5) is built.</description>
+</CustomObject>

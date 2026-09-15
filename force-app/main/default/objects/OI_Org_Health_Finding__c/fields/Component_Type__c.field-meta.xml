@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Component_Type__c</fullName>
+    <label>Component Type</label>
+    <type>Text</type>
+    <length>120</length>
+    <required>false</required>
+    <description
+  >The typeKey of the affected component (e.g. SalesforceMetadata.CustomObject) or a Standard/Custom/Managed classification string — whatever the owning rule finds most useful to disclose.</description>
+</CustomField>

@@ -1,5 +1,9 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <classAccesses>
+        <apexClass>OI_OrgHealthController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <customMetadataTypeAccesses>
         <enabled>true</enabled>
         <name>OI_Edge_Type_Descriptor__mdt</name>
@@ -16,9 +20,37 @@
         <enabled>true</enabled>
         <name>OI_Settings__mdt</name>
     </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>OI_Org_Health_Section_Config__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>OI_Org_Health_Metric_Config__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>OI_Data_Health_Object_Scope__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>OI_Health_Severity_Descriptor__mdt</name>
+    </customMetadataTypeAccesses>
     <customPermissions>
         <enabled>true</enabled>
         <name>OI_Manage_Settings</name>
+    </customPermissions>
+    <customPermissions>
+        <enabled>true</enabled>
+        <name>OI_View_Org_Health</name>
+    </customPermissions>
+    <customPermissions>
+        <enabled>true</enabled>
+        <name>OI_Run_Org_Health_Compute</name>
+    </customPermissions>
+    <customPermissions>
+        <enabled>true</enabled>
+        <name>OI_Manage_Finding_Workflow</name>
     </customPermissions>
     <customPermissions>
         <enabled>true</enabled>
@@ -60,7 +92,20 @@
         <enabled>true</enabled>
         <name>OI_View_Hierarchy_History</name>
     </customPermissions>
-    <description>Full admin access: graph, scans, settings, logs, and Hierarchy Accelerator management (ADR-0022). Search_Records not bundled — opt-in.</description>
+    <description
+  >Full admin access: graph, scans, settings, logs, and Hierarchy Accelerator management (ADR-0022). Search_Records not bundled — opt-in.</description>
+    <tabSettings>
+        <tab>OI_Graph_Explorer</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>OI_Hierarchy_Manager</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>OI_Org_Health</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <fieldPermissions>
         <editable>true</editable>
         <field>OI_Graph_Edge__c.Attributes_Json__c</field>
@@ -208,12 +253,14 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>OI_Hierarchy_Relationship_History__c.Previous_Parent_Record_Id__c</field>
+        <field
+    >OI_Hierarchy_Relationship_History__c.Previous_Parent_Record_Id__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>OI_Hierarchy_Relationship_History__c.New_Parent_Record_Id__c</field>
+        <field
+    >OI_Hierarchy_Relationship_History__c.New_Parent_Record_Id__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -316,6 +363,176 @@
         <field>OI_Scan_Task__c.Retry_Attempt_Count__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Snapshot__c.Coverage_Note__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Snapshot__c.Is_Truncated__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Snapshot__c.Result_Json__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Snapshot__c.Row_Count_Examined__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Snapshot__c.Score__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Snapshot__c.Triggered_By__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Confidence__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Component_Key__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Component_Type__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Component_Label__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Namespace__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Is_Managed__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Evidence__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Measured_Value__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Expected_Value__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Explanation__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Org_Risk__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Potential_Impact__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Remediation__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Validation_Steps__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Due_Date__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Notes__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Compensating_Control__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Resolution_Evidence__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Compute_Run_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Has_Automatic_Action__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Required_Permission__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Score__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Score_Explanation__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Severity_Contributors_Json__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Resolved_Date__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.Risk_Acceptance_Expiry__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Org_Health_Finding__c.False_Positive_Justification__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>OI_Org_Health_Finding__c.Severity_Rank__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
     <hasActivationRequired>false</hasActivationRequired>
     <label>OI Administrator</label>
     <objectPermissions>
@@ -345,6 +562,26 @@
         <allowRead>true</allowRead>
         <modifyAllRecords>true</modifyAllRecords>
         <object>OI_Impact_Cache__c</object>
+        <viewAllFields>false</viewAllFields>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <object>OI_Org_Health_Snapshot__c</object>
+        <viewAllFields>false</viewAllFields>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <object>OI_Org_Health_Finding__c</object>
         <viewAllFields>false</viewAllFields>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>

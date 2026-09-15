@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Severity_Rank__c</fullName>
+    <label>Severity Rank</label>
+    <type>Number</type>
+    <formula
+  >CASE(Severity__c, &quot;Critical&quot;, 0, &quot;Warning&quot;, 1, &quot;Good&quot;, 2, 3)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <precision>1</precision>
+    <scale>0</scale>
+    <description
+  >Worst-first sort key for Severity__c (Critical=0, Warning=1, Good=2) — a plain alphabetical ORDER BY on Severity__c would incorrectly sort Good before Warning. Used only by the Remediation Management workspace's queue query (OI_OrgHealthFindingRepository.getFindingsByFilter); not persisted, recomputed per query.</description>
+</CustomField>

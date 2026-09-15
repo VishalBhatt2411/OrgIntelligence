@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Severity__c</fullName>
+    <label>Severity</label>
+    <type>Text</type>
+    <length>20</length>
+    <required>true</required>
+    <description
+  >Good/Warning/Critical today, matching OI_Health_Severity_Descriptor__mdt's existing 3-band registry (kept a Text field, not a Picklist, so a future richer band set is a metadata-only change, never a field migration).</description>
+</CustomField>

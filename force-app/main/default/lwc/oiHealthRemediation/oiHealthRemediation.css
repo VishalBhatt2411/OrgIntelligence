@@ -1,0 +1,199 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * MIXED-PALETTE CLEANUP. This file was one of the two places ADR-0028's audit found the seam
+ * between the app's two competing palettes actively leaking inside a single stylesheet: body text
+ * was the Graph family's #181818 on the breakdown lists, the table title and nothing else, while
+ * the button label two rules below it was the Health family's #12161f, and the row-hover surface
+ * was the Graph family's #f3f3f3 against Health-family #edf0f4 borders. Both text values now
+ * resolve through --oi-color-text-primary and both surfaces through the surface tokens, so one
+ * vocabulary governs the component.
+ *
+ * Defects corrected, each an SLDS tier consumed opposite to the literal fallback beside it:
+ *   - card, filter panel, table wrapper and cell borders asked for --slds-g-color-border-2 with
+ *     #edf0f4 as fallback, but border-2 is SLDS 2's STRONG border (#5c5c5c): every one of those
+ *     hairlines rendered as a mid-grey rule -> --oi-color-border.
+ *   - breakdown headings, column headers, the component sub-label, the empty note and the
+ *     pagination caption asked for --slds-g-color-on-surface-3 with #8892a0 as fallback, but -3 is
+ *     the STRONGEST tier (#03234d), so muted chrome rendered dark navy -> --oi-color-text-muted.
+ *   - list rows, the finding title and the button label asked for --slds-g-color-on-surface-1 with
+ *     #181818 / #12161f as fallback, but -1 is the WEAKEST tier (#5c5c5c), so primary content
+ *     rendered lighter than the column headers labelling it -> --oi-color-text-primary.
+ *   - the error line bound to --slds-g-color-error-base-40, measured magenta (#b60554) in this org
+ *     rather than the intended red #ba0517 -> --oi-color-severity-critical (ADR-0028 §2
+ *     exception 2).
+ *   - 'Manrope' / 'IBM Plex Sans' never loaded — no static resources ship in the package.
+ * Weight 800 retired in favour of 700, and the three different uppercase trackings (0.05em,
+ * 0.06em) collapse onto --oi-letter-spacing-caps (ADR-0028 §4 C10/C11).
+ * The off-ladder 760px breakpoints become the ladder's 768px rung (§6).
+ * `.num` had no rule at all despite the template using it on three breakdown value columns and the
+ * score cell; it now gets the tabular-figure treatment those numeric columns need.
+ */
+
+.oi-health-remediation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-4);
+}
+
+.oi-remediation-summary {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-4);
+}
+
+.oi-remediation-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--oi-space-3);
+}
+@media (max-width: 768px) {
+  .oi-remediation-kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oi-remediation-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--oi-space-4);
+}
+@media (max-width: 768px) {
+  .oi-remediation-breakdowns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oi-remediation-breakdown h3 {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+  margin: 0 0 var(--oi-space-2);
+}
+
+.oi-remediation-breakdown ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+}
+
+.oi-remediation-breakdown li {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-remediation-filters {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  padding: var(--oi-space-4) var(--oi-space-5);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--oi-space-3);
+}
+.oi-remediation-filters lightning-dual-listbox,
+.oi-remediation-filters lightning-record-picker,
+.oi-remediation-filters lightning-input {
+  min-width: 220px;
+}
+
+.oi-remediation-table-wrap {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  overflow-x: auto;
+}
+
+.oi-remediation-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.oi-remediation-table th,
+.oi-remediation-table td {
+  padding: var(--oi-space-2) var(--oi-space-3);
+  text-align: left;
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+}
+
+.oi-remediation-th {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+  cursor: pointer;
+}
+.oi-remediation-th_active {
+  color: var(--oi-color-accent);
+}
+.oi-remediation-th:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+.oi-remediation-sort-indicator {
+  font-size: var(--oi-font-size-micro);
+}
+
+.oi-remediation-row {
+  cursor: pointer;
+}
+.oi-remediation-row:hover {
+  background: var(--oi-color-surface-sunken);
+}
+
+.oi-remediation-title {
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-remediation-component {
+  font-size: var(--oi-font-size-caption);
+  color: var(--oi-color-text-muted);
+}
+
+/* Scores and counts are computed data: tabular figures so digits do not reflow between rows. */
+.num {
+  font-variant-numeric: var(--oi-font-numeric);
+}
+
+.oi-remediation-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-remediation-pagination-buttons {
+  display: flex;
+  gap: var(--oi-space-2);
+}

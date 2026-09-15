@@ -1,0 +1,94 @@
+@import "c/oiDesignTokens";
+
+/**
+ * The platform's one loading/empty/error banner. Carries over the tokenized styling of the former
+ * `oiHealthStateBanner` under surface-neutral class names.
+ *
+ * Severity is never carried by colour alone (ADR-0028 §4): every variant pairs its colour with the
+ * icon glyph and the caller's title text, so the state survives greyscale and colour-blindness.
+ */
+
+.oi-state-banner {
+  display: flex;
+  gap: var(--oi-space-3);
+  align-items: flex-start;
+  padding: var(--oi-space-3) var(--oi-space-4);
+  font-family: var(--oi-font-family-sans);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+}
+
+/* 1.6rem is fixed geometry for the glyph square, not a spacing step. */
+.oi-state-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  border-radius: var(--oi-radius-md);
+}
+
+.oi-state-banner_success {
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+}
+
+.oi-state-banner_warning {
+  background: var(--oi-color-severity-warning-wash);
+  color: var(--oi-color-severity-warning);
+}
+
+.oi-state-banner_critical {
+  background: var(--oi-color-severity-critical-wash);
+  color: var(--oi-color-severity-critical);
+}
+
+.oi-state-banner_neutral {
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+
+.oi-state-banner-title {
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-state-banner-sub {
+  margin-top: var(--oi-space-1);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-secondary);
+}
+
+.oi-state-banner-retry {
+  margin-left: var(--oi-space-1);
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+  color: var(--oi-color-accent);
+  background: none;
+  border: 0;
+}
+
+.oi-state-banner-retry:focus-visible {
+  outline: none;
+  border-radius: var(--oi-radius-sm);
+  box-shadow: var(--oi-focus-ring);
+}
+
+/* Correlation ids are data to be read back to support, so they get tabular figures. */
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}

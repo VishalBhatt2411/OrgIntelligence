@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Has_Automatic_Action__c</fullName>
+    <label>Has Automatic Action</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >Reserved for a future guided/automatic remediation action (ProductSpecs.md §11) — always false today; no automatic remediation is implemented in this release, so this only ever gates UI that does not yet exist.</description>
+</CustomField>

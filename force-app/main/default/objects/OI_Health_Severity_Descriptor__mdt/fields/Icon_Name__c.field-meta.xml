@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Icon_Name__c</fullName>
+    <label>Icon Name</label>
+    <type>Text</type>
+    <length>80</length>
+    <required>false</required>
+    <description
+  >SLDS icon token for this severity, mirroring OI_Node_Type_Descriptor__mdt.Icon_Name__c's convention.</description>
+</CustomField>

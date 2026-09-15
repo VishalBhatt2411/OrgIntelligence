@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Confidence__c</fullName>
+    <label>Confidence</label>
+    <type>Text</type>
+    <length>20</length>
+    <required>false</required>
+    <description
+  >High/Medium/Low — how much the rule author trusts this signal alone (scan coverage, corroboration, known scanner limitations). Never left to the reader to infer from severity alone.</description>
+</CustomField>

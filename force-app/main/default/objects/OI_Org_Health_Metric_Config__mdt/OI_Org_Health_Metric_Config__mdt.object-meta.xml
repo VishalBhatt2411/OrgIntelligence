@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Org Health Metric Config</label>
+    <pluralLabel>OI Org Health Metric Configs</pluralLabel>
+    <visibility>Public</visibility>
+    <description
+  >Per-metric weight/threshold/formula configuration, one generic type reused across every section that needs a configurable number (deliberately not one mdt per section, per ADR-0026) — the structural mechanism that keeps "any score must expose formula" true by construction, since Formula_Description__c is read directly by the DTO that feeds oiHealthFormulaDisclosure. No records shipped in the Storage/Org Overview vertical slice (Phase 1) — populated starting with Metadata Health (Phase 2), which is the first section with admin-configurable thresholds.</description>
+</CustomObject>

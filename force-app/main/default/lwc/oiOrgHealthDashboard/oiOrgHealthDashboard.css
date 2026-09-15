@@ -1,0 +1,94 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Defects corrected, all of them the SLDS on-surface tier inversion ADR-0028's Context section
+ * documents (--slds-g-color-on-surface-1 is SLDS 2's WEAKEST text tier, #5c5c5c, and -3 the
+ * STRONGEST, #03234d — this file assumed the reverse throughout):
+ *   - every primary-text rule (.oi-health-app, the h1, the back link's hover) read
+ *     --slds-g-color-on-surface-1 while its literal fallback said #12161f, so the page's body copy
+ *     and its page title rendered mid-grey #5c5c5c instead of near-black. Now text-primary.
+ *   - .oi-health-last-run and its "last run" label read --slds-g-color-on-surface-3 while intending
+ *     the muted grey #8892a0, so the least important text on the page rendered dark navy #03234d —
+ *     stronger than the values it annotates. Now text-muted.
+ *
+ * 'IBM Plex Mono', 'IBM Plex Sans' and 'Manrope' are deleted: the package ships no static
+ * resource, so all three always silently fell through to the platform font (ADR-0028 Context).
+ *
+ * Font weight 800 on the page title is retired to --oi-font-weight-bold (700) per ADR-0028 §4 C11.
+ *
+ * The button vocabulary this file used to define locally now lives in c/oiButtonStyles.
+ */
+
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}
+
+.oi-health-app {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body-lg);
+  line-height: var(--oi-line-height-body);
+  padding: var(--oi-space-5) var(--oi-space-5) var(--oi-space-6);
+  color: var(--oi-color-text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-5);
+}
+
+.oi-health-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--oi-space-5);
+}
+
+.oi-health-lede {
+  margin: var(--oi-space-1) 0 0;
+  color: var(--oi-color-text-secondary);
+  font-size: var(--oi-font-size-body-lg);
+  line-height: var(--oi-line-height-body);
+  /* Measure, not spacing: a ch-based reading width the type scale does not govern. */
+  max-width: 44ch;
+}
+
+.oi-health-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-3);
+  flex-shrink: 0;
+}
+
+.oi-health-last-run {
+  text-align: right;
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+  display: flex;
+  flex-direction: column;
+}
+.oi-health-last-run .num {
+  color: var(--oi-color-text-secondary);
+  font-size: var(--oi-font-size-body);
+}
+
+.oi-health-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-secondary);
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+  /* Pulls the back link into the flex gap above it — derived from the spacing scale so it stays
+     * in step with the gap it is cancelling. */
+  margin-bottom: calc(var(--oi-space-2) * -1);
+}
+.oi-health-detail-back:hover {
+  color: var(--oi-color-text-primary);
+}

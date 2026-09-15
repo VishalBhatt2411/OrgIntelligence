@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Formula_Description__c</fullName>
+    <label>Formula Description</label>
+    <length>1000</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+    <description
+  >Human-readable explanation shown verbatim in oiHealthFormulaDisclosure — read directly by the DTO so the displayed formula can never drift from the number actually computed.</description>
+</CustomField>

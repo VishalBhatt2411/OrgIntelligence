@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Resolution_Evidence__c</fullName>
+    <label>Resolution Evidence</label>
+    <length>4096</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>4</visibleLines>
+    <description
+  >Why this finding is considered resolved — either the auto-resolve note OI_OrgHealthFindingRepository stamps when a re-scan no longer detects the condition, or an administrator's own explanation.</description>
+</CustomField>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>First_Detected__c</fullName>
+    <label>First Detected</label>
+    <type>DateTime</type>
+    <required>true</required>
+    <description
+  >When this fingerprint was first detected — set once on insert, never overwritten by a later re-scan.</description>
+</CustomField>

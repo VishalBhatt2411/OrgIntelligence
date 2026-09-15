@@ -1,30 +1,48 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Layout is unchanged.
+ *
+ * Defect corrected: the viewer title asked for --slds-g-color-on-surface-1 with a near-black
+ * #181818 fallback, but on-surface-1 is SLDS 2's WEAKEST text tier (#5c5c5c) — the heading
+ * rendered mid-grey against the intended primary black. It now resolves --oi-color-text-primary.
+ *
+ * The 0.9rem title collapses onto --oi-font-size-body-lg (0.875rem, 14px) per ADR-0028 §5's
+ * seven-step scale; this is a sub-pixel shift and is the intended consolidation.
+ *
+ * max-height: 22rem on the tree pane stays literal — it is a scroll-container dimension, not a
+ * spacing step.
+ */
+
 .oi-hierarchy-viewer {
-    padding: 0.75rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+  padding: var(--oi-space-3) var(--oi-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-3);
+  font-family: var(--oi-font-family-sans);
 }
 
 .oi-hierarchy-viewer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--oi-space-3);
 }
 
 .oi-hierarchy-viewer-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--slds-g-color-on-surface-1, #181818);
-    margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+  margin: 0;
 }
 
 .oi-hierarchy-viewer-path {
-    border-bottom: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    padding-bottom: 0.5rem;
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+  padding-bottom: var(--oi-space-2);
 }
 
 .oi-hierarchy-viewer-tree {
-    max-height: 22rem;
-    overflow-y: auto;
+  max-height: 22rem;
+  overflow-y: auto;
 }

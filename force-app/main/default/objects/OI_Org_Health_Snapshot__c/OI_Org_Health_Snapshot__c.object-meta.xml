@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI Org Health Snapshot</label>
+    <pluralLabel>OI Org Health Snapshots</pluralLabel>
+    <nameField>
+        <label>Snapshot Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>HEALTH-{00000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description
+  >Append-only, one row per (Section_Key__c, Compute_Run_Id__c) — the durable result of an Org Health Tier-3 (async/persisted) computation, per ADR-0026. Deliberately NOT used by Tier 1/2 sections (Org Overview, Storage, and most Metadata/Automation/Code/Security Health metrics), which stay live/bounded and unpersisted — this object exists only for Data Health and the two exhaustive-enumeration metrics (Metadata Health orphan detection, Code Health API-version audit) that genuinely need it. Modeled on OI_Log__c/OI_Impact_Cache__c's shape, not OI_Graph_Node__c's immutable-versioning model, since this is not graph data. Owned exclusively by OI_OrgHealthSnapshotRepository.</description>
+</CustomObject>

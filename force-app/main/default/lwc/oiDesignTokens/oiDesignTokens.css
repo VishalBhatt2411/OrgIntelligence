@@ -1,0 +1,237 @@
+/**
+ * oiDesignTokens — the platform's single design token vocabulary.
+ *
+ * Purpose
+ *   One authoritative definition of every color, type step, spacing unit, radius, and elevation
+ *   used by any Org Intelligence component, so appearance is governed in one file rather than at
+ *   570 scattered call sites. Governed by docs/ADR/0028-unified-cross-surface-design-token-system.md
+ *   §5, which is the normative source for these names and values.
+ *
+ * Consumption
+ *   This is a CSS-only LWC module (no .js, no meta file) — the platform's native mechanism for
+ *   sharing CSS. Import it as the FIRST line of a component stylesheet:
+ *
+ *       @import 'c/oiDesignTokens';
+ *
+ *   Tokens are declared on :host so each component carries its own token scope. That is
+ *   deliberate: the three surfaces (Graph Explorer, Hierarchy Manager, Org Health) are separate
+ *   FlexiPages whose root components are siblings with no shared ancestor to inherit from, and
+ *   App Builder can place any component anywhere. See ADR-0028 §1.
+ *
+ * Rules for contributors
+ *   - Never introduce a color, font-size, radius, shadow, or spacing literal in a component.
+ *     If a value is missing here, add it here.
+ *   - Every token resolves SLDS-first — var(--slds-g-color-*, <literal>) — so the app inherits
+ *     customer org theming and degrades to the specification's literal where SLDS 2 tokens are
+ *     absent. Three exceptions are permitted and each is justified inline below.
+ *   - NEVER use @media (prefers-color-scheme: dark) in this codebase. Measured in projectOrg on
+ *     2026-09-02: `color-scheme` computes to `normal`, so every SLDS light-dark() token resolves
+ *     to its LIGHT value even on a machine whose OS reports a dark preference. A
+ *     prefers-color-scheme query would darken our tokens while SLDS stayed light, producing a
+ *     half-dark UI. Author dark variants with light-dark() instead — it keys off the same signal
+ *     SLDS uses, resolves light today, and follows automatically if Salesforce flips it.
+ */
+
+:host {
+  /* ---------------------------------------------------------------------
+   * Color — surface and text (SLDS-first)
+   *
+   * The three text tiers restore VisualDesignSpecification.md §4's taxonomy, which
+   * OrgHealthVisualDesignSpecification.md had collapsed into two. They map onto SLDS's own three
+   * on-surface tiers, so the SLDS-first resolution is a genuine semantic match rather than a
+   * convenient coincidence.
+   * ------------------------------------------------------------------ */
+  --oi-color-surface: var(--slds-g-color-surface-container-1, #ffffff);
+  --oi-color-surface-sunken: var(--slds-g-color-surface-container-2, #f7f8fa);
+  --oi-color-text-primary: var(--slds-g-color-on-surface-3, #17233d);
+  --oi-color-text-secondary: var(--slds-g-color-on-surface-2, #44506a);
+  --oi-color-text-muted: var(--slds-g-color-on-surface-1, #6b7280);
+  --oi-color-border: var(--slds-g-color-border-1, #d9dde5);
+  --oi-color-border-strong: var(--slds-g-color-border-2, #c9c7c5);
+
+  /* Accent. Measured: --slds-g-color-accent-1 is #066afe in projectOrg, perceptually adjacent to
+   * the specification's #0b5cff, so binding to the token is safe and gains org theming.
+   * Do NOT pair this with --slds-g-color-accent-container-1: both resolve to #066afe here, so a
+   * "washed container" built from that token would be invisible against its own foreground. */
+  --oi-color-accent: var(--slds-g-color-accent-1, #0b5cff);
+  --oi-color-accent-wash: rgba(11, 92, 255, 0.1);
+  --oi-color-on-accent: var(--slds-g-color-on-accent-1, #ffffff);
+
+  /* Hover/active step for accent-filled controls. accent-2 (#0250d9 here) is genuinely darker
+   * than accent-1 (#066afe), so it reads as a pressed state. Safe to use alongside accent-1 —
+   * unlike accent-container-1, which resolves to the same value as accent-1 in this org. */
+  --oi-color-accent-strong: var(--slds-g-color-accent-2, #014486);
+
+  /* ---------------------------------------------------------------------
+   * Color — severity  (EXCEPTION 2 of 3: hardcoded, per ADR-0028 §2)
+   *
+   * Not bound to the SLDS severity families, because measuring them in projectOrg on 2026-09-02
+   * falsified OrgHealthVisualDesignSpecification.md §4's original mapping:
+   *     --slds-g-color-success-1     -> #056764  dark teal,  NOT green
+   *     --slds-g-color-warning-1     -> #8c4b02  brown,      NOT amber
+   *     --slds-g-color-error-1       -> #b60554  magenta,    NOT red
+   * Binding severity there would destroy the traffic-light semantic, and the teal additionally
+   * collides with --oi-color-rel-master-detail (#0b827c) on the graph canvas. Status legibility
+   * outranks brand adaptation, so these are literal — but authored with light-dark() so they
+   * still follow a future dark theme, and still overridable by a consuming org.
+   *
+   * Severity is a channel of its own: never used for interactive/brand elements, and never
+   * substituted for the structural colors below. Per ADR-0028 §4 severity must also be carried by
+   * a label or glyph, never by color alone.
+   * ------------------------------------------------------------------ */
+  --oi-color-severity-good: light-dark(#2e844a, #45c65a);
+  --oi-color-severity-warning: light-dark(#b95000, #f0a020);
+  --oi-color-severity-critical: light-dark(#ba0517, #fe8aa7);
+  --oi-color-severity-none: var(--slds-g-color-on-surface-1, #6b7280);
+  --oi-color-severity-good-wash: light-dark(#e6f4ea, #10321c);
+  --oi-color-severity-warning-wash: light-dark(#fdf0e4, #3a2100);
+  --oi-color-severity-critical-wash: light-dark(#fceaec, #40060f);
+  --oi-color-severity-none-wash: light-dark(#eef1f5, #22262c);
+
+  /* ---------------------------------------------------------------------
+   * Color — categorical identity
+   *
+   * A THIRD colour channel, distinct from both accent and severity: "which thing is this",
+   * carrying no status meaning whatsoever. Used for the Org Health section monogram tiles and for
+   * metadata-type accents in the Intelligence Panel.
+   *
+   * This family exists because binding identity to severity produces actively misleading UI. The
+   * Org Health landing grid did exactly that before this token family existed: the Code Health
+   * card's monogram was severity-green and Data Health's severity-amber as fixed properties of the
+   * section, so the icons implied a status that contradicted the real scores next to them.
+   *
+   * Rules:
+   *   - Deliberately excludes green and red, so an identity tile can never be mistaken for a
+   *     severity signal.
+   *   - Only ever a monogram/icon tile fill or a type accent — never a badge, never body text,
+   *     never a score. Any card using one must still show its real severity via a labelled badge.
+   *   - The numbering is intentional: these are interchangeable slots in a categorical ramp, so
+   *     the token layer carries no product taxonomy.
+   * ------------------------------------------------------------------ */
+  --oi-color-identity-1: light-dark(#3b6fe0, #8ab0ff); /* blue */
+  --oi-color-identity-2: light-dark(#5e35b1, #b39ddb); /* violet */
+  --oi-color-identity-3: light-dark(#0b827c, #4dd0c7); /* teal */
+  --oi-color-identity-4: light-dark(#7376e0, #a5a7ee); /* indigo */
+  --oi-color-identity-5: light-dark(#c95bb6, #e39fd6); /* plum */
+  --oi-color-identity-6: light-dark(#5c6672, #9aa5b1); /* slate */
+  --oi-color-identity-7: light-dark(#0d7d9d, #56c2dd); /* cyan */
+  --oi-color-identity-1-wash: light-dark(#eaf1ff, #16233d);
+  --oi-color-identity-2-wash: light-dark(#f1ecfa, #241839);
+  --oi-color-identity-3-wash: light-dark(#e4f4f3, #0a2c2a);
+  --oi-color-identity-4-wash: light-dark(#eeeffc, #1d1e3a);
+  --oi-color-identity-5-wash: light-dark(#fbecf7, #34112c);
+  --oi-color-identity-6-wash: light-dark(#eef1f5, #22262c);
+  --oi-color-identity-7-wash: light-dark(#e5f4f9, #082b36);
+
+  /* ---------------------------------------------------------------------
+   * Color — structural / relationship kind  (EXCEPTION 1 of 3: hardcoded)
+   *
+   * The original exception, established and justified in oiRelationshipCanvas.css: verified live,
+   * --slds-g-color-accent-2 (#0250d9) and --slds-g-color-accent-3 (#022ac0) are visually
+   * indistinguishable under this org's theme, which silently defeats the legend's whole purpose
+   * of telling relationship kinds apart at a glance. These are guaranteed-distinct literals.
+   *
+   * Structural green means "this object" — it is NOT severity green. The two families may never
+   * be substituted for one another.
+   * ------------------------------------------------------------------ */
+  --oi-color-rel-incoming: #5e35b1;
+  --oi-color-rel-outgoing: #0176d3;
+  --oi-color-rel-master-detail: #0b827c;
+  --oi-color-rel-self: #a61b7b;
+  --oi-color-rel-object: #1f9d61;
+
+  /* ---------------------------------------------------------------------
+   * Typography
+   *
+   * Root font size is 16px (measured, not assumed), so the px equivalents below are exact.
+   * Seven steps replace the 26 distinct sizes the audit found — 17 of which were crowded into the
+   * 0.58–0.9rem band, where clusters like {0.65, 0.66, 0.68} and {0.8, 0.82, 0.85, 0.86} were
+   * accidental drift rather than intent.
+   *
+   * The specifications' 12–14px band binds BODY text: that is caption/body/body-lg. `micro` sits
+   * below it and `title` and up sit above it, as named exceptions per ADR-0028 §4 — headings and
+   * uppercase micro-labels are not body text.
+   * ------------------------------------------------------------------ */
+  /* Font stacks. Both specifications mandate "Salesforce Sans/system sans-serif".
+   *
+   * These replace 'Manrope' / 'IBM Plex Sans' / 'IBM Plex Mono', which 18 components declared
+   * across 37 rules and which NEVER LOADED in any org: the package contains no static resources,
+   * the rendered document carries exactly one @font-face rule (Salesforce's own icon font), and
+   * all three families measured byte-identical to the platform fallback when probed in projectOrg
+   * on 2026-09-02. That typographic identity was aspirational, not real. Shipping it for real
+   * would require packaging the faces as a static resource — extra weight and an added Security
+   * Review surface — to reach an appearance the binding specifications do not ask for.
+   *
+   * Also collapses three competing monospace stacks into one. */
+  --oi-font-family-sans:
+    "Salesforce Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --oi-font-family-mono:
+    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --oi-font-size-micro: 0.6875rem; /* 11px — uppercase labels and pills only, pair with -caps */
+  --oi-font-size-caption: 0.75rem; /* 12px */
+  --oi-font-size-body: 0.8125rem; /* 13px */
+  --oi-font-size-body-lg: 0.875rem; /* 14px */
+  --oi-font-size-title: 1rem; /* 16px — card and section headings */
+  --oi-font-size-display: 1.25rem; /* 20px — score numerals, KPI values */
+  --oi-font-size-display-lg: 1.5rem; /* 24px — page title */
+
+  /* Three weights replace five. 500 and 800 are retired: they appeared in only 8 of 117
+   * declarations and gave the same role a different weight per component. */
+  --oi-font-weight-regular: 400;
+  --oi-font-weight-semibold: 600;
+  --oi-font-weight-bold: 700;
+
+  /* Uppercase micro-labels need positive tracking to stay legible. Neither specification named a
+   * letter-spacing value despite both mandating uppercase labels. 0.08em preserves the tracking
+   * the existing Org Health eyebrow labels were designed with (they used 0.09em) rather than
+   * imposing a tighter value the design was not drawn for. */
+  --oi-letter-spacing-caps: 0.08em;
+  --oi-line-height-tight: 1.25;
+  --oi-line-height-body: 1.45;
+
+  /* Scores, counts, and KPI values are computed data and must not reflow as digits change. */
+  --oi-font-numeric: tabular-nums;
+
+  /* ---------------------------------------------------------------------
+   * Spacing and geometry
+   * ------------------------------------------------------------------ */
+  --oi-space-1: 0.25rem;
+  --oi-space-2: 0.5rem;
+  --oi-space-3: 0.75rem;
+  --oi-space-4: 1rem;
+  --oi-space-5: 1.5rem;
+  --oi-space-6: 2rem;
+
+  /* Four radii replace fifteen. {0.3, 0.35, 0.375, 0.4}rem were four values for one small radius,
+   * split by component family; pill shape was expressed as both 999px and 50%. */
+  --oi-radius-sm: 0.25rem; /* 4px */
+  --oi-radius-md: 0.375rem; /* 6px — control radius */
+  --oi-radius-lg: 0.5rem; /* 8px — card radius */
+  --oi-radius-pill: 999px;
+
+  --oi-border-width: 1px;
+  --oi-icon-tile: 2rem; /* 32px — inside VisualDesignSpecification.md §5's 30–32px range */
+
+  /* ---------------------------------------------------------------------
+   * Elevation  (EXCEPTION 3 of 3: hardcoded, per ADR-0028 §2)
+   *
+   * Both specifications fix the card shadow at exactly 0 2px 8px rgba(15,23,42,0.10), while this
+   * org's real --slds-g-shadow-1/-2 are three-layer shadows with materially different geometry.
+   * The specification value is binding, so elevation is literal.
+   *
+   * Three tiers replace fifteen distinct shadows — and, more importantly, replace the eight
+   * different fallback values that --slds-g-shadow-2 was given across five components.
+   * ------------------------------------------------------------------ */
+  --oi-shadow-card: 0 2px 8px rgba(15, 23, 42, 0.1);
+  --oi-shadow-raised: 0 4px 16px rgba(15, 23, 42, 0.14);
+  --oi-shadow-overlay: 0 8px 24px rgba(15, 23, 42, 0.18);
+
+  /* One focus treatment. Replaces two competing recipes that differed within single files
+   * (oiGraphNode.css:52 vs :154, oiSchemaObjectCard.css:38 vs :43) and supplies the focus-visible
+   * value both specifications omit despite VisualDesignSpecification.md §8 making keyboard
+   * accessibility mandatory. */
+  --oi-focus-ring: 0 0 0 2px var(--oi-color-accent);
+}

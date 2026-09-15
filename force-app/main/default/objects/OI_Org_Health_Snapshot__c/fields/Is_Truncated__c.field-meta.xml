@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Truncated__c</fullName>
+    <label>Is Truncated</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >True when this run hit its configured row ceiling and did not examine every eligible record — surfaced in the UI's coverage note rather than left implicit.</description>
+</CustomField>

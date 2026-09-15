@@ -1,0 +1,19 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Mirrors oiHealthFindingDrawer's / oiHealthLiveInsightPanel's own modal shell (same z-index
+ * family, same viewport-capped body) so this reads as the same family of overlay.
+ */
+
+.oi-kpi-drilldown-modal {
+  z-index: 9001;
+}
+
+.oi-kpi-drilldown-header {
+  background: var(--oi-color-surface);
+}
+
+.oi-kpi-drilldown-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}

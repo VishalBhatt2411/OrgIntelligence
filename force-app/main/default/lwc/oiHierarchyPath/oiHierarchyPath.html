@@ -1,38 +1,60 @@
 <template>
-    <div class="oi-hierarchy-path">
-        <template lwc:if={isLoading}>
-            <lightning-spinner alternative-text="Loading path" size="x-small"></lightning-spinner>
+  <div class="oi-hierarchy-path">
+    <template lwc:if={isLoading}>
+      <c-oi-skeleton
+        data-id="path-loading"
+        lines="1"
+        label="Loading hierarchy path"
+      ></c-oi-skeleton>
+    </template>
+    <template lwc:elseif={hasError}>
+      <c-oi-state-banner
+        data-id="path-error"
+        state="error"
+        title="Couldn't load the hierarchy path"
+        message={errorMessage}
+        onretry={handleRetry}
+      ></c-oi-state-banner>
+    </template>
+    <template lwc:elseif={hasCrumbs}>
+      <ol class="oi-hierarchy-path-trail" data-id="path-trail">
+        <template for:each={crumbs} for:item="crumb">
+          <li key={crumb.key} class="oi-hierarchy-path-crumb-item">
+            <template lwc:if={crumb.isCurrent}>
+              <span
+                class="oi-hierarchy-path-current"
+                data-id="path-crumb-current"
+                title={crumb.label}
+                >{crumb.label}</span
+              >
+            </template>
+            <template lwc:else>
+              <button
+                type="button"
+                class="oi-hierarchy-path-crumb"
+                data-id="path-crumb"
+                data-record-id={crumb.recordId}
+                data-object-api-name={crumb.objectApiName}
+                title={crumb.label}
+                onclick={handleCrumbClick}
+              >
+                {crumb.label}
+              </button>
+              <span class="oi-hierarchy-path-separator" aria-hidden="true"
+                >›</span
+              >
+            </template>
+          </li>
         </template>
-        <template lwc:elseif={hasError}>
-            <p class="oi-hierarchy-path-error" data-id="path-error" role="alert">{errorMessage}</p>
-        </template>
-        <template lwc:elseif={hasCrumbs}>
-            <ol class="oi-hierarchy-path-trail" data-id="path-trail">
-                <template for:each={crumbs} for:item="crumb">
-                    <li key={crumb.key} class="oi-hierarchy-path-crumb-item">
-                        <template lwc:if={crumb.isCurrent}>
-                            <span class="oi-hierarchy-path-current" data-id="path-crumb-current" title={crumb.label}>{crumb.label}</span>
-                        </template>
-                        <template lwc:else>
-                            <button
-                                type="button"
-                                class="oi-hierarchy-path-crumb"
-                                data-id="path-crumb"
-                                data-record-id={crumb.recordId}
-                                data-object-api-name={crumb.objectApiName}
-                                title={crumb.label}
-                                onclick={handleCrumbClick}
-                            >
-                                {crumb.label}
-                            </button>
-                            <span class="oi-hierarchy-path-separator" aria-hidden="true">›</span>
-                        </template>
-                    </li>
-                </template>
-            </ol>
-        </template>
-        <template lwc:elseif={showRootNote}>
-            <p class="oi-hierarchy-path-note" data-id="path-root-note">This record is a root in this hierarchy — it has no parent.</p>
-        </template>
-    </div>
+      </ol>
+    </template>
+    <template lwc:elseif={showRootNote}>
+      <c-oi-state-banner
+        data-id="path-root-note"
+        state="true-zero"
+        title="This record is a root in this hierarchy"
+        message="It has no parent, so there is no path above it."
+      ></c-oi-state-banner>
+    </template>
+  </div>
 </template>

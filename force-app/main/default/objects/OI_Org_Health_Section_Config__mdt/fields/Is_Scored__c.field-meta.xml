@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Scored__c</fullName>
+    <label>Is Scored</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >False means this section is facts-only by product rule (e.g. Automation Health, Security Health — "no fake score") — the DTO/UI must never synthesize a score for it.</description>
+</CustomField>

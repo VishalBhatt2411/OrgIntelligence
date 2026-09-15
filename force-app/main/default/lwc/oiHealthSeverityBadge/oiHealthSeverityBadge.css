@@ -1,0 +1,87 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Severity resolves through --oi-color-severity-* rather than the SLDS severity families, which
+ * ADR-0028's live audit found do not carry traffic-light semantics in this org: success-1 is a
+ * dark teal (#056764), warning-1 a brown (#8c4b02), error-1 a magenta (#b60554). Before this
+ * migration the GOOD pill therefore rendered mint-on-teal and CRITICAL pink-on-magenta rather
+ * than the green and red the literal fallbacks here intended.
+ *
+ * The neutral dot and the facts badge additionally resolved --slds-g-color-on-surface-3 to dark
+ * navy (#03234d) where a muted grey was intended — that token is SLDS 2's STRONGEST text tier,
+ * not its weakest.
+ *
+ * Severity is never carried by color alone (ADR-0028 §4): every variant here pairs its color with
+ * the uppercase text label the template supplies.
+ */
+
+.oi-health-severity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-1);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  border-radius: var(--oi-radius-pill);
+}
+
+.oi-health-severity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--oi-radius-pill);
+  flex-shrink: 0;
+}
+
+.oi-health-severity-badge_good {
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+}
+.oi-health-severity-badge_good .oi-health-severity-dot {
+  background: var(--oi-color-severity-good);
+}
+
+.oi-health-severity-badge_warning {
+  background: var(--oi-color-severity-warning-wash);
+  color: var(--oi-color-severity-warning);
+}
+.oi-health-severity-badge_warning .oi-health-severity-dot {
+  background: var(--oi-color-severity-warning);
+}
+
+.oi-health-severity-badge_critical {
+  background: var(--oi-color-severity-critical-wash);
+  color: var(--oi-color-severity-critical);
+}
+.oi-health-severity-badge_critical .oi-health-severity-dot {
+  background: var(--oi-color-severity-critical);
+}
+
+/* "Not scanned / not obtainable" — deliberately neutral, never colored as if it were a severity. */
+.oi-health-severity-badge_neutral {
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+.oi-health-severity-badge_neutral .oi-health-severity-dot {
+  background: var(--oi-color-severity-none);
+}
+
+/* A section that reports facts and is deliberately unscored. Dashed border and muted type mark it
+ * as a structural statement, not a pending or failed score. */
+.oi-health-facts-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: var(--oi-space-1) var(--oi-space-2);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+  border: var(--oi-border-width) dashed var(--oi-color-border);
+  border-radius: var(--oi-radius-pill);
+}

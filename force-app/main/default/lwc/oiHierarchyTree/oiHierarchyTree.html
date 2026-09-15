@@ -1,27 +1,41 @@
 <template>
-    <div class="oi-hierarchy-tree">
-        <template lwc:if={isLoading}>
-            <lightning-spinner alternative-text="Loading hierarchy tree" size="x-small"></lightning-spinner>
-        </template>
-        <template lwc:elseif={hasError}>
-            <p class="oi-hierarchy-tree-error" data-id="tree-error" role="alert">{errorMessage}</p>
-        </template>
-        <template lwc:elseif={hasRoot}>
-            <c-oi-hierarchy-tree-node
-                data-id="tree-root"
-                node-record-id={rootRecordId}
-                node-object-api-name={rootObjectApiName}
-                node-label={effectiveRootLabel}
-                children-by-parent-id={childrenByParentId}
-                depth={rootDepth}
-                is-root
-                onrecordselect={handleRootSelect}
-            ></c-oi-hierarchy-tree-node>
-            <template lwc:if={hasMore}>
-                <p class="oi-hierarchy-tree-note" data-id="tree-has-more-note">
-                    Additional descendants exist beyond what's shown here — bounded to keep this within governor limits.
-                </p>
-            </template>
-        </template>
-    </div>
+  <div class="oi-hierarchy-tree">
+    <template lwc:if={isLoading}>
+      <c-oi-skeleton
+        data-id="tree-loading"
+        lines="5"
+        label="Loading hierarchy tree"
+      ></c-oi-skeleton>
+    </template>
+    <template lwc:elseif={hasError}>
+      <c-oi-state-banner
+        data-id="tree-error"
+        state="error"
+        title="Couldn't load the hierarchy tree"
+        message={errorMessage}
+        onretry={handleRetry}
+      ></c-oi-state-banner>
+    </template>
+    <template lwc:elseif={hasRoot}>
+      <c-oi-hierarchy-tree-node
+        data-id="tree-root"
+        node-record-id={rootRecordId}
+        node-object-api-name={rootObjectApiName}
+        node-label={effectiveRootLabel}
+        children-by-parent-id={childrenByParentId}
+        depth={rootDepth}
+        is-root
+        onrecordselect={handleRootSelect}
+      ></c-oi-hierarchy-tree-node>
+      <template lwc:if={hasMore}>
+        <c-oi-state-banner
+          class="oi-hierarchy-tree-has-more"
+          data-id="tree-has-more-note"
+          state="coverage-incomplete"
+          title="Not every descendant is shown"
+          message="Additional descendants exist beyond what's shown here — the traversal is bounded to stay within governor limits."
+        ></c-oi-state-banner>
+      </template>
+    </template>
+  </div>
 </template>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Status__c</fullName>
+    <label>Status</label>
+    <type>Picklist</type>
+    <required>true</required>
+    <trackHistory>true</trackHistory>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Open</fullName><default>true</default><label
+        >Open</label></value>
+            <value><fullName>Acknowledged</fullName><default
+        >false</default><label>Acknowledged</label></value>
+            <value><fullName>In Progress</fullName><default
+        >false</default><label>In Progress</label></value>
+            <value><fullName>Risk Accepted</fullName><default
+        >false</default><label>Risk Accepted</label></value>
+            <value><fullName>Resolved</fullName><default>false</default><label
+        >Resolved</label></value>
+            <value><fullName>False Positive</fullName><default
+        >false</default><label>False Positive</label></value>
+        </valueSetDefinition>
+    </valueSet>
+    <description
+  >The finding's remediation lifecycle. A re-scan that still detects the same fingerprint never resets this back to Open — only OI_OrgHealthFindingRepository's own auto-resolve path (when the condition disappears) or an explicit administrator action changes it.</description>
+</CustomField>

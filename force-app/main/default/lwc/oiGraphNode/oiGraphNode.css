@@ -1,31 +1,67 @@
+@import "c/oiDesignTokens";
+
 /**
- * Every color below is an SLDS global styling hook (--slds-g-color-*) with the original
- * literal hex as its fallback — var(--slds-g-color-X, #hex) — so the card adapts to Lightning
- * Experience's SLDS 2 dark mode where available and renders exactly as before where it isn't.
- * --oi-node-accent itself is normally overridden per-instance by oiGraphNode.js's nodeStyle
- * (resolved from the registry's colorToken, which is itself now hook-backed — see that file),
- * so the value here is only the pre-registry-resolution default.
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * --oi-node-accent reconciliation (ADR-0028 §Context's named conflict). This file defaulted the
+ * property from --slds-g-color-border-2 with a #706e6b fallback, while oiSchemaObjectCard.css
+ * defaulted the SAME property from --slds-g-color-accent-1 (a blue) — two conflicting defaults
+ * for one conceptual thing, a node's identity stripe. Worse, border-2 is SLDS 2's STRONG border
+ * and resolves to a dark grey #5c5c5c in this org, so the rule never even delivered its own
+ * #706e6b intent. Both files now default to --oi-color-accent. Rationale: the stripe is an
+ * identity/interaction affordance, and ADR-0028 §4 (C4) makes accent the interaction channel;
+ * a grey-by-default stripe reads as disabled, and the neutral case is still served — every
+ * instance's real colour is injected by JS from the registry's colorToken, whose `neutral` entry
+ * resolves --oi-color-text-muted. Choosing the neutral grey as the shared default would have made
+ * the pre-resolution frame of every card look inert for no benefit.
+ *
+ * Other defects corrected:
+ *   - .oi-graph-node-label resolved --slds-g-color-on-surface-1, SLDS 2's WEAKEST text tier
+ *     (#5c5c5c), while asking for #181818 — the node's primary label rendered a full tier lighter
+ *     than intended. Now --oi-color-text-primary.
+ *   - the secondary/type/hop captions resolved --slds-g-color-on-surface-2 while asking for
+ *     #706e6b, a muted tone; now --oi-color-text-muted, so label > caption hierarchy holds.
+ *   - the two focus/selection rings DISAGREED inside this one file: .is-selected used
+ *     --slds-g-color-border-accent-1 and .is-on-path used --slds-g-color-accent-1. Both now use
+ *     the single --oi-focus-ring recipe.
+ *   - .oi-graph-node-open:hover bound to --slds-g-color-surface-container-2 (a grey surface) but
+ *     declared an accent wash (#eef4ff) as its fallback, so it rendered grey or blue depending on
+ *     the org. The declared intent wins: --oi-color-accent-wash.
+ *   - the private --oi-node-chip-bg / --oi-node-chip-color pair existed only to hold two literals
+ *     past the SLDS accent-container collision ADR-0028 records. Now that both values are real
+ *     tokens (--oi-color-accent-wash / --oi-color-accent) the indirection is dead weight and is
+ *     removed; the collision they worked around is documented once, in oiDesignTokens.css.
+ *   - font-weight 500 on the type caption is retired by ADR-0028 §4 (C11) and folds onto
+ *     --oi-font-weight-semibold; the type caption's 0.02em tracking becomes the platform's
+ *     --oi-letter-spacing-caps (0.08em), which is the uppercase-label treatment ADR-0028 §4 (C10)
+ *     mandates and is a small deliberate widening.
+ *
+ * Left literal deliberately: the 4px accent stripe, the cluster ::before/::after 3px/6px offsets,
+ * the tooltip's 260px max-width and its calc()/translate() positioning, transition durations,
+ * z-index, and the opacity in .is-dimmed — all local geometry, not tokenable values.
+ *
+ * NOTE for visual verification: the relationship chip's vertical padding was 0.05rem (0.8px),
+ * below the smallest spacing step, and now resolves --oi-space-1 (4px). The chip therefore grows
+ * ~6px taller. The card boxes themselves are fixed by the canvas foreignObject, so this needs a
+ * look at the reference viewport on the shortest neighbour card.
  */
 .oi-graph-node {
-    --oi-node-accent: var(--slds-g-color-border-2, #706e6b);
-    /** Deliberately literal, not var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified live in a real org (audit #09): those two distinct SLDS tokens resolve to the exact same color under this org's actual theme, which made the relationship-role chip below a solid color block with invisible text. Same fix as oiRelationshipCanvas.css's own scoped-custom-property exception for the identical collision. */
-    --oi-node-chip-bg: rgba(1, 118, 211, 0.1);
-    --oi-node-chip-color: #0176d3;
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: var(--slds-g-color-surface-container-1, #ffffff);
-    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    border-left: 4px solid var(--oi-node-accent);
-    border-radius: 0.5rem;
-    padding: 0.3rem 0.6rem;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    font-size: 0.75rem;
-    /**
+  --oi-node-accent: var(--oi-color-accent);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-left: 4px solid var(--oi-node-accent);
+  border-radius: var(--oi-radius-lg);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  font-size: var(--oi-font-size-caption);
+  /**
      * Was `hidden`. The label/secondary spans below already clip and ellipsize themselves
      * (.oi-graph-node-label/.oi-graph-node-secondary) — this outer overflow was never required
      * for that. Keeping it hidden would also clip the hover tooltip (.oi-graph-node-tooltip
@@ -34,87 +70,89 @@
      * stylesheet, not this file) — see oiGraphCanvas.css's .oi-graph-node-draggable rule for
      * the matching override on that side.
      */
-    overflow: visible;
-    box-shadow: var(--slds-g-shadow-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08));
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
-    /** A node is dragged/panned far more often than its label text is deliberately selected — without this, a mouse-drag that starts on the label paints the browser's native blue selection box instead of moving the node. Inherited by the label span below; no separate rule needed there. */
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
+  overflow: visible;
+  box-shadow: var(--oi-shadow-card);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+  /** A node is dragged/panned far more often than its label text is deliberately selected — without this, a mouse-drag that starts on the label paints the browser's native blue selection box instead of moving the node. Inherited by the label span below; no separate rule needed there. */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
 }
 
 .oi-graph-node:hover {
-    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.1));
-    transform: translateY(-2px) scale(1.015);
+  box-shadow: var(--oi-shadow-raised);
+  transform: translateY(-2px) scale(1.015);
 }
 
 .oi-graph-node.is-selected {
-    box-shadow: 0 0 0 2px var(--slds-g-color-border-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--oi-focus-ring), var(--oi-shadow-raised);
 }
 
 /** A stacked-card look (two faint shadow layers offset behind the card) — the visual cue that this one card represents a collapsed group of many, not a single real node (§26). */
 .oi-graph-node.is-cluster {
-    border-left-style: dashed;
+  border-left-style: dashed;
 }
 
 .oi-graph-node.is-cluster::before,
 .oi-graph-node.is-cluster::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    border-radius: 0.5rem;
-    background: var(--slds-g-color-surface-container-1, #ffffff);
-    z-index: -1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  background: var(--oi-color-surface);
+  z-index: -1;
 }
 
 .oi-graph-node.is-cluster::before {
-    transform: translate(3px, 3px);
+  transform: translate(3px, 3px);
 }
 
 .oi-graph-node.is-cluster::after {
-    transform: translate(6px, 6px);
-    opacity: 0.7;
+  transform: translate(6px, 6px);
+  opacity: 0.7;
 }
 
 .oi-graph-node-icon {
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .oi-graph-node-labels {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 0;
-    overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .oi-graph-node-label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 600;
-    color: var(--slds-g-color-on-surface-1, #181818);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
 }
 
 /** The object/qualified-identity line (secondaryKey) — e.g. an Object API name for a record node, or "Account.OwnerId" for a field. Distinct, smaller styling keeps it a supporting caption under the primary label, never competing with it (§28: color/weight is never the only signal — size and position carry the hierarchy here too). */
 .oi-graph-node-secondary {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.65rem;
-    font-weight: 400;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-regular);
+  color: var(--oi-color-text-muted);
 }
 
 /** The node's type (Object, Field, Apex Trigger, ...) — a caption under the label, quieter than the label itself and never a raw typeKey. */
 .oi-graph-node-type {
-    font-size: 0.6rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--oi-letter-spacing-caps);
+  color: var(--oi-color-text-muted);
 }
 
 /**
@@ -122,71 +160,76 @@
  * requirement). Deliberately its own visual weight, distinct from the type caption above: the
  * type says WHAT the node is, the chip says WHY it is connected, and conflating them into one
  * line would bury the more important of the two facts.
+ *
+ * Accent, not --oi-color-rel-*: the chip states a relationship ROLE in words for whatever kind
+ * the edge happens to be, so it is not the outgoing-kind swatch — it is the interaction accent,
+ * paired with its own wash.
  */
 .oi-graph-node-relationship-chip {
-    display: inline-block;
-    margin-top: 0.15rem;
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.65rem;
-    background: var(--oi-node-chip-bg);
-    color: var(--oi-node-chip-color);
-    font-size: 0.62rem;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
+  display: inline-block;
+  margin-top: var(--oi-space-1);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+  background: var(--oi-color-accent-wash);
+  color: var(--oi-color-accent);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /** Multi-hop distance — a quiet caption, never competing with the relationship chip which is the more important fact for a direct neighbour. */
 .oi-graph-node-hop-label {
-    font-size: 0.6rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-style: italic;
+  font-size: var(--oi-font-size-micro);
+  color: var(--oi-color-text-muted);
+  font-style: italic;
 }
 
 /**
  * Path-to-centre highlight (hover/selection). A visible ring rather than a colour swap alone, so
  * the highlight reads correctly even under a colour-vision deficiency — the same accessibility
- * discipline GraphUI.md already applies to selection.
+ * discipline GraphUI.md already applies to selection. Same ring recipe as .is-selected above;
+ * they previously used two different SLDS accent tokens for the identical treatment.
  */
 .oi-graph-node.is-on-path {
-    box-shadow: 0 0 0 2px var(--slds-g-color-accent-1, #0176d3), var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--oi-focus-ring), var(--oi-shadow-raised);
 }
 
 /** De-emphasis for everything NOT on the active path — opacity only, never display:none, so layout and existing interactions (drag, click) are completely undisturbed. */
 .oi-graph-node.is-dimmed {
-    opacity: 1;
+  opacity: 1;
 }
 
 .oi-graph-node-open {
-    border: 0;
-    border-radius: 0.25rem;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    cursor: pointer;
-    padding: 0.1rem 0.25rem;
-    font-size: 0.8rem;
+  border: 0;
+  border-radius: var(--oi-radius-sm);
+  background: transparent;
+  color: var(--oi-color-accent);
+  cursor: pointer;
+  padding: var(--oi-space-1) var(--oi-space-1);
+  font-size: var(--oi-font-size-body);
 }
 
 .oi-graph-node-open:hover,
 .oi-graph-node-open:focus-visible {
-    background: var(--slds-g-color-surface-container-2, #eef4ff);
+  background: var(--oi-color-accent-wash);
 }
 
 .oi-graph-node-expand-toggle {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    font-size: 0.7rem;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0 0.25rem;
-    flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  cursor: pointer;
+  padding: 0 var(--oi-space-1);
+  flex-shrink: 0;
 }
 
 .oi-graph-node-expand-toggle:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 /**
@@ -195,32 +238,38 @@
  * fully replaced by "just make the box wide enough"). Positioned above the card, centered,
  * hidden by default and only opacity/transform-transitioned in on hover/focus so it never
  * affects this component's own layout or the canvas's layout pass.
+ *
+ * The dark ground is --oi-color-text-primary and the text --oi-color-surface: a deliberate
+ * inversion of the page's own ink/paper pair, which is what the previous #16171a-on-#ffffff
+ * literals were reaching for via two SLDS neutral-base hooks the vocabulary does not carry.
  */
 .oi-graph-node-tooltip {
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 0.4rem);
-    transform: translate(-50%, 4px);
-    background: var(--slds-g-color-neutral-base-10, #16171a);
-    color: var(--slds-g-color-neutral-base-100, #ffffff);
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.3rem;
-    font-size: 0.68rem;
-    font-weight: 500;
-    line-height: 1.3;
-    white-space: normal;
-    width: max-content;
-    max-width: 260px;
-    text-align: center;
-    box-shadow: var(--slds-g-shadow-2, 0 4px 10px rgba(0, 0, 0, 0.25));
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s ease, transform 0.12s ease;
-    z-index: 20;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  transform: translate(-50%, 4px);
+  background: var(--oi-color-text-primary);
+  color: var(--oi-color-surface);
+  padding: var(--oi-space-2) var(--oi-space-2);
+  border-radius: var(--oi-radius-md);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  white-space: normal;
+  width: max-content;
+  max-width: 260px;
+  text-align: center;
+  box-shadow: var(--oi-shadow-overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+  z-index: 20;
 }
 
 .oi-graph-node:hover .oi-graph-node-tooltip,
 .oi-graph-node:focus-within .oi-graph-node-tooltip {
-    opacity: 1;
-    transform: translate(-50%, 0);
+  opacity: 1;
+  transform: translate(-50%, 0);
 }

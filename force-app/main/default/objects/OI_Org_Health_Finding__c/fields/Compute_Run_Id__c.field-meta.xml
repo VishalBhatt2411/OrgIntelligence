@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Compute_Run_Id__c</fullName>
+    <label>Compute Run Id</label>
+    <type>Text</type>
+    <length>36</length>
+    <required>false</required>
+    <description
+  >Identifier of the scan run that most recently (re)detected this finding — lets the UI group findings by run and compare runs for the historical-comparison view.</description>
+</CustomField>

@@ -1,15 +1,23 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Structure unchanged.
+ *
+ * .oi-hierarchy-tree-error and .oi-hierarchy-tree-note were deleted rather than retokenized: the
+ * error state now renders through c/oiStateBanner (state="error"), the bounded-traversal note
+ * through the same banner as state="coverage-incomplete" — which is exactly what it reports — and
+ * the loading state through c/oiSkeleton. ADR-0028 §7 retires these per-component state styles.
+ *
+ * The only rule left behind is the note's own top margin, which is layout, not state styling.
+ */
+
 .oi-hierarchy-tree {
-    font-size: 0.8rem;
+  font-size: var(--oi-font-size-body);
+  font-family: var(--oi-font-family-sans);
+  line-height: var(--oi-line-height-body);
 }
 
-.oi-hierarchy-tree-error {
-    color: var(--slds-g-color-error-1, #ba0517);
-    margin: 0;
-}
-
-.oi-hierarchy-tree-note {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-size: 0.75rem;
-    font-style: italic;
-    margin: 0.5rem 0 0 0;
+.oi-hierarchy-tree-has-more {
+  display: block;
+  margin-top: var(--oi-space-2);
 }

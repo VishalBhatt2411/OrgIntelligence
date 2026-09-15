@@ -1,0 +1,18 @@
+<template>
+  <div class="oi-health-nav" role="tablist" aria-label="Org Health sections">
+    <template for:each={renderedSections} for:item="section">
+      <button
+        key={section.sectionKey}
+        type="button"
+        role="tab"
+        class={section.tabClass}
+        aria-selected={section.isActive}
+        data-section-key={section.sectionKey}
+        onclick={handleSelect}
+      >
+        <span class="oi-health-nav-dot" style={section.dotStyle}></span
+        >{section.displayLabel}
+      </button>
+    </template>
+  </div>
+</template>

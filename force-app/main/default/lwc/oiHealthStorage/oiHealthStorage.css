@@ -1,0 +1,65 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary. Defects corrected:
+ *   - header card border: --slds-g-color-border-2 is SLDS 2's STRONG border (#5c5c5c) while the
+ *     #edf0f4 fallback intended a hairline, so the card was outlined in mid grey
+ *     -> --oi-color-border.
+ *   - eyebrow: --slds-g-color-on-surface-3 is the STRONGEST text tier (#03234d) while the #8892a0
+ *     fallback intended muted grey -> --oi-color-text-muted.
+ *   - section title: --slds-g-color-on-surface-1 is the WEAKEST tier (#5c5c5c) while the #12161f
+ *     fallback intended primary text -> --oi-color-text-primary. The two together meant the
+ *     eyebrow rendered stronger than the heading it introduces.
+ *   - 'Manrope' / 'IBM Plex Sans' never loaded (the package ships no static resources).
+ * This is the component ADR-0028's Consequences section flags as visibly changing: it used font
+ * weight 800 exclusively, and 800 is retired in favour of 700 (§4 C11).
+ * The off-ladder 760px breakpoint becomes the ladder's 768px rung (§6).
+ */
+
+.oi-health-storage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-4);
+}
+
+.oi-health-detail-header {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-5);
+  display: flex;
+  gap: var(--oi-space-5);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.oi-health-eyebrow {
+  font-family: var(--oi-font-family-sans);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-micro);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-detail-header-title h2 {
+  font-family: var(--oi-font-family-sans);
+  margin: var(--oi-space-1) 0 0;
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-detail-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--oi-space-3);
+}
+@media (max-width: 768px) {
+  .oi-health-detail-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

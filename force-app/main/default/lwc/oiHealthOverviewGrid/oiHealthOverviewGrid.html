@@ -1,0 +1,75 @@
+<template>
+  <div class="oi-health-kpi-strip">
+    <template for:each={kpiTiles} for:item="tile">
+      <c-oi-health-kpi-tile
+        key={tile.key}
+        label={tile.label}
+        value={tile.value}
+      ></c-oi-health-kpi-tile>
+    </template>
+  </div>
+
+  <div class="oi-health-category-grid">
+    <template for:each={categoryCards} for:item="card">
+      <article
+        key={card.sectionKey}
+        class={card.cardClass}
+        data-section-key={card.sectionKey}
+        tabindex="0"
+        role="button"
+        aria-label={card.displayLabel}
+        onclick={handleCardClick}
+        onkeydown={handleCardKeydown}
+      >
+        <div class="oi-health-category-card-top">
+          <div>
+            <div class="oi-health-category-icon" style={card.iconStyle}>
+              {card.iconAbbreviation}
+            </div>
+            <div class="oi-health-category-title">{card.displayLabel}</div>
+            <div class="oi-health-category-sub">{card.coverageNote}</div>
+          </div>
+          <template if:true={card.showScoreRing}>
+            <c-oi-health-score-ring
+              score={card.score}
+              severity-key={card.severityKey}
+            ></c-oi-health-score-ring>
+          </template>
+          <template if:true={card.showFactsBadge}>
+            <c-oi-health-severity-badge
+              facts-only="true"
+            ></c-oi-health-severity-badge>
+          </template>
+        </div>
+
+        <template if:true={card.hasTopSignals}>
+          <div class="oi-health-category-kpis">
+            <template for:each={card.topSignals} for:item="signal">
+              <div key={signal.label} class="oi-health-category-kpi-row">
+                <span class="oi-health-category-kpi-label">{signal.label}</span>
+                <span class="num">{signal.value}</span>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <div class="oi-health-card-footer">
+          <template if:true={card.isImplemented}>
+            <template if:true={card.severityKey}>
+              <c-oi-health-severity-badge
+                severity-key={card.severityKey}
+              ></c-oi-health-severity-badge>
+            </template>
+            <template if:false={card.severityKey}>
+              <span></span>
+            </template>
+            <span class="oi-health-view-link">View details →</span>
+          </template>
+          <template if:false={card.isImplemented}>
+            <span class="oi-health-coming-soon">Not yet available</span>
+          </template>
+        </div>
+      </article>
+    </template>
+  </div>
+</template>

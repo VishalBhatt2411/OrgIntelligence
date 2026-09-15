@@ -18,114 +18,139 @@
  *              oiGraphCanvas.js's buildFieldAbsorptionMap — only this card's own field-LIST
  *              rendering is gone; `fields` is still accepted, but solely for its length.
  */
-import { LightningElement, api } from 'lwc';
+import { LightningElement, api } from "lwc";
 
-/** Same registry-driven semantic categories and same dark-mode-aware SLDS-hook-with-hex-fallback approach as oiGraphNode.js — see that file's doc comment for the full rationale; duplicated here (not shared) because the two components' own color maps are already independently duplicated, and unifying that is out of scope for this change. */
+/**
+ * Same registry-driven semantic categories as oiGraphNode.js, and byte-for-byte the same values —
+ * see that file's doc comment for why each entry resolves an ADR-0028 platform token rather than
+ * an SLDS severity hook (measured: those resolve teal/brown/magenta in this org, not
+ * green/amber/red). Still duplicated rather than shared: extracting a common JS module is out of
+ * scope for the token migration, so the requirement here is only that the two maps agree.
+ */
 const COLOR_TOKEN_HEX = {
-    brand: 'var(--slds-g-color-accent-1, #0176d3)',
-    success: 'var(--slds-g-color-success-1, #2e844a)',
-    warning: 'var(--slds-g-color-warning-1, #b57c00)',
-    error: 'var(--slds-g-color-error-1, #ba0517)',
-    neutral: 'var(--slds-g-color-border-2, #706e6b)'
+  brand: "var(--oi-color-accent)",
+  success: "var(--oi-color-severity-good)",
+  warning: "var(--oi-color-severity-warning)",
+  error: "var(--oi-color-severity-critical)",
+  neutral: "var(--oi-color-text-muted)"
 };
 const DEFAULT_COLOR_HEX = COLOR_TOKEN_HEX.neutral;
 
 export default class OiSchemaObjectCard extends LightningElement {
-    @api nodeKey;
-    @api typeKey;
-    @api label;
-    @api secondaryKey;
-    @api iconName = 'standard:record';
-    @api colorToken = 'brand';
-    @api isSelected = false;
-    @api isExpanded = false;
-    @api hasMoreNeighbors = false;
-    @api fields = [];
-    /** Why this object is on screen — mirrors oiGraphNode's relationship chip (e.g. "References Account via AccountId"). See that component for the full rationale. */
-    @api relationshipRole;
-    @api relationshipContext;
-    @api relationshipVia;
-    @api hopDistance;
-    @api isOnActivePath = false;
-    @api isDimmed = false;
+  @api nodeKey;
+  @api typeKey;
+  @api label;
+  @api secondaryKey;
+  @api iconName = "standard:record";
+  @api colorToken = "brand";
+  @api isSelected = false;
+  @api isExpanded = false;
+  @api hasMoreNeighbors = false;
+  @api fields = [];
+  /** Why this object is on screen — mirrors oiGraphNode's relationship chip (e.g. "References Account via AccountId"). See that component for the full rationale. */
+  @api relationshipRole;
+  @api relationshipContext;
+  @api relationshipVia;
+  @api hopDistance;
+  @api isOnActivePath = false;
+  @api isDimmed = false;
 
-    get relationshipChipText() {
-        if (!this.relationshipRole) {
-            return null;
-        }
-        const context = this.relationshipContext ? ` ${this.relationshipContext}` : '';
-        const via = this.relationshipVia ? ` via ${this.relationshipVia}` : '';
-        return `${this.relationshipRole}${context}${via}`;
+  get relationshipChipText() {
+    if (!this.relationshipRole) {
+      return null;
     }
+    const context = this.relationshipContext
+      ? ` ${this.relationshipContext}`
+      : "";
+    const via = this.relationshipVia ? ` via ${this.relationshipVia}` : "";
+    return `${this.relationshipRole}${context}${via}`;
+  }
 
-    get hasRelationshipChip() {
-        return !!this.relationshipChipText;
-    }
+  get hasRelationshipChip() {
+    return !!this.relationshipChipText;
+  }
 
-    get hopLabel() {
-        return this.hopDistance > 1 ? `${this.hopDistance} relationships away` : null;
-    }
+  get hopLabel() {
+    return this.hopDistance > 1
+      ? `${this.hopDistance} relationships away`
+      : null;
+  }
 
-    get hasHopLabel() {
-        return !!this.hopLabel;
-    }
+  get hasHopLabel() {
+    return !!this.hopLabel;
+  }
 
-    get cardClass() {
-        return 'oi-schema-card' + (this.isSelected ? ' is-selected' : '') + (this.isOnActivePath ? ' is-on-path' : '') + (this.isDimmed ? ' is-dimmed' : '');
-    }
+  get cardClass() {
+    return (
+      "oi-schema-card" +
+      (this.isSelected ? " is-selected" : "") +
+      (this.isOnActivePath ? " is-on-path" : "") +
+      (this.isDimmed ? " is-dimmed" : "")
+    );
+  }
 
-    get resolvedColor() {
-        return COLOR_TOKEN_HEX[this.colorToken] || DEFAULT_COLOR_HEX;
-    }
+  get resolvedColor() {
+    return COLOR_TOKEN_HEX[this.colorToken] || DEFAULT_COLOR_HEX;
+  }
 
-    get cardStyle() {
-        return `--oi-node-accent: ${this.resolvedColor};`;
-    }
+  get cardStyle() {
+    return `--oi-node-accent: ${this.resolvedColor};`;
+  }
 
-    get totalFieldCount() {
-        return (this.fields || []).length;
-    }
+  get totalFieldCount() {
+    return (this.fields || []).length;
+  }
 
-    get fieldCountLabel() {
-        const count = this.totalFieldCount;
-        return count === 1 ? '1 field' : `${count} fields`;
-    }
+  get fieldCountLabel() {
+    const count = this.totalFieldCount;
+    return count === 1 ? "1 field" : `${count} fields`;
+  }
 
-    get expandToggleLabel() {
-        return this.isExpanded ? 'Collapse' : 'Expand';
-    }
+  get expandToggleLabel() {
+    return this.isExpanded ? "Collapse" : "Expand";
+  }
 
-    /** Full, untruncated header text for the hover tooltip — see oiGraphNode.js's identical getter for the full rationale (real Object/API-name labels routinely outrun any width this card could reasonably grow to). */
-    get tooltipText() {
-        return this.secondaryKey ? `${this.label} — ${this.secondaryKey}` : this.label;
-    }
+  /** Full, untruncated header text for the hover tooltip — see oiGraphNode.js's identical getter for the full rationale (real Object/API-name labels routinely outrun any width this card could reasonably grow to). */
+  get tooltipText() {
+    return this.secondaryKey
+      ? `${this.label} — ${this.secondaryKey}`
+      : this.label;
+  }
 
-    get ariaLabel() {
-        const expandState = this.isExpanded ? 'expanded' : 'collapsed';
-        const more = this.hasMoreNeighbors ? ', more relationships available' : '';
-        const relationship = this.relationshipChipText ? `, ${this.relationshipChipText}` : '';
-        const hops = this.hopLabel ? `, ${this.hopLabel}` : '';
-        return `${this.label}, Object, ${this.totalFieldCount} fields${relationship}${hops}, ${expandState}${more}`;
-    }
+  get ariaLabel() {
+    const expandState = this.isExpanded ? "expanded" : "collapsed";
+    const more = this.hasMoreNeighbors ? ", more relationships available" : "";
+    const relationship = this.relationshipChipText
+      ? `, ${this.relationshipChipText}`
+      : "";
+    const hops = this.hopLabel ? `, ${this.hopLabel}` : "";
+    return `${this.label}, Object, ${this.totalFieldCount} fields${relationship}${hops}, ${expandState}${more}`;
+  }
 
-    handleHeaderClick() {
-        this.dispatchEvent(new CustomEvent('select', { detail: { nodeKey: this.nodeKey } }));
-    }
+  handleHeaderClick() {
+    this.dispatchEvent(
+      new CustomEvent("select", { detail: { nodeKey: this.nodeKey } })
+    );
+  }
 
-    handleHeaderKeydown(event) {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            this.handleHeaderClick();
-        }
+  handleHeaderKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      this.handleHeaderClick();
     }
+  }
 
-    handleExpandToggle(event) {
-        event.stopPropagation();
-        this.dispatchEvent(new CustomEvent('expandtoggle', { detail: { nodeKey: this.nodeKey } }));
-    }
+  handleExpandToggle(event) {
+    event.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("expandtoggle", { detail: { nodeKey: this.nodeKey } })
+    );
+  }
 
-    handleOpen(event) {
-        event.stopPropagation();
-        this.dispatchEvent(new CustomEvent('open', { detail: { nodeKey: this.nodeKey } }));
-    }
+  handleOpen(event) {
+    event.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("open", { detail: { nodeKey: this.nodeKey } })
+    );
+  }
 }

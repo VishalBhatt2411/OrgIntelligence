@@ -1,0 +1,25 @@
+<template>
+  <div class="oi-health-heatmap-panel">
+    <div class="oi-health-heatmap-head">
+      <h3>{title}</h3>
+    </div>
+    <div class="oi-health-heatmap">
+      <div class="oi-health-heatmap-grid" style={gridStyle}>
+        <div></div>
+        <template for:each={columnLabels} for:item="columnLabel">
+          <div key={columnLabel} class="oi-health-heatmap-col-label">
+            {columnLabel}
+          </div>
+        </template>
+        <template for:each={rows} for:item="row">
+          <div key={row.rowLabel} class="oi-health-heatmap-row-label">
+            {row.rowLabel}
+          </div>
+          <template for:each={row.cells} for:item="cell">
+            <div key={cell.key} class={cell.cellClass}>{cell.value}</div>
+          </template>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>

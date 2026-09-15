@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Rule_Version__c</fullName>
+    <label>Rule Version</label>
+    <type>Number</type>
+    <precision>4</precision>
+    <scale>0</scale>
+    <required>true</required>
+    <defaultValue>1</defaultValue>
+    <description
+  >Version of the rule's evaluation logic at the time this finding was last (re)computed — bumped by the rule author whenever the severity/evidence formula changes, so a historical finding stays explainable against the rule version that actually produced it rather than silently being reinterpreted under today's logic.</description>
+</CustomField>

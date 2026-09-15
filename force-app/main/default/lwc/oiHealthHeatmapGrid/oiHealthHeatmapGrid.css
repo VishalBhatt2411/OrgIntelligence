@@ -1,0 +1,106 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Defects corrected:
+ *   - the panel border resolved to #5c5c5c rather than the near-white #edf0f4 its own fallback
+ *     asked for, because --slds-g-color-border-2 is SLDS 2's STRONG border. Now
+ *     --oi-color-border.
+ *   - the panel heading and the row labels resolved to #5c5c5c (--slds-g-color-on-surface-1 is the
+ *     WEAKEST text tier) where their fallback #12161f asked for the strongest. Now
+ *     --oi-color-text-primary.
+ *   - the uppercase column labels resolved to #03234d (--slds-g-color-on-surface-3, the STRONGEST
+ *     tier) where their fallback #8892a0 asked for a muted grey, so the axis labels outweighed the
+ *     data. Now --oi-color-text-muted.
+ *   - the three heat levels resolved through the SLDS success/warning/error families, measured in
+ *     this org as teal (#056764), brown (#8c4b02) and magenta (#b60554) — the heatmap's whole
+ *     point is a green-to-red read, which those do not give. Now --oi-color-severity-*.
+ *   - the unscored cell's neutral grey now resolves through --oi-color-severity-none / -none-wash,
+ *     keeping "no data" inside the severity channel rather than borrowing a text token.
+ *   - 'Manrope' / 'IBM Plex Sans' / 'IBM Plex Mono' were declared but have never loaded (no static
+ *     resources in the package).
+ *
+ * Left as literals: the 1.9rem cell height (fixed cell geometry) and the grid's column template,
+ * which the component supplies from JS.
+ */
+
+.oi-health-heatmap-panel {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  overflow: hidden;
+}
+
+.oi-health-heatmap-head {
+  padding: var(--oi-space-3) var(--oi-space-4) 0;
+}
+
+.oi-health-heatmap-head h3 {
+  font-family: var(--oi-font-family-sans);
+  margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-heatmap {
+  padding: var(--oi-space-4);
+}
+
+.oi-health-heatmap-grid {
+  display: grid;
+  gap: var(--oi-space-2);
+  align-items: center;
+}
+
+.oi-health-heatmap-col-label {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+  text-align: center;
+  font-weight: var(--oi-font-weight-bold);
+}
+
+.oi-health-heatmap-row-label {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+/* Cell counts are computed data: tabular figures so digits do not reflow as values change.
+ * Severity is never carried by color alone (ADR-0028 §4) — every cell prints its own count. */
+.oi-health-heat-cell {
+  height: 1.9rem;
+  border-radius: var(--oi-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+
+.oi-health-heat-cell_good {
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+}
+.oi-health-heat-cell_warning {
+  background: var(--oi-color-severity-warning-wash);
+  color: var(--oi-color-severity-warning);
+}
+.oi-health-heat-cell_critical {
+  background: var(--oi-color-severity-critical-wash);
+  color: var(--oi-color-severity-critical);
+}

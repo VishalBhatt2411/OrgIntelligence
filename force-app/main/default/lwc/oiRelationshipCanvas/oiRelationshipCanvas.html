@@ -572,7 +572,10 @@
           <div
             class="oi-orc-lane-empty oi-orc-lane-empty-outgoing"
             data-id="outgoing-empty"
+            data-state="true-zero"
+            role="status"
           >
+            <span class="oi-orc-lane-empty-icon" aria-hidden="true">✓</span>
             <span>No business relationships from {rootObject.label}.</span>
             <button
               type="button"
@@ -589,17 +592,23 @@
           <div
             class="oi-orc-lane-empty oi-orc-lane-empty-outgoing"
             data-id="outgoing-empty"
+            data-state="true-zero"
+            role="status"
           >
-            {outgoingEmptyMessage}
+            <span class="oi-orc-lane-empty-icon" aria-hidden="true">✓</span>
+            <span>{outgoingEmptyMessage}</span>
           </div>
         </template>
         <template lwc:if={hasIncoming}></template>
         <template lwc:else>
           <div
-            class="oi-orc-lane-empty oi-orc-lane-empty-incoming"
+            class="oi-orc-lane-empty"
             data-id="incoming-empty"
+            data-state="true-zero"
+            role="status"
           >
-            {incomingEmptyMessage}
+            <span class="oi-orc-lane-empty-icon" aria-hidden="true">✓</span>
+            <span>{incomingEmptyMessage}</span>
           </div>
         </template>
         <!-- the two empty lwc:if/elseif branches above are intentional: they suppress the paired lwc:else from firing when the lane genuinely has content, without rendering anything themselves -->

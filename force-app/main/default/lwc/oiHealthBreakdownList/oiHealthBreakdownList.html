@@ -1,0 +1,42 @@
+<template>
+  <div class="oi-health-panel">
+    <div class="oi-health-panel-head">
+      <h3>{title}</h3>
+      <span class="oi-health-panel-eyebrow">{coverageCaption}</span>
+    </div>
+    <template if:true={hasRows}>
+      <table class="oi-health-breakdown">
+        <thead>
+          <tr>
+            <th>Object</th>
+            <template for:each={metricColumnLabels} for:item="columnLabel">
+              <th key={columnLabel}>{columnLabel}</th>
+            </template>
+            <th>Severity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template for:each={displayRows} for:item="row">
+            <tr
+              key={row.key}
+              class={row.rowClass}
+              data-key={row.key}
+              onclick={handleRowClick}
+            >
+              <td class="oi-health-breakdown-primary">{row.primaryLabel}</td>
+              <template for:each={row.metricValues} for:item="metric">
+                <td key={metric.key} class="num">{metric.value}</td>
+              </template>
+              <td>
+                <c-oi-health-severity-badge
+                  severity-key={row.severityKey}
+                  label={row.severityLabel}
+                ></c-oi-health-severity-badge>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </template>
+  </div>
+</template>

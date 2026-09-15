@@ -23,40 +23,60 @@
  *              OI_DependencyEngineService's own class doc).
  */
 public without sharing class OI_ImpactCacheRepository {
-    public OI_Impact_Cache__c getUnexpired(String cacheKey) {
-        if (String.isBlank(cacheKey)) {
-            return null;
-        }
-        List<OI_Impact_Cache__c> rows = [
-            SELECT Id, Cache_Key__c, Root_Node_Key__c, Direction__c, Depth__c, Manual_Test_Json__c, Computed_At__c, Expires_At__c
-            FROM OI_Impact_Cache__c
-            WHERE Cache_Key__c = :cacheKey AND Expires_At__c > :Datetime.now()
-            LIMIT 1
-        ];
-        return rows.isEmpty() ? null : rows[0];
+  public OI_Impact_Cache__c getUnexpired(String cacheKey) {
+    if (String.isBlank(cacheKey)) {
+      return null;
     }
+    List<OI_Impact_Cache__c> rows = [
+      SELECT
+        Id,
+        Cache_Key__c,
+        Root_Node_Key__c,
+        Direction__c,
+        Depth__c,
+        Manual_Test_Json1__c,
+        Computed_At__c,
+        Expires_At__c
+      FROM OI_Impact_Cache__c
+      WHERE Cache_Key__c = :cacheKey AND Expires_At__c > :Datetime.now()
+      LIMIT 1
+    ];
+    return rows.isEmpty() ? null : rows[0];
+  }
 
-    public void put(String cacheKey, String rootNodeKey, String direction, Integer depth, String resultJson, Datetime computedAt, Datetime expiresAt) {
-        if (String.isBlank(cacheKey)) {
-            return;
-        }
-        OI_Impact_Cache__c row = new OI_Impact_Cache__c(
-            Cache_Key__c = cacheKey,
-            Root_Node_Key__c = rootNodeKey,
-            Direction__c = direction,
-            Depth__c = depth,
-            Manual_Test_Json__c = resultJson,
-            Computed_At__c = computedAt,
-            Expires_At__c = expiresAt
-        );
-        upsert row OI_Impact_Cache__c.Cache_Key__c;
+  public void put(
+    String cacheKey,
+    String rootNodeKey,
+    String direction,
+    Integer depth,
+    String resultJson,
+    Datetime computedAt,
+    Datetime expiresAt
+  ) {
+    if (String.isBlank(cacheKey)) {
+      return;
     }
+    OI_Impact_Cache__c row = new OI_Impact_Cache__c(
+      Cache_Key__c = cacheKey,
+      Root_Node_Key__c = rootNodeKey,
+      Direction__c = direction,
+      Depth__c = depth,
+      Manual_Test_Json1__c = resultJson,
+      Computed_At__c = computedAt,
+      Expires_At__c = expiresAt
+    );
+    upsert row OI_Impact_Cache__c.Cache_Key__c;
+  }
 
-    /** DE-7's mechanism — evicts every cached row whose Root_Node_Key__c is in the given set. Callable today (OI_DependencyEngineServiceTest exercises it directly); automatic invocation from the live scan pipeline (calling this once a scan delta is known) is a documented near-term follow-up, not wired in this pass — see Backlog.md's Dependency Engine epic. */
-    public void evictByRootNodeKeys(Set<String> rootNodeKeys) {
-        if (rootNodeKeys == null || rootNodeKeys.isEmpty()) {
-            return;
-        }
-        delete [SELECT Id FROM OI_Impact_Cache__c WHERE Root_Node_Key__c IN :rootNodeKeys];
+  /** DE-7's mechanism — evicts every cached row whose Root_Node_Key__c is in the given set. Callable today (OI_DependencyEngineServiceTest exercises it directly); automatic invocation from the live scan pipeline (calling this once a scan delta is known) is a documented near-term follow-up, not wired in this pass — see Backlog.md's Dependency Engine epic. */
+  public void evictByRootNodeKeys(Set<String> rootNodeKeys) {
+    if (rootNodeKeys == null || rootNodeKeys.isEmpty()) {
+      return;
     }
+    delete [
+      SELECT Id
+      FROM OI_Impact_Cache__c
+      WHERE Root_Node_Key__c IN :rootNodeKeys
+    ];
+  }
 }

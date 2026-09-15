@@ -1,0 +1,90 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Defects corrected:
+ *   - the card border and the body divider resolved to #5c5c5c rather than the near-white #edf0f4
+ *     their own fallbacks asked for, because --slds-g-color-border-2 is SLDS 2's STRONG border.
+ *     Now --oi-color-border.
+ *   - the summary, the body copy and the inline figures resolved to #5c5c5c
+ *     (--slds-g-color-on-surface-1 is the WEAKEST text tier) where their fallback #12161f asked
+ *     for the strongest, so the disclosure's own heading sat at the same weight as its list items.
+ *     Now --oi-color-text-primary.
+ *   - the chevron resolved to #03234d (--slds-g-color-on-surface-3, the STRONGEST tier) where its
+ *     fallback #8892a0 asked for a muted grey, making the affordance darker than the label it sits
+ *     beside. Now --oi-color-text-muted.
+ *   - 'IBM Plex Mono' was declared but has never loaded (no static resources in the package).
+ *
+ * Left as literals: the chevron's rotate transition curve and the 180deg open-state rotation, both
+ * behaviour rather than token-able appearance.
+ */
+
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}
+
+.oi-health-formula {
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+  padding: var(--oi-space-3) var(--oi-space-4);
+}
+
+.oi-health-formula-summary {
+  cursor: pointer;
+  font-family: var(--oi-font-family-sans);
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.oi-health-formula-summary::-webkit-details-marker {
+  display: none;
+}
+
+.oi-health-formula-summary:focus-visible {
+  outline: none;
+  border-radius: var(--oi-radius-sm);
+  box-shadow: var(--oi-focus-ring);
+}
+
+.oi-health-formula-chev {
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-health-formula[open] .oi-health-formula-chev {
+  transform: rotate(180deg);
+}
+
+.oi-health-formula-body {
+  margin-top: var(--oi-space-3);
+  padding-top: var(--oi-space-3);
+  border-top: var(--oi-border-width) solid var(--oi-color-border);
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-health-formula-body ul {
+  margin: var(--oi-space-2) 0 0;
+  padding-left: var(--oi-space-4);
+  font-size: var(--oi-font-size-body);
+  color: var(--oi-color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+}
+
+.oi-health-formula-body .num {
+  color: var(--oi-color-text-primary);
+}

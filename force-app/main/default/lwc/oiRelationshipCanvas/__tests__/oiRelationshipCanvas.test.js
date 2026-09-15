@@ -247,14 +247,26 @@ describe("c-oi-relationship-canvas", () => {
       });
 
       return Promise.resolve().then(() => {
+        const incomingEmpty = element.shadowRoot.querySelector(
+          '[data-id="incoming-empty"]'
+        );
+        const outgoingEmpty = element.shadowRoot.querySelector(
+          '[data-id="outgoing-empty"]'
+        );
+        expect(incomingEmpty.textContent).toContain("No objects reference");
+        expect(outgoingEmpty.textContent).toContain(
+          "references no other objects"
+        );
+        /**
+         * A designed empty lane, not a blank half-canvas — and it names its state with the same
+         * canonical ADR-0028 §7 key c/oiStateBanner uses, alongside the glyph that keeps the state
+         * from being carried by colour alone.
+         */
+        expect(incomingEmpty.dataset.state).toBe("true-zero");
+        expect(outgoingEmpty.dataset.state).toBe("true-zero");
         expect(
-          element.shadowRoot.querySelector('[data-id="incoming-empty"]')
-            .textContent
-        ).toContain("No objects reference");
-        expect(
-          element.shadowRoot.querySelector('[data-id="outgoing-empty"]')
-            .textContent
-        ).toContain("references no other objects");
+          incomingEmpty.querySelector(".oi-orc-lane-empty-icon")
+        ).not.toBeNull();
       });
     });
 

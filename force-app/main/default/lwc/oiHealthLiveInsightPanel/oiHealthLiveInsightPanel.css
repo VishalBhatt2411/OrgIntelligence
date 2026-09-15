@@ -1,0 +1,101 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Mirrors oiHealthFindingDrawer's own modal shell (same z-index, same 65vh body cap — a
+ * stacking/viewport contract, not a token-able value) so this reads as the same family of
+ * overlay, not a visually distinct one — even though it is a lighter, read-mostly view.
+ */
+
+.oi-live-insight-panel {
+  z-index: 9001;
+}
+
+.oi-live-insight-header {
+  background: var(--oi-color-surface);
+  padding-bottom: var(--oi-space-3);
+}
+
+.oi-live-insight-subheader {
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  margin-top: var(--oi-space-2);
+}
+
+.oi-live-insight-eyebrow {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-live-insight-body {
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.oi-live-insight-section {
+  margin-bottom: var(--oi-space-4);
+}
+
+.oi-live-insight-section h3 {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+  margin: 0 0 var(--oi-space-1);
+}
+
+.oi-live-insight-section p {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
+  margin: 0;
+}
+
+.oi-live-insight-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oi-space-4);
+  margin: 0;
+}
+
+.oi-live-insight-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+}
+
+.oi-live-insight-metric dt {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-caption);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-live-insight-metric dd {
+  margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-live-insight-sync {
+  background: var(--oi-color-surface-sunken);
+  border-radius: var(--oi-radius-md);
+  padding: var(--oi-space-3);
+}
+
+.oi-live-insight-sync p {
+  margin-bottom: var(--oi-space-2);
+  color: var(--oi-color-text-secondary);
+}
+
+.num {
+  font-family: var(--oi-font-family-mono);
+  font-variant-numeric: var(--oi-font-numeric);
+}

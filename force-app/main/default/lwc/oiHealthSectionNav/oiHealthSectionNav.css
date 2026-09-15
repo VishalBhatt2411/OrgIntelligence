@@ -1,0 +1,59 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * Defect corrected: the active tab and the hover state read --slds-g-color-on-surface-1 while
+ * their literal fallbacks asked for #12161f. That token is SLDS 2's WEAKEST text tier (#5c5c5c),
+ * so selecting a tab made its label barely distinguishable from the #5c5c5c inactive tabs beside
+ * it — the selected state was almost invisible. Both now resolve --oi-color-text-primary
+ * (#03234d), restoring the intended contrast against text-secondary inactive tabs.
+ *
+ * 'IBM Plex Sans' is deleted: it never loaded (the package ships no static resource), so the strip
+ * always rendered in the platform font.
+ *
+ * The severity dot's color comes from oiHealthSectionNav.js, likewise migrated to
+ * --oi-color-severity-*; the 7px dot size and the 2px active-tab underline are left literal as
+ * spec-bound geometry (--oi-border-width is the 1px hairline and would thin the indicator).
+ */
+
+.oi-health-nav {
+  display: flex;
+  gap: var(--oi-space-1);
+  overflow-x: auto;
+  padding-bottom: var(--oi-space-1);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+}
+
+.oi-health-nav-tab {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: var(--oi-space-2) var(--oi-space-3) var(--oi-space-3);
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-secondary);
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  font-family: var(--oi-font-family-sans);
+}
+
+.oi-health-nav-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--oi-radius-pill);
+  flex-shrink: 0;
+}
+
+.oi-health-nav-tab_active {
+  color: var(--oi-color-text-primary);
+  border-bottom-color: var(--oi-color-accent);
+}
+
+.oi-health-nav-tab:hover {
+  color: var(--oi-color-text-primary);
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Org_Health_Live_Rows__c</fullName>
+    <label>Max Org Health Live Rows</label>
+    <type>Number</type>
+    <precision>18</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <description
+  >Default row ceiling for Org Health's Tier-2 bounded aggregate queries (ADR-0026) — e.g. "top N objects by field count." A section may override this via OI_Org_Health_Section_Config__mdt.Live_Row_Ceiling__c. When the ceiling is hit, the DTO must set truncated=true rather than silently returning a partial result as if it were exhaustive.</description>
+</CustomField>

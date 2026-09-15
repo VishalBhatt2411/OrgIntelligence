@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Weight__c</fullName>
+    <label>Weight</label>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>2</scale>
+    <required>false</required>
+    <description
+  >0-100 — only meaningful for a section that rolls sub-metrics into one weighted composite score (e.g. Data Health).</description>
+</CustomField>

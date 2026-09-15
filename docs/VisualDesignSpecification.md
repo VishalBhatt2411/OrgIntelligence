@@ -1,8 +1,16 @@
 # Object Relationship Explorer — Reference Visual Specification
 
-Status: Approved visual target
+Status: Approved visual target — §4, §7, and §9 amended by [ADR-0028](ADR/0028-unified-cross-surface-design-token-system.md)
 
 Owner: Product + UX Architecture
+
+Amendment note (2026-09-02): §4's token table is superseded by ADR-0028's canonical `--oi-*`
+vocabulary, which resolves this document's ambiguities (two alternative hexes given for one
+relationship role; no token identifiers despite §4 mandating centralization; no letter-spacing,
+line-height, border-width, or focus-ring value despite §8 making keyboard accessibility mandatory)
+and reconciles the conflicts between this document and `OrgHealthVisualDesignSpecification.md`.
+Where this document and ADR-0028 differ on a value, ADR-0028 controls; everything else here —
+anatomy, card and connector contracts, acceptance process — remains binding.
 
 Applies to: Object Analyze mode in the Salesforce Org Intelligence Platform, API v67.0
 
@@ -80,32 +88,52 @@ At 1536 × 1024, the application-owned workspace begins below the Salesforce nav
 
 ## 4. Visual tokens
 
-The implementation must centralize these values as CSS custom properties at the application shell. Small browser anti-aliasing differences are acceptable; arbitrary per-component substitutes are not.
+The implementation must centralize these values as CSS custom properties. The canonical vocabulary,
+the SLDS-first resolution rule, and the three permitted hardcoded exceptions are defined in
+[ADR-0028](ADR/0028-unified-cross-surface-design-token-system.md) §5 — that ADR is the single
+source of truth for token _names and values_, and is shared with the Org Health surface. Small
+browser anti-aliasing differences are acceptable; arbitrary per-component substitutes are not.
 
-| Role | Target |
-|---|---|
-| Canvas/surface | `#ffffff` |
-| Page background | approximately `#f7f8fa` |
-| Primary text | approximately `#17233d` |
-| Secondary text | approximately `#44506a` |
-| Muted text | approximately `#6b7280` |
-| Salesforce action blue | approximately `#0b5cff` |
-| Incoming/lookup purple | approximately `#7f45c8` |
-| Outgoing/master-detail cyan-blue | approximately `#118ab2` / `#1b72ff` |
-| Object/self green | approximately `#1f9d61` |
-| Border | approximately `#d9dde5` |
-| Soft shadow | `0 2px 8px rgba(15, 23, 42, 0.10)` |
-| Card radius | 8 px |
-| Control radius | 6–8 px |
-| Body type | Salesforce Sans/system sans-serif, 12–14 px |
+The roles this surface requires, and their canonical tokens:
+
+| Role                    | Token                                                          |
+| ----------------------- | -------------------------------------------------------------- |
+| Canvas/surface          | `--oi-color-surface`                                           |
+| Page background         | `--oi-color-surface-sunken`                                    |
+| Primary text            | `--oi-color-text-primary`                                      |
+| Secondary text          | `--oi-color-text-secondary`                                    |
+| Muted text              | `--oi-color-text-muted`                                        |
+| Action blue / accent    | `--oi-color-accent`                                            |
+| Incoming/lookup         | `--oi-color-rel-incoming`                                      |
+| Outgoing                | `--oi-color-rel-outgoing`                                      |
+| Master-detail           | `--oi-color-rel-master-detail`                                 |
+| Self                    | `--oi-color-rel-self`                                          |
+| Object/structural green | `--oi-color-rel-object`                                        |
+| Border                  | `--oi-color-border`                                            |
+| Soft shadow             | `--oi-shadow-card`                                             |
+| Card radius             | `--oi-radius-lg` (8 px)                                        |
+| Control radius          | `--oi-radius-md` (6 px)                                        |
+| Body type               | `--oi-font-size-caption` … `--oi-font-size-body-lg` (12–14 px) |
+
+Two clarifications ADR-0028 resolves. This document previously offered two alternative hexes for
+one outgoing/master-detail role without disambiguating; those are now two distinct tokens, because
+outgoing direction and master-detail kind are independent properties of a connector. And the
+12–14 px band binds **body text only** — headings (`--oi-font-size-title` and above) and the
+uppercase micro-labels this document mandates in §3.4, §3.5, and §5 are named exceptions on the
+scale, not violations of it.
 
 Color must not be the only relationship discriminator. Lookup, Master-Detail, Self, and System relationships also differ through arrow form, stroke weight, or dash pattern.
+
+Structural color and severity color are separate channels that may never be substituted for one
+another: `--oi-color-rel-object` green means "this object," not "healthy." Severity tokens are
+reserved to severity-bearing components, and per ADR-0028 §4 the redundant-encoding rule above
+extends to them — severity is always carried by a label or glyph as well as color.
 
 ## 5. Card contract
 
 Neighbor cards target approximately 236 × 80 px. Each contains:
 
-- a 30–32 px colored icon tile;
+- a colored icon tile of `--oi-icon-tile` (32 px);
 - bold object label and a smaller Standard/Custom Object caption;
 - a right chevron;
 - a divider;
@@ -130,7 +158,9 @@ Cards use real object icons where available through supported Salesforce APIs; m
 
 ## 7. Responsive behavior
 
-The reference viewport is the primary acceptance viewport. Supported behavior:
+The reference viewport is the primary acceptance viewport. This ladder — 1280 / 1024 / 768 — is the
+platform's only responsive ladder, and per [ADR-0028](ADR/0028-unified-cross-surface-design-token-system.md)
+§6 it governs the Org Health surface too. Supported behavior:
 
 - **≥ 1280 px:** full two-column layout, fixed right panel, two relationship lanes.
 - **1024–1279 px:** narrower cards/gaps are allowed; the Intelligence Panel remains a right rail where practical.

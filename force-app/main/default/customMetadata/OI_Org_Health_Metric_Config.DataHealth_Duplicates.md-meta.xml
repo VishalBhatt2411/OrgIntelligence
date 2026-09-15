@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomMetadata
+  xmlns="http://soap.sforce.com/2006/04/metadata"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+>
+    <label>DataHealth Duplicates</label>
+    <protected>false</protected>
+    <values>
+        <field>Section_Key__c</field>
+        <value xsi:type="xsd:string">DataHealth</value>
+    </values>
+    <values>
+        <field>Metric_Key__c</field>
+        <value xsi:type="xsd:string">Duplicates</value>
+    </values>
+    <values>
+        <field>Threshold_Value__c</field>
+        <value xsi:type="xsd:double">5</value>
+    </values>
+    <values>
+        <field>Weight__c</field>
+        <value xsi:type="xsd:double">30</value>
+    </values>
+    <values>
+        <field>Formula_Description__c</field>
+        <value
+      xsi:type="xsd:string"
+    >Duplicates — among sampled records, an exact case-insensitive match on the object's Email or Phone field (whichever it has) counts every record in that matched group as a duplicate. An object where 5% or more of its sampled records are duplicates is flagged Warning on the breakdown/heatmap; 10% or more is Critical. Contributes 30% of the composite Data Health score, proportional to its org-wide duplicate rate.</value>
+    </values>
+    <values>
+        <field>Is_Active__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+</CustomMetadata>

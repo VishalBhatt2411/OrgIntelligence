@@ -1,0 +1,10 @@
+<template>
+  <template if:true={factsOnly}>
+    <span class="oi-health-facts-badge">Facts only</span>
+  </template>
+  <template if:false={factsOnly}>
+    <span class={badgeClass}>
+      <span class="oi-health-severity-dot"></span>{displayLabel}
+    </span>
+  </template>
+</template>

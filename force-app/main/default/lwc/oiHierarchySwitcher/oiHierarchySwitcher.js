@@ -13,93 +13,113 @@
  *              hierarchy" concept yet (FR-006 names the requirement, not a tie-break rule), so
  *              CLAUDE.md's "never invent missing business requirements" applies here.
  */
-import { LightningElement, api } from 'lwc';
-import getDefinitions from '@salesforce/apex/OI_HierarchyDefinitionController.getDefinitions';
+import { LightningElement, api } from "lwc";
+import getDefinitions from "@salesforce/apex/OI_HierarchyDefinitionController.getDefinitions";
 
-const ACTIVE_STATUS = 'Active';
+const ACTIVE_STATUS = "Active";
 
 export default class OiHierarchySwitcher extends LightningElement {
-    allDefinitions = [];
-    isLoading = true;
-    errorMessage = null;
-    _objectApiName;
-    _selectedDefinitionId;
+  allDefinitions = [];
+  isLoading = true;
+  errorMessage = null;
+  _objectApiName;
+  _selectedDefinitionId;
 
-    connectedCallback() {
-        this.loadDefinitions();
-    }
+  connectedCallback() {
+    this.loadDefinitions();
+  }
 
-    @api
-    get objectApiName() {
-        return this._objectApiName;
-    }
+  @api
+  get objectApiName() {
+    return this._objectApiName;
+  }
 
-    set objectApiName(value) {
-        this._objectApiName = value;
-        this.autoSelect();
-    }
+  set objectApiName(value) {
+    this._objectApiName = value;
+    this.autoSelect();
+  }
 
-    get selectedDefinitionId() {
-        return this._selectedDefinitionId;
-    }
+  get selectedDefinitionId() {
+    return this._selectedDefinitionId;
+  }
 
-    async loadDefinitions() {
-        this.isLoading = true;
-        this.errorMessage = null;
-        try {
-            this.allDefinitions = await getDefinitions();
-            this.autoSelect();
-        } catch (error) {
-            this.allDefinitions = [];
-            this.errorMessage = (error && error.body && error.body.message) || 'Something went wrong loading hierarchies. Please try again.';
-        } finally {
-            this.isLoading = false;
-        }
+  async loadDefinitions() {
+    this.isLoading = true;
+    this.errorMessage = null;
+    try {
+      this.allDefinitions = await getDefinitions();
+      this.autoSelect();
+    } catch (error) {
+      this.allDefinitions = [];
+      this.errorMessage =
+        (error && error.body && error.body.message) ||
+        "Something went wrong loading hierarchies. Please try again.";
+    } finally {
+      this.isLoading = false;
     }
+  }
 
-    get applicableDefinitions() {
-        if (!this._objectApiName) {
-            return [];
-        }
-        return this.allDefinitions.filter((definition) => definition.objectApiName === this._objectApiName && definition.status === ACTIVE_STATUS);
+  get applicableDefinitions() {
+    if (!this._objectApiName) {
+      return [];
     }
+    return this.allDefinitions.filter(
+      (definition) =>
+        definition.objectApiName === this._objectApiName &&
+        definition.status === ACTIVE_STATUS
+    );
+  }
 
-    get comboboxOptions() {
-        return this.applicableDefinitions.map((definition) => ({ label: definition.name, value: definition.definitionId }));
-    }
+  get comboboxOptions() {
+    return this.applicableDefinitions.map((definition) => ({
+      label: definition.name,
+      value: definition.definitionId
+    }));
+  }
 
-    get hasApplicableDefinitions() {
-        return this.applicableDefinitions.length > 0;
-    }
+  get hasApplicableDefinitions() {
+    return this.applicableDefinitions.length > 0;
+  }
 
-    get hasError() {
-        return !!this.errorMessage;
-    }
+  get hasError() {
+    return !!this.errorMessage;
+  }
 
-    get showEmptyState() {
-        return !this.isLoading && !this.hasError && !this.hasApplicableDefinitions;
-    }
+  get showEmptyState() {
+    return !this.isLoading && !this.hasError && !this.hasApplicableDefinitions;
+  }
 
-    /** Re-derives the selection whenever either input to it changes (new data, new objectApiName) — a previous selection that no longer applies is replaced, never left dangling. */
-    autoSelect() {
-        const applicable = this.applicableDefinitions;
-        const stillApplicable = applicable.some((definition) => definition.definitionId === this._selectedDefinitionId);
-        if (stillApplicable) {
-            return;
-        }
-        const nextId = applicable.length > 0 ? applicable[0].definitionId : null;
-        if (nextId !== this._selectedDefinitionId) {
-            this._selectedDefinitionId = nextId;
-            this.notifyChange();
-        }
+  /** Re-derives the selection whenever either input to it changes (new data, new objectApiName) — a previous selection that no longer applies is replaced, never left dangling. */
+  autoSelect() {
+    const applicable = this.applicableDefinitions;
+    const stillApplicable = applicable.some(
+      (definition) => definition.definitionId === this._selectedDefinitionId
+    );
+    if (stillApplicable) {
+      return;
     }
+    const nextId = applicable.length > 0 ? applicable[0].definitionId : null;
+    if (nextId !== this._selectedDefinitionId) {
+      this._selectedDefinitionId = nextId;
+      this.notifyChange();
+    }
+  }
 
-    handleChange(event) {
-        this._selectedDefinitionId = event.detail.value;
-        this.notifyChange();
-    }
+  /** Retry is meaningful here: loadDefinitions() takes no arguments, so re-running it is the whole recovery. */
+  handleRetry() {
+    this.loadDefinitions();
+  }
 
-    notifyChange() {
-        this.dispatchEvent(new CustomEvent('definitionchange', { detail: { definitionId: this._selectedDefinitionId } }));
-    }
+  handleChange(event) {
+    this._selectedDefinitionId = event.detail.value;
+    this.notifyChange();
+  }
+
+  notifyChange() {
+    this.dispatchEvent(
+      new CustomEvent("definitionchange", {
+        detail: { definitionId: this._selectedDefinitionId }
+      })
+    );
+  }
 }

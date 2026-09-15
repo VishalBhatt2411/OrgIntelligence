@@ -1,86 +1,104 @@
+@import "c/oiDesignTokens";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * One live defect corrected. The modal header painted itself a light grey
+ * (--slds-g-color-surface-container-3, #f3f2f2) while the subtitle asked for
+ * --slds-g-color-on-surface-inverse-1 (#ffffff) — white text on a near-white bar, i.e. an
+ * invisible subtitle. The header is now the sunken surface with secondary text on it.
+ *
+ * Still outstanding and NOT fixable from CSS: the template's close button carries
+ * `slds-button_icon-inverse` and `variant="inverse"` (oiRelationshipConnectorDetail.html:13-14),
+ * so that glyph is still painted white on this light header. It needs the non-inverse variant in
+ * markup, which is outside this migration's scope.
+ */
+
 .oi-rcd-header {
-    background: var(--slds-g-color-surface-container-3, #f3f2f2);
+  background: var(--oi-color-surface-sunken);
 }
 
 .oi-rcd-subtitle {
-    font-size: 0.8rem;
-    color: var(--slds-g-color-on-surface-inverse-1, #ffffff);
+  font-size: var(--oi-font-size-body);
+  color: var(--oi-color-text-secondary);
 }
 
+/* An inline caveat on the action just taken. Severity is carried by the message text itself, not
+ * by colour alone (ADR-0028 §4). */
 .oi-rcd-action-message {
-    margin-bottom: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.3rem;
-    background: var(--slds-g-color-warning-container-1, rgba(181, 124, 0, 0.1));
-    color: var(--slds-g-color-warning-1, #b57c00);
-    font-size: 0.8rem;
+  margin-bottom: var(--oi-space-3);
+  padding: var(--oi-space-2) var(--oi-space-3);
+  border-radius: var(--oi-radius-md);
+  background: var(--oi-color-severity-warning-wash);
+  color: var(--oi-color-severity-warning);
+  font-size: var(--oi-font-size-body);
 }
 
 .oi-rcd-detail-list {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.4rem 1rem;
-    margin: 0 0 1rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--oi-space-2) var(--oi-space-4);
+  margin: 0 0 var(--oi-space-4);
 }
 
 .oi-rcd-detail-list dt {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--oi-letter-spacing-caps);
+  color: var(--oi-color-text-muted);
 }
 
 .oi-rcd-detail-list dd {
-    margin: 0;
-    font-size: 0.85rem;
-    color: var(--slds-g-color-on-surface-1, #181818);
+  margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  color: var(--oi-color-text-primary);
 }
 
 .oi-rcd-link {
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    font-size: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  font-size: inherit;
+  font-weight: var(--oi-font-weight-semibold);
+  cursor: pointer;
+  padding: 0;
 }
 
 .oi-rcd-link:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .oi-rcd-fields {
-    border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    padding-top: 0.75rem;
+  border-top: var(--oi-border-width) solid var(--oi-color-border);
+  padding-top: var(--oi-space-3);
 }
 
 .oi-rcd-fields-title {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--oi-letter-spacing-caps);
+  color: var(--oi-color-text-muted);
 }
 
 .oi-rcd-field-list {
-    list-style: none;
-    margin: 0.4rem 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+  list-style: none;
+  margin: var(--oi-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-2);
 }
 
 .oi-rcd-field-list li {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  font-size: var(--oi-font-size-body);
 }
 
 .oi-rcd-field-type {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-size: 0.72rem;
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-caption);
 }

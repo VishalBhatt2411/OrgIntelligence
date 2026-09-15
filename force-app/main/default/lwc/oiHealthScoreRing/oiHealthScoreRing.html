@@ -1,0 +1,17 @@
+<template>
+  <div class={wrapClass} role="img" aria-label={ariaLabel}>
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+      <circle class="oi-health-ring-track" cx="20" cy="20" r="16"></circle>
+      <circle
+        class={valueCircleClass}
+        cx="20"
+        cy="20"
+        r="16"
+        style={valueCircleStyle}
+        stroke-dasharray={dashArray}
+        stroke-dashoffset={dashOffset}
+      ></circle>
+    </svg>
+    <div class={numClass}>{displayValue}</div>
+  </div>
+</template>

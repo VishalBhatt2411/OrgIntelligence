@@ -1,129 +1,154 @@
+@import "c/oiDesignTokens";
+
 /**
- * Every color below is an SLDS global styling hook (--slds-g-color-*) with the prior literal
- * hex as its fallback value, matching the convention already established in
- * oiGraphCanvas.css/oiGraphNode.css — so this panel adapts to Lightning Experience's SLDS 2
- * dark-mode tokens where present, and renders pixel-identical to before where they aren't.
+ * Migrated to the ADR-0028 token vocabulary. This file previously carried the app's widest private
+ * palette (20 distinct hexes) plus its own scoped accent pair; both are now resolved from tokens.
+ *
+ * Defects corrected, all of the same class — the SLDS tier actually named disagreed with the
+ * literal fallback the rule intended, and ADR-0028's audit established the tiers run the opposite
+ * way round from what these rules assumed:
+ *   - --slds-g-color-on-surface-1 is SLDS 2's WEAKEST text tier (#5c5c5c), not its strongest.
+ *     The panel title, overview values, card titles and field inputs used it with a #181818
+ *     fallback, so they rendered mid-grey where near-black was intended; they are now
+ *     --oi-color-text-primary. Conversely on-surface-2 with a #706e6b fallback intended muted
+ *     grey, and is now --oi-color-text-muted.
+ *   - --slds-g-color-border-2 is the STRONG border (#5c5c5c); the section's left accent rule asked
+ *     for it with a subtle #e2e1df fallback and so rendered a heavy dark bar. Now
+ *     --oi-color-border.
+ *   - the field-row hover used --slds-g-color-accent-container-1, which resolves identically to
+ *     --slds-g-color-accent-1 in this org (the collision the removed --oi-panel-accent-* pair
+ *     existed to dodge). Now --oi-color-accent-wash, which is guaranteed distinct from the accent
+ *     it washes.
+ *
+ * The per-section identity hues under .oi-node-detail-panel-section-icon.is-* and the code badge
+ * now resolve from ADR-0028 §5's categorical identity ramp, which was added specifically to cover
+ * them. Two of those hues changed deliberately in the process — see the comment at that block.
+ *
+ * Not token-able, and correctly left alone: the object icon tiles are `lightning-icon` elements
+ * whose colour lives in a closed Salesforce shadow root. VisualDesignSpecification.md §2 puts
+ * base-component internals outside the acceptance boundary, so no token governs them.
  */
 .oi-node-detail-panel {
-    height: 100%;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    /** Deliberately literal, not var(--slds-g-color-accent-container-1)/var(--slds-g-color-accent-1) — verified live in a real org (audit #09): those two distinct SLDS tokens resolve to the exact same color under this org's actual theme, which silently made any element pairing them (an accent-colored label over an accent-container background) an invisible-text color block. Same fix as oiRelationshipCanvas.css/oiGraphNode.css/oiSchemaObjectCard.css's identical collision. */
-    --oi-panel-accent-bg: #eef4fc;
-    --oi-panel-accent-color: #0176d3;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 /** The panel's own chrome — always visible regardless of loading/error/empty/detail state, matching the approved reference's persistent "Intelligence Panel" title bar. */
 .oi-node-detail-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.65rem 0.75rem;
-    border-bottom: 1px solid var(--slds-g-color-border-1, #dddbda);
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--oi-space-2);
+  padding: var(--oi-space-3);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+  flex-shrink: 0;
 }
 
 .oi-node-detail-panel-header-title {
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--slds-g-color-on-surface-1, #181818);
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--oi-color-text-primary);
 }
 
 .oi-node-detail-panel-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.15rem;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-1);
 }
 
 .oi-node-detail-panel-pin-toggle,
 .oi-node-detail-panel-collapse-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.6rem;
-    height: 1.6rem;
-    border: none;
-    border-radius: 0.3rem;
-    background: transparent;
-    cursor: pointer;
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: none;
+  border-radius: var(--oi-radius-md);
+  background: transparent;
+  cursor: pointer;
+  /* The SLDS component hook is kept — it is how lightning-icon takes a colour — but its value
+     * now comes from a token rather than a hand-picked SLDS tier. */
+  --sds-c-icon-color-foreground-default: var(--oi-color-text-muted);
 }
 
 .oi-node-detail-panel-pin-toggle:hover,
 .oi-node-detail-panel-collapse-toggle:hover {
-    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+  background: var(--oi-color-surface-sunken);
 }
 
 .oi-node-detail-panel-pin-toggle.is-active {
-    background: var(--oi-panel-accent-bg);
-    --sds-c-icon-color-foreground-default: var(--oi-panel-accent-color);
+  background: var(--oi-color-accent-wash);
+  --sds-c-icon-color-foreground-default: var(--oi-color-accent);
 }
 
 .oi-node-detail-panel-loading,
 .oi-node-detail-panel-content,
 .oi-node-detail-panel-empty {
-    padding: 0.75rem;
+  padding: var(--oi-space-3);
 }
 
-.oi-node-detail-panel-loading,
+/** Only the pre-selection placeholder still uses -empty; the panel's real empty/error findings go
+ * through c/oiStateBanner. -loading reserves the panel's height for c/oiSkeleton. */
 .oi-node-detail-panel-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--oi-color-text-muted);
 }
 
-.oi-node-detail-panel-error {
-    color: var(--slds-g-color-error-1, #c23934);
+.oi-node-detail-panel-loading {
+  display: flex;
+  align-items: flex-start;
 }
 
 /** Overview's two-column grid (GraphUI.md §42's approved reference layout) — label above value, two fields per row, replacing what used to be a one-column key/value table. */
 .oi-node-detail-panel-overview-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem 0.75rem;
-    margin: 0.5rem 0 0.25rem 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--oi-space-2) var(--oi-space-3);
+  margin: var(--oi-space-2) 0 var(--oi-space-1) 0;
 }
 
 .oi-node-detail-panel-overview-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+  min-width: 0;
 }
 
 .oi-node-detail-panel-overview-label {
-    font-size: 0.7rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  font-size: var(--oi-font-size-caption);
+  color: var(--oi-color-text-muted);
 }
 
 .oi-node-detail-panel-overview-value {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--slds-g-color-on-surface-1, #181818);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  font-size: var(--oi-font-size-body-lg);
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .oi-node-detail-panel-table {
-    width: 100%;
-    margin-top: 0.75rem;
-    font-size: 0.8rem;
-    border-collapse: collapse;
+  width: 100%;
+  margin-top: var(--oi-space-3);
+  font-size: var(--oi-font-size-body);
+  border-collapse: collapse;
 }
 
 .oi-node-detail-panel-table th {
-    text-align: left;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    padding: 0.3rem 0.5rem 0.3rem 0;
-    vertical-align: top;
-    font-weight: 500;
+  text-align: left;
+  color: var(--oi-color-text-muted);
+  padding: var(--oi-space-1) var(--oi-space-2) var(--oi-space-1) 0;
+  vertical-align: top;
+  font-weight: var(--oi-font-weight-semibold);
 }
 
 /**
@@ -133,40 +158,40 @@
  * full name is still available via the row's own title attribute (html), shown on hover.
  */
 .oi-node-detail-panel-table td {
-    padding: 0.3rem 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  padding: var(--oi-space-1) 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .oi-node-detail-panel-table tr:not(:last-child) th,
 .oi-node-detail-panel-table tr:not(:last-child) td {
-    border-bottom: 1px solid var(--slds-g-color-border-1, #f0efed);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
 }
 
 /** A stronger header treatment than a plain bold line — a small accent rule on the left reads as a distinct section, not just heavier body text, giving the panel real visual hierarchy between chrome and content. */
 .oi-node-detail-panel-section {
-    margin-top: 1.1rem;
-    padding-top: 0.75rem;
-    padding-left: 0.6rem;
-    border-top: 1px solid var(--slds-g-color-border-1, #dddbda);
-    border-left: 3px solid var(--slds-g-color-border-2, #e2e1df);
+  margin-top: var(--oi-space-4);
+  padding-top: var(--oi-space-3);
+  padding-left: var(--oi-space-2);
+  border-top: var(--oi-border-width) solid var(--oi-color-border);
+  border-left: 3px solid var(--oi-color-border);
 }
 
 .oi-node-detail-panel-section-title {
-    font-size: 0.8rem;
-    font-weight: 700;
-    margin: 0;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: var(--slds-g-color-on-surface-2, #444);
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-bold);
+  margin: 0;
+  letter-spacing: var(--oi-letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--oi-color-text-secondary);
 }
 
 .oi-node-detail-panel-section-note {
-    font-size: 0.75rem;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    margin: 0.25rem 0 0 0;
-    line-height: 1.4;
+  font-size: var(--oi-font-size-caption);
+  color: var(--oi-color-text-muted);
+  margin: var(--oi-space-1) 0 0 0;
+  line-height: var(--oi-line-height-body);
 }
 
 /**
@@ -183,18 +208,18 @@
  * another section.
  */
 .oi-node-detail-panel-freshness {
-    margin: 0.75rem 0 0 0;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    font-size: 0.7rem;
-    line-height: 1.4;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  margin: var(--oi-space-3) 0 0 0;
+  padding-top: var(--oi-space-2);
+  border-top: var(--oi-border-width) solid var(--oi-color-border);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
 }
 
-/** A known-incomplete scan is a real caveat on every number above it, so it gets warning colour — but stays inline, since it qualifies the freshness line rather than being an error in its own right. */
+/** A known-incomplete scan is a real caveat on every number above it, so it gets warning colour — but stays inline, since it qualifies the freshness line rather than being an error in its own right. Severity is carried by the wording too, never by colour alone (ADR-0028 §4). */
 .oi-node-detail-panel-freshness-warning {
-    color: var(--slds-g-color-warning-base-40, #a86403);
-    font-weight: 600;
+  color: var(--oi-color-severity-warning);
+  font-weight: var(--oi-font-weight-semibold);
 }
 
 /**
@@ -203,181 +228,181 @@
  * rather than a button so a column of them reads as data, not as a toolbar.
  */
 .oi-node-detail-panel-count-button {
-    border: none;
-    background: transparent;
-    padding: 0;
-    font: inherit;
-    font-weight: 600;
-    color: var(--slds-g-color-accent-1, #0176d3);
-    cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: var(--oi-font-weight-semibold);
+  color: var(--oi-color-accent);
+  cursor: pointer;
 }
 
 .oi-node-detail-panel-count-button:hover,
 .oi-node-detail-panel-count-button:focus {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .oi-node-detail-panel-impact-breakdown {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin: 0.5rem 0 0 0;
-    padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oi-space-2);
+  margin: var(--oi-space-2) 0 0 0;
+  padding: 0;
 }
 
 .oi-node-detail-panel-impact-breakdown-chip {
-    font-size: 0.7rem;
-    line-height: 1.2;
-    padding: 0.15rem 0.45rem;
-    border-radius: 0.75rem;
-    background: var(--slds-g-color-surface-container-2, #f3f3f3);
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    border: 1px solid var(--slds-g-color-border-1, #e2e1df);
-    white-space: nowrap;
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-tight);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+  background: var(--oi-color-surface-sunken);
+  color: var(--oi-color-text-muted);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  white-space: nowrap;
 }
 
 .oi-node-detail-panel-show-fields-button,
 .oi-node-detail-panel-hide-fields-button {
-    margin-top: 0.4rem;
-    border-radius: 0.25rem;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
+  margin-top: var(--oi-space-2);
+  border-radius: var(--oi-radius-sm);
+  padding: var(--oi-space-1) var(--oi-space-3);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .oi-node-detail-panel-show-fields-button {
-    border: 1px solid var(--slds-g-color-border-accent-1, #0176d3);
-    background: transparent;
-    color: var(--oi-panel-accent-color);
+  border: var(--oi-border-width) solid var(--oi-color-accent);
+  background: transparent;
+  color: var(--oi-color-accent);
 }
 
 .oi-node-detail-panel-show-fields-button:hover {
-    background: var(--oi-panel-accent-bg);
+  background: var(--oi-color-accent-wash);
 }
 
 /** A visually quieter secondary action than Show Fields — a collapse should read as lower-commitment than the expand it undoes. */
 .oi-node-detail-panel-hide-fields-button {
-    border: 1px solid var(--slds-g-color-border-1, #dddbda);
-    background: transparent;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  background: transparent;
+  color: var(--oi-color-text-muted);
 }
 
 .oi-node-detail-panel-hide-fields-button:hover {
-    background: var(--slds-g-color-surface-container-2, #f3f3f3);
+  background: var(--oi-color-surface-sunken);
 }
 
 .oi-node-detail-panel-impact-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oi-space-2);
+  margin-top: var(--oi-space-2);
 }
 
 .oi-node-detail-panel-impact-button {
-    border: 1px solid var(--slds-g-color-border-accent-1, #0176d3);
-    background: transparent;
-    color: var(--oi-panel-accent-color);
-    border-radius: 0.25rem;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
+  border: var(--oi-border-width) solid var(--oi-color-accent);
+  background: transparent;
+  color: var(--oi-color-accent);
+  border-radius: var(--oi-radius-sm);
+  padding: var(--oi-space-1) var(--oi-space-3);
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-semibold);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .oi-node-detail-panel-impact-button:hover {
-    background: var(--oi-panel-accent-bg);
+  background: var(--oi-color-accent-wash);
 }
 
 .oi-node-detail-panel-fields-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.4rem;
-    flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  margin-top: var(--oi-space-2);
+  flex-wrap: wrap;
 }
 
 .oi-node-detail-panel-field-search {
-    flex: 1;
-    min-width: 8rem;
-    border: 1px solid var(--slds-g-color-border-1, #dddbda);
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    background: var(--slds-g-color-surface-container-1, #ffffff);
-    color: var(--slds-g-color-on-surface-1, #181818);
+  flex: 1;
+  min-width: 8rem;
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-sm);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  font-size: var(--oi-font-size-caption);
+  background: var(--oi-color-surface);
+  color: var(--oi-color-text-primary);
 }
 
 .oi-node-detail-panel-field-filter-group {
-    display: flex;
-    border: 1px solid var(--slds-g-color-border-1, #dddbda);
-    border-radius: 0.25rem;
-    overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
+  display: flex;
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-sm);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .oi-node-detail-panel-field-filter-button {
-    border: none;
-    border-right: 1px solid var(--slds-g-color-border-1, #dddbda);
-    background: var(--slds-g-color-surface-container-1, #ffffff);
-    color: var(--slds-g-color-on-surface-1, #444);
-    padding: 0.25rem 0.6rem;
-    font-size: 0.72rem;
-    cursor: pointer;
+  border: none;
+  border-right: var(--oi-border-width) solid var(--oi-color-border);
+  background: var(--oi-color-surface);
+  color: var(--oi-color-text-secondary);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  font-size: var(--oi-font-size-caption);
+  cursor: pointer;
 }
 
 .oi-node-detail-panel-field-filter-button:last-child {
-    border-right: none;
+  border-right: none;
 }
 
 .oi-node-detail-panel-field-filter-button.is-active {
-    background: var(--slds-g-color-accent-1, #0176d3);
-    color: var(--slds-g-color-on-accent-1, #ffffff);
+  background: var(--oi-color-accent);
+  color: var(--oi-color-on-accent);
 }
 
 .oi-node-detail-panel-fields-table {
-    max-height: 16rem;
-    display: block;
-    overflow-y: auto;
+  max-height: 16rem;
+  display: block;
+  overflow-y: auto;
 }
 
 .oi-node-detail-panel-fields-table thead,
 .oi-node-detail-panel-fields-table tbody {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
+  display: table;
+  width: 100%;
+  table-layout: fixed;
 }
 
 .oi-node-detail-panel-field-row {
-    cursor: pointer;
+  cursor: pointer;
 }
 
 .oi-node-detail-panel-field-row:hover {
-    background: var(--slds-g-color-accent-container-1, #f3f7fb);
+  background: var(--oi-color-accent-wash);
 }
 
 .oi-node-detail-panel-field-badge {
-    display: inline-block;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0.05rem 0.4rem;
-    border-radius: 0.65rem;
-    white-space: nowrap;
+  display: inline-block;
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+  white-space: nowrap;
 }
 
 .oi-node-detail-panel-field-badge.is-custom {
-    background: var(--oi-panel-accent-bg);
-    color: var(--oi-panel-accent-color);
+  background: var(--oi-color-accent-wash);
+  color: var(--oi-color-accent);
 }
 
 .oi-node-detail-panel-field-badge.is-standard {
-    background: var(--slds-g-color-surface-container-2, #f3f3f3);
-    color: var(--slds-g-color-on-surface-1, #444);
+  background: var(--oi-color-surface-sunken);
+  color: var(--oi-color-text-secondary);
 }
 
 /**
@@ -386,182 +411,212 @@
  * identically to every other interactive control in this panel.
  */
 .oi-node-detail-panel-section-header {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    width: 100%;
-    border: none;
-    background: transparent;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    text-align: left;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
 }
 
 .oi-node-detail-panel-section-header:hover .oi-node-detail-panel-section-title {
-    color: var(--slds-g-color-accent-1, #0176d3);
+  color: var(--oi-color-accent);
 }
 
 .oi-node-detail-panel-section-header .oi-node-detail-panel-section-title {
-    margin: 0;
+  margin: 0;
 }
 
 .oi-node-detail-panel-section-chevron {
-    flex-shrink: 0;
-    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.oi-node-detail-panel-section-header[aria-expanded='true'] .oi-node-detail-panel-section-chevron {
-    transform: rotate(90deg);
+.oi-node-detail-panel-section-header[aria-expanded="true"]
+  .oi-node-detail-panel-section-chevron {
+  transform: rotate(90deg);
 }
 
 /** The count badge reads as a clickable-adjacent affordance (product rule: every number here is explainable) without itself being a second, redundant control inside the header button. */
 .oi-node-detail-panel-section-count {
-    margin-left: auto;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    background: var(--slds-g-color-surface-container-2, #f3f3f3);
-    border-radius: 0.65rem;
-    padding: 0.05rem 0.5rem;
+  margin-left: auto;
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  color: var(--oi-color-text-muted);
+  background: var(--oi-color-surface-sunken);
+  border-radius: var(--oi-radius-pill);
+  padding: var(--oi-space-1) var(--oi-space-2);
 }
 
 /**
- * Empty-state differentiation (GraphUI.md §42, item 22) — TRUE ZERO / UNSCANNED / STALE /
- * POSSIBLY INCOMPLETE each get their own quiet, color-coded treatment so a missing scanner never
- * reads as a confident zero. Deliberately restrained (no banners) — this is a caveat on one
- * section's count, not an error demanding the whole panel's attention.
+ * Per-section empty-state badge, now speaking ADR-0028 §7's canonical vocabulary: the four
+ * private variants (zero / unscanned / stale / incomplete) collapse onto the two canonical
+ * states those causes actually are — see CANONICAL_STATE_BY_EMPTY_KIND in the JS — so the panel
+ * and c/oiStateBanner name the same states with the same keys.
+ *
+ * It stays a compact inline badge rather than becoming a c/oiStateBanner card: this sits inside a
+ * collapsible section header's body in a 360px rail, and one card per Automation/Code/Security
+ * category would dominate the panel it is only a caveat on. The state keys are shared; the
+ * presentation is the quiet tier OrgHealthVisualDesignSpecification.md §6 asks for. State is never
+ * carried by colour alone — buildEmptyStateMessage still says the cause in words, and it keeps all
+ * four distinctions the colour no longer needs to make.
  */
 .oi-node-detail-panel-empty-state-badge {
-    font-size: 0.75rem;
-    margin: 0.25rem 0 0 0;
-    line-height: 1.4;
-    font-style: italic;
+  font-size: var(--oi-font-size-caption);
+  margin: var(--oi-space-1) 0 0 0;
+  line-height: var(--oi-line-height-body);
+  font-style: italic;
 }
 
-.oi-node-detail-panel-empty-state-zero {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
+/** true-zero: c/oiStateBanner's `success` variant rendered at this surface's quiet tier — a
+ * confirmed zero is reassuring, never something to draw the eye. */
+.oi-node-detail-panel-empty-state_true-zero {
+  color: var(--oi-color-text-muted);
 }
 
-.oi-node-detail-panel-empty-state-unscanned {
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-style: normal;
-    font-weight: 600;
-}
-
-.oi-node-detail-panel-empty-state-stale {
-    color: var(--slds-g-color-warning-base-40, #a86403);
-    font-style: normal;
-    font-weight: 600;
-}
-
-.oi-node-detail-panel-empty-state-incomplete {
-    color: var(--slds-g-color-brand-base-40, #0176d3);
-    font-style: normal;
+/** coverage-incomplete: unscanned, stale and partial data all land here, because all three mean
+ * the zero above cannot be trusted. Same warning tier as the shared banner's variant. */
+.oi-node-detail-panel-empty-state_coverage-incomplete {
+  color: var(--oi-color-severity-warning);
+  font-style: normal;
+  font-weight: var(--oi-font-weight-semibold);
 }
 
 /** A static (non-collapsible) section header — used for Overview, which stays always-expanded. */
 .oi-node-detail-panel-section-header-static {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  margin-bottom: var(--oi-space-1);
 }
 
-.oi-node-detail-panel-section-header-static .oi-node-detail-panel-section-title {
-    margin: 0;
+.oi-node-detail-panel-section-header-static
+  .oi-node-detail-panel-section-title {
+  margin: 0;
 }
 
 /** One colored identity icon per section — a quiet visual anchor distinguishing Fields/Relationships/Automation/Code/Security/Impact/Technical Details at a glance, matching the approved reference's section iconography. */
 .oi-node-detail-panel-section-icon {
-    flex-shrink: 0;
-    box-sizing: content-box;
-    padding: 0.28rem;
-    border-radius: 0.35rem;
-    background: color-mix(in srgb, currentColor 12%, transparent);
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+  flex-shrink: 0;
+  box-sizing: content-box;
+  padding: var(--oi-space-1);
+  border-radius: var(--oi-radius-md);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  --sds-c-icon-color-foreground-default: var(--oi-color-text-muted);
 }
 
 .oi-node-detail-panel-code-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.7rem;
-    height: 1.3rem;
-    border-radius: 0.35rem;
-    background: #fff2d8;
-    color: #b85d00;
-    font-family: Consolas, 'Courier New', monospace;
-    font-size: 0.68rem;
-    font-weight: 800;
-    line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  height: 1.3rem;
+  border-radius: var(--oi-radius-md);
+  /* Type identity, not severity — matches .is-code in the identity block below. */
+  background: var(--oi-color-identity-7-wash);
+  color: var(--oi-color-identity-7);
+  font-family: var(--oi-font-family-mono);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: 1;
 }
 
-.oi-node-detail-panel-section-header[aria-expanded='true'] ~ * {
-    animation: oi-panel-disclosure-in 0.22s cubic-bezier(0.2, 0, 0, 1) both;
-    transform-origin: top;
+.oi-node-detail-panel-section-header[aria-expanded="true"] ~ * {
+  animation: oi-panel-disclosure-in 0.22s cubic-bezier(0.2, 0, 0, 1) both;
+  transform-origin: top;
 }
 
 @keyframes oi-panel-disclosure-in {
-    from { opacity: 0; transform: translateY(-5px) scaleY(0.98); }
-    to { opacity: 1; transform: translateY(0) scaleY(1); }
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scaleY(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .oi-node-detail-panel-section-chevron,
-    .oi-node-detail-panel-section-header[aria-expanded='true'] ~ * {
-        transition: none;
-        animation: none;
-    }
+  .oi-node-detail-panel-section-chevron,
+  .oi-node-detail-panel-section-header[aria-expanded="true"] ~ * {
+    transition: none;
+    animation: none;
+  }
 }
 
+/**
+ * Per-section identity palette, resolved from ADR-0028 §5's categorical identity ramp.
+ *
+ * These hues are a mutually-distinguishable set whose only job is to tell one metadata section
+ * apart from another at a glance — the same kind of value as the relationship-kind legend, where
+ * two entries collapsing into one colour is a silent functional failure.
+ *
+ * Two hues changed during the migration, and the change is the point. This block previously used
+ * green (#04844b) for Automation and red (#c23934) for Security. In a product whose entire subject
+ * is org health and risk, a red icon beside the word "Security" reads as a status verdict no matter
+ * what the code intends — the identical defect ADR-0028 Context records on the Org Health landing
+ * grid, where severity-coloured monograms contradicted the real scores beside them. The identity
+ * ramp therefore excludes green and red by construction, and Automation and Security take violet
+ * and slate. Real severity in this panel is carried by the empty-state badges and the Org Health
+ * surface, never by a section icon.
+ *
+ * Do not substitute --oi-color-severity-* here: ADR-0028 §4 (C5/C6) keeps the four colour channels
+ * — accent, severity, structural, identity — strictly separate.
+ *
+ * .is-technical stays neutral: the absence of an identity hue, not one of them.
+ */
 .oi-node-detail-panel-section-icon.is-overview {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-3, #7376e0);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-4);
 }
 
 .oi-node-detail-panel-section-icon.is-fields {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-4, #c95bb6);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-5);
 }
 
 .oi-node-detail-panel-section-icon.is-relationships {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-1, #0176d3);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-1);
 }
 
 .oi-node-detail-panel-section-icon.is-automation {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-success-1, #04844b);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-2);
 }
 
 .oi-node-detail-panel-section-icon.is-code {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-warning-base-40, #dd7a01);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-7);
 }
 
 .oi-node-detail-panel-section-icon.is-security {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-error-1, #c23934);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-6);
 }
 
 .oi-node-detail-panel-section-icon.is-impact {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-accent-2, #06a59a);
+  --sds-c-icon-color-foreground-default: var(--oi-color-identity-3);
 }
 
 .oi-node-detail-panel-section-icon.is-technical {
-    --sds-c-icon-color-foreground-default: var(--slds-g-color-on-surface-2, #706e6b);
+  --sds-c-icon-color-foreground-default: var(--oi-color-text-muted);
 }
 
 /** The "Coverage details" disclosure (GraphUI.md §42, item 15) — quiet, secondary styling so the scanner's own honest explanation stays available without dominating the section the way an always-visible paragraph did. */
 .oi-node-detail-panel-coverage-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    margin-top: 0.4rem;
-    border: none;
-    background: transparent;
-    color: var(--slds-g-color-on-surface-2, #706e6b);
-    font-size: 0.72rem;
-    cursor: pointer;
-    padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-1);
+  margin-top: var(--oi-space-2);
+  border: none;
+  background: transparent;
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-caption);
+  cursor: pointer;
+  padding: 0;
 }
 
 .oi-node-detail-panel-coverage-toggle:hover {
-    color: var(--slds-g-color-accent-1, #0176d3);
-    text-decoration: underline;
+  color: var(--oi-color-accent);
+  text-decoration: underline;
 }

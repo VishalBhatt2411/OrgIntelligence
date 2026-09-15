@@ -1,0 +1,221 @@
+@import "c/oiDesignTokens";
+@import "c/oiButtonStyles";
+
+/**
+ * Migrated to the ADR-0028 token vocabulary.
+ *
+ * MIXED-PALETTE CLEANUP. This is the second of the two files ADR-0028's audit named as actively
+ * leaking the seam between the app's two competing palettes inside a single stylesheet:
+ *   - body text was the Graph family's #181818 on the component name, the section paragraph, the
+ *     related-item button and the history rows, while the shared button two rules away used the
+ *     Health family's #12161f. Both now resolve through --oi-color-text-primary.
+ *   - muted text was the Graph family's #706e6b on the rule name and the values row but the Health
+ *     family's #8892a0 on the section headings, meta row, read-only note and history date — two
+ *     greys for one role, side by side. Both now resolve through --oi-color-text-muted.
+ *   - the evidence block's sunken surface was the Graph family's #f3f3f3 while every border in the
+ *     file was the Health family's #edf0f4. Now --oi-color-surface-sunken and --oi-color-border.
+ *
+ * Defects corrected, each an SLDS tier consumed opposite to the literal fallback beside it:
+ *   - the meta rule and the history separator asked for --slds-g-color-border-2 with #edf0f4 as
+ *     fallback, but border-2 is SLDS 2's STRONG border (#5c5c5c), so both hairlines rendered as
+ *     mid-grey rules -> --oi-color-border.
+ *   - every muted role asked for --slds-g-color-on-surface-3 (STRONGEST tier, #03234d) or -2 where
+ *     a grey was written as the fallback, so muted chrome rendered dark navy
+ *     -> --oi-color-text-muted.
+ *   - primary content asked for --slds-g-color-on-surface-1, the WEAKEST tier (#5c5c5c), so the
+ *     finding description and component name rendered lighter than the uppercase section headings
+ *     labelling them -> --oi-color-text-primary.
+ *   - the error and expired-risk lines bound to --slds-g-color-error-base-40, measured magenta
+ *     (#b60554) in this org, and the success line to --slds-g-color-success-1, measured dark teal
+ *     (#056764) — neither the red nor the green their fallbacks intended. Both now use
+ *     --oi-color-severity-* (ADR-0028 §2 exception 2).
+ *   - 'Manrope' / 'IBM Plex Sans' never loaded (no static resources in the package), and the
+ *     'SF Mono'-first monospace stack was one of three competing stacks; both collapse onto the
+ *     shared font tokens.
+ * Weight 800 retired in favour of 700, and the 0.06em uppercase tracking collapses onto
+ * --oi-letter-spacing-caps (ADR-0028 §4 C10/C11).
+ *
+ * Left literal deliberately: the z-index (stacking contract with the SLDS docked panel) and the
+ * 65vh body cap (viewport-relative scroll geometry) are not token-able values. No box-shadow is
+ * declared here — the drawer's elevation comes from the SLDS panel it renders inside — so nothing
+ * maps to --oi-shadow-overlay.
+ */
+
+.oi-finding-drawer {
+  z-index: 9001;
+}
+
+.oi-finding-drawer-header {
+  background: var(--oi-color-surface);
+  padding-bottom: var(--oi-space-3);
+}
+
+.oi-finding-drawer-subheader {
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  margin-top: var(--oi-space-2);
+}
+
+.oi-finding-drawer-component {
+  font-weight: var(--oi-font-weight-bold);
+  font-size: var(--oi-font-size-body-lg);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-finding-drawer-rule {
+  font-family: var(--oi-font-family-mono);
+  font-size: var(--oi-font-size-micro);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-finding-drawer-body {
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.oi-finding-drawer-section {
+  margin-bottom: var(--oi-space-4);
+}
+
+.oi-finding-drawer-section h3 {
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  line-height: var(--oi-line-height-tight);
+  text-transform: uppercase;
+  color: var(--oi-color-text-muted);
+  margin: 0 0 var(--oi-space-2);
+}
+
+.oi-finding-drawer-section p {
+  margin: 0;
+  font-size: var(--oi-font-size-body-lg);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-finding-drawer-evidence {
+  font-family: var(--oi-font-family-mono);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  background: var(--oi-color-surface-sunken);
+  padding: var(--oi-space-2) var(--oi-space-3);
+  border-radius: var(--oi-radius-md);
+  margin-bottom: var(--oi-space-2);
+}
+
+.oi-finding-drawer-values {
+  display: flex;
+  gap: var(--oi-space-5);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  font-variant-numeric: var(--oi-font-numeric);
+  color: var(--oi-color-text-muted);
+}
+
+.oi-finding-drawer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oi-space-4);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+  border-top: var(--oi-border-width) solid var(--oi-color-border);
+  padding-top: var(--oi-space-3);
+  margin-bottom: var(--oi-space-4);
+}
+
+.oi-finding-drawer-triage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-3);
+}
+
+.oi-finding-drawer-readonly-note {
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-muted);
+  margin: 0 0 var(--oi-space-2);
+}
+
+.oi-finding-drawer-readonly-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+}
+
+.oi-finding-drawer-success {
+  margin: 0;
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-severity-good);
+}
+
+/* Severity is never carried by color alone (ADR-0028 §4): the template supplies the "expired"
+ * wording this rule emphasises. */
+.oi-finding-drawer-risk-expired {
+  color: var(--oi-color-severity-critical);
+  font-weight: var(--oi-font-weight-bold);
+}
+
+.oi-finding-drawer-related-list,
+.oi-finding-drawer-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-2);
+}
+
+.oi-finding-drawer-related-item {
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-md);
+  padding: var(--oi-space-2) var(--oi-space-2);
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
+  cursor: pointer;
+}
+.oi-finding-drawer-related-item:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+.oi-finding-drawer-history-list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oi-space-1);
+  font-size: var(--oi-font-size-body);
+  line-height: var(--oi-line-height-body);
+  color: var(--oi-color-text-primary);
+  border-bottom: var(--oi-border-width) solid var(--oi-color-border);
+  padding-bottom: var(--oi-space-2);
+}
+
+.oi-finding-drawer-history-date {
+  font-size: var(--oi-font-size-micro);
+  color: var(--oi-color-text-muted);
+}
+
+/*
+ * Layout-only, not button identity: this drawer's actions sit in a flex column, so without this
+ * they would stretch to the full drawer width. Kept local when `.oi-health-btn` moved into
+ * c/oiButtonStyles — the shared vocabulary must not carry one consumer's column geometry.
+ */
+.oi-btn {
+  align-self: flex-start;
+}

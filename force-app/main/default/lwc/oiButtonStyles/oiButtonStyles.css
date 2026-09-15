@@ -1,0 +1,83 @@
+@import "c/oiDesignTokens";
+
+/**
+ * The platform's native-button vocabulary.
+ *
+ * Why this module exists: `.oi-health-btn` had been copy-pasted into eight stylesheets, and the
+ * eight copies had drifted apart. Three of them (Automation, Metadata, the Org Health dashboard)
+ * carried no `:focus-visible` rule at all, so their buttons showed no focus indicator whatsoever —
+ * an accessibility defect that VisualDesignSpecification.md §8 forbids, and one that only became
+ * visible by diffing the copies. Three others omitted `font-family`/`line-height`, so the same
+ * button rendered at a different size depending on which section you were looking at, and the
+ * `-primary` variant existed in only two. A single definition makes that class of drift impossible.
+ *
+ * Three variants, and no more:
+ *   .oi-btn          the default. A bordered neutral button on the card surface.
+ *   .oi-btn_primary  the one affordance that commits the user's intent in a given region.
+ *   .oi-btn_link     a text-weight action inside dense rows and tables, where a bordered
+ *                    button per row would out-shout the data it acts on.
+ *
+ * These style the NATIVE <button> element. `lightning-button` renders into a closed Salesforce
+ * shadow root and cannot be reached from here; components already using it keep using it, and are
+ * outside this vocabulary by construction.
+ */
+
+.oi-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  border-radius: var(--oi-radius-md);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  background: var(--oi-color-surface);
+  color: var(--oi-color-text-primary);
+  font-family: var(--oi-font-family-sans);
+  font-size: var(--oi-font-size-body);
+  font-weight: var(--oi-font-weight-semibold);
+  line-height: var(--oi-line-height-tight);
+  padding: var(--oi-space-2) var(--oi-space-3);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.oi-btn:hover:not(:disabled) {
+  border-color: var(--oi-color-accent);
+}
+
+.oi-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--oi-focus-ring);
+}
+
+/* Reads as unavailable without going invisible: 0.6 keeps disabled label text legible. */
+.oi-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.oi-btn_primary {
+  background: var(--oi-color-accent);
+  border-color: var(--oi-color-accent);
+  color: var(--oi-color-on-accent);
+}
+
+/*
+ * A filled button cannot signal hover by changing its border against its own fill, so the primary
+ * variant dims instead. Restating the border colour stops the base rule's accent border from
+ * reading as a change on a surface that is already accent-coloured.
+ */
+.oi-btn_primary:hover:not(:disabled) {
+  opacity: 0.92;
+  border-color: var(--oi-color-accent);
+}
+
+.oi-btn_link {
+  border: none;
+  background: transparent;
+  color: var(--oi-color-accent);
+  font-size: var(--oi-font-size-caption);
+  padding: 0;
+}
+
+.oi-btn_link:hover:not(:disabled) {
+  text-decoration: underline;
+}

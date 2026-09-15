@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Score_Explanation__c</fullName>
+    <label>Score Explanation</label>
+    <length>1024</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+    <description
+  >OI_HealthScoringEngine's one-line "why this severity" summary, naming the top contributing signal(s) — stored verbatim alongside Severity_Contributors_Json__c's full breakdown so the drawer never has to re-derive it from the raw contributor list.</description>
+</CustomField>

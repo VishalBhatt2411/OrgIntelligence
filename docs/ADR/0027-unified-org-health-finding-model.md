@@ -1,0 +1,42 @@
+# ADR-0027: Unified Org Health Finding Model and Remediation Lifecycle
+
+## Status
+
+Accepted — vertical slice implemented for Metadata Health; remaining sections deferred (see Consequences).
+
+## Context
+
+ADR-0026 established a compute-tier architecture (Tier 1 live/unpersisted, Tier 2 live/bounded, Tier 3 async/persisted) for scoring each Org Health section, and explicitly deferred "Finding lifecycle" and "Remediation workspace" as "v1 scope, not defaults to revisit." That deferral was sound for shipping the scoring/visual contract first, but it left every section's `breakdownRows` as read-only: an administrator can see that `Hub_Object__c` is Warning-severity, but not why in enough detail to act, not who is meant to act on it, and not whether someone already looked at it and decided the risk is acceptable. A re-scan also has no memory — every computation is a fresh, unpersisted view (Tier 1/2) or an overwritten snapshot (Tier 3), so there is no way to track "this was flagged three scans ago and is still open" versus "this just appeared."
+
+Separately, the master directive governing this iteration is explicit that findings must behave like real audit records, not transient scan output: a stable identity across re-scans, an explicit status lifecycle (Open → Acknowledged → In Progress → Risk Accepted / Resolved / False Positive), and — critically — a finding that stops being detected must be marked Resolved, never deleted, so remediation history survives.
+
+## Decision
+
+**One new object, `OI_Org_Health_Finding__c`, shared by every section.** Not one object per section — a finding's shape (evidence, severity, explanation, org risk, impact, remediation, validation steps, lifecycle fields) is identical regardless of whether it came from Metadata Health or (later) Security Health; `Section_Key__c` plus `Rule_Id__c` distinguish origin without needing separate schemas. This mirrors `OI_Org_Health_Snapshot__c`'s existing precedent of one shared, minimally-scoped object rather than per-section proliferation.
+
+**Identity is a computed fingerprint, not a natural key on any one field.** `Fingerprint__c` is `SHA-256(sectionKey :: ruleId :: componentKey)`, computed by `OI_OrgHealthFindingRepository.computeFingerprint` and declared as the object's external ID. A scan's candidates are `upsert`ed by this fingerprint in one call — a fingerprint not on file is a new Open finding; one already on file has only its evidence/severity fields refreshed, never its lifecycle fields (`Status__c`, `OwnerId`, `Due_Date__c`, `Notes__c`, `Compensating_Control__c`, `Resolution_Evidence__c`). This is what lets an administrator's triage decision survive indefinitely across re-scans without the next scan silently overwriting it.
+
+**Disappearance means Resolved, never delete.** `resolveMissingFindings` marks every non-terminal finding in a section not present in the current scan's fingerprint set as Resolved, stamping `Resolution_Evidence__c` with the run that stopped detecting it. Terminal statuses (Resolved, False Positive) are left alone once reached from a _previous_ resolution — except recurrence: if a condition marked Resolved is detected again, `mergeCandidateOntoRecord` reopens it to Open (a Resolved status is a factual claim the condition is gone, which recurrence disproves). Risk Accepted and False Positive do NOT reopen on recurrence — those are judgments about the condition itself, not claims that it disappeared, so a mere repeat detection doesn't override an administrator's stated risk decision.
+
+**Two new permissions, narrower than the existing two.** `OI_Run_Org_Health_Compute` (already existing, from the Data Health recompute action) now also gates `syncMetadataHealthFindings` — computing and persisting findings is a write action distinct from viewing live detail. A new `OI_Manage_Finding_Workflow` gates `updateFindingStatus` specifically: viewing findings and computing them do not imply the right to change their remediation lifecycle. Granted to Administrator and Power User; Viewer gets read-only object/field access and neither custom permission, consistent with its tier throughout this package.
+
+**A vertical slice, not a big-bang rollout.** This iteration wires the full model — object, Repository, Service, Controller methods, permission sets, `oiHealthFindingDrawer`, and `oiHealthBreakdownList`'s new opt-in `clickable`/`rowselect` contract — through exactly one section, Metadata Health. `OI_MetadataHealthService.getFindingCandidates()` is the one section-specific piece: it re-expresses the same signals already computed for the live score as `OI_OrgHealthFindingCandidate` rows with real, differentiated evidence/remediation text (not placeholder copy), keeping severity capped the same way the live detail computation already caps it (e.g., "no incoming references" never escalates past Warning; a Standard object is never flagged for field count or degree). Automation/Code/Security/Data Health are deliberately left on the read-only breakdown they already had — extending them is mechanical repetition of this same pattern once it has proven itself against real usage, not a new design question.
+
+## Consequences
+
+- An administrator can now click any Metadata Health breakdown row and see the full evidence/remediation/validation-steps behind it, and record a real triage decision that survives every future scan.
+- `oiHealthBreakdownList` gained an opt-in `clickable` boolean and a `rowselect` event rather than being hardwired to findings — a section with no findings wired up yet (Automation/Code/Security/Data Health) is entirely unaffected; the component stays generic across every section, per this package's existing convention.
+- `OI_Org_Health_Finding__c` is a real, owner-assignable, sharing-enforced business record (`sharingModel: ReadWrite`, `with sharing` Repository) — structurally closer to `OI_Hierarchy_Definition__c` than to the Apex-boundary-secured `OI_Graph_Node__c`/`OI_Graph_Edge__c` (ADR-0006), because a finding's owner and audit trail are meant to be visible/reportable the way any Salesforce record is.
+- Extending Automation/Code/Security/Data Health onto this same model is explicitly future work: each needs its own `getFindingCandidates()`-equivalent and a `sync*Findings` controller method following the exact pattern established here — no new architecture, but not yet done, and not to be assumed done.
+- Owner reassignment has no UI yet — `OwnerId`/`ownerName` round-trip end-to-end (Repository, Service, DTO, Controller) but `oiHealthFindingDrawer` does not yet expose a user picker to change it. Deferred rather than rushed with an unproven lookup component; the drawer always passes `ownerId: null` to `updateFindingStatus`, which by design leaves an omitted field untouched.
+
+## Alternatives Considered
+
+- **A finding object per section** (`OI_Metadata_Health_Finding__c`, `OI_Security_Health_Finding__c`, …) — rejected: identical schema six times over, and a shared remediation workspace (explicitly on this package's roadmap) would need to query six objects instead of one.
+- **Deleting a finding when it's no longer detected** — rejected outright by the master directive's own requirement and by ADR-0026's spirit of honest, auditable history; a deleted row is indistinguishable from "never happened," which is false.
+- **Re-checking `OI_Manage_Finding_Workflow` inside `OI_OrgHealthFindingRepository`** — rejected; the Repository documents this as the Controller's responsibility (CodingStandards.md §1 Repository role), matching how every other Repository in this codebase stays a pure data-access layer, not a second enforcement point.
+- **Recurrence always reopening, or never reopening, regardless of prior status** — rejected as both being wrong in different cases: always-reopen would silently overturn a documented Risk Accepted/False Positive judgment on every re-scan; never-reopen would let a genuinely-recurring condition stay marked Resolved forever. The per-status rule (§ Decision) is deliberately asymmetric.
+
+## Related
+
+`ADR-0026`; `ProductSpecs.md` (Unified Finding Model, Remediation Management); `OI_OrgHealthFindingRepository.cls`; `OI_OrgHealthFindingService.cls`; `OI_MetadataHealthService.getFindingCandidates`; `OI_OrgHealthController` (`getMetadataHealthFindings`, `syncMetadataHealthFindings`, `updateFindingStatus`); `oiHealthFindingDrawer`; `oiHealthBreakdownList`.

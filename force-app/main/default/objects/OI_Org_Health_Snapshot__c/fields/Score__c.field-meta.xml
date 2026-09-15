@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Score__c</fullName>
+    <label>Score</label>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>1</scale>
+    <required>false</required>
+    <description
+  >0-100, nullable. Null for facts-only sections/metrics where the product spec explicitly forbids inventing a score ("no fake score") — never defaulted to 0 or 100 as a stand-in for "not applicable." (re-deployed to force re-indexing)</description>
+</CustomField>

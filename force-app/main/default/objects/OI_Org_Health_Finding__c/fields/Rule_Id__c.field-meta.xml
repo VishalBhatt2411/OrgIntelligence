@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Rule_Id__c</fullName>
+    <label>Rule Id</label>
+    <type>Text</type>
+    <length>100</length>
+    <required>true</required>
+    <externalId>false</externalId>
+    <description
+  >Stable identifier of the detection rule that raised this finding (e.g. MetadataHealth.HighFieldCount) — distinct from Section_Key__c so one domain can carry several independent rules.</description>
+</CustomField>
