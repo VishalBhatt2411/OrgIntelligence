@@ -95,6 +95,25 @@ describe("c-oi-hierarchy-manager", () => {
     }
   });
 
+  it("renders the hierarchy studio orientation and three-step setup rail", async () => {
+    getDefinitions.mockResolvedValue([]);
+    const element = createElement("c-oi-hierarchy-manager", {
+      is: OiHierarchyManager
+    });
+    document.body.appendChild(element);
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(".oi-hierarchy-manager-workspace-header")
+    ).not.toBeNull();
+    expect(
+      element.shadowRoot.querySelectorAll(".oi-hierarchy-manager-step")
+    ).toHaveLength(3);
+    expect(
+      element.shadowRoot.querySelector(".oi-hierarchy-manager-definition-card")
+    ).not.toBeNull();
+  });
+
   beforeEach(() => {
     getDefinitions.mockReset();
     saveDefinition.mockReset();

@@ -1,22 +1,107 @@
 @import "c/oiDesignTokens";
 
-/**
- * The panel's first stylesheet. It had none at all, so every visual decision came from the
- * `slds-*` utility classes in its markup and from lightning-card. Those are left in place —
- * ADR-0028 §7 is a state-layer change, not a redesign of this widget — and the only styling added
- * here is what the new busy affordance needs, expressed entirely in --oi-* tokens.
- *
- * Why a busy label rather than a spinner or a skeleton for the action path: the button is still on
- * screen and still the thing the user is waiting on, so the content is present, not absent. A
- * skeleton would be a lie (nothing is being placed there) and an overlay spinner would hide the
- * control it describes. The initial fetch is the opposite case — the status line genuinely has no
- * value yet — and that one does get a skeleton.
- */
+:host {
+  display: block;
+  font-family: var(--oi-font-family-sans);
+}
 
-.oi-scan-status-panel-actions {
+.oi-scan-command {
+  min-height: 3.25rem;
   display: flex;
   align-items: center;
   gap: var(--oi-space-3);
+  padding: var(--oi-space-2) var(--oi-space-3);
+  color: var(--oi-color-text-primary);
+  background: var(--oi-color-surface);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-lg);
+  box-shadow: var(--oi-shadow-card);
+}
+
+.oi-scan-command-identity {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--oi-radius-md);
+  color: var(--oi-color-accent);
+  background: var(--oi-color-accent-wash);
+  font-size: var(--oi-font-size-title);
+  font-weight: var(--oi-font-weight-bold);
+}
+
+.oi-scan-command-pulse {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: var(--oi-radius-pill);
+  background: var(--oi-color-severity-good);
+  box-shadow: 0 0 0 2px var(--oi-color-surface);
+}
+
+.oi-scan-command-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-4);
+}
+
+.oi-scan-command-copy {
+  min-width: 8rem;
+}
+
+.oi-scan-command-eyebrow {
+  display: block;
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  letter-spacing: var(--oi-letter-spacing-caps);
+  text-transform: uppercase;
+}
+
+.oi-scan-command-status {
+  margin: 0.1rem 0 0;
+  color: var(--oi-color-text-primary);
+  font-size: var(--oi-font-size-body-lg);
+  line-height: var(--oi-line-height-tight);
+}
+
+.oi-scan-command-message {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--oi-color-text-secondary);
+  font-size: var(--oi-font-size-caption);
+  line-height: var(--oi-line-height-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oi-scan-status-panel-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-3);
+}
+
+@media (max-width: 767px) {
+  .oi-scan-command-content {
+    flex-wrap: wrap;
+    gap: var(--oi-space-2);
+  }
+
+  .oi-scan-command-message {
+    order: 3;
+    flex-basis: 100%;
+    white-space: normal;
+  }
 }
 
 .oi-scan-status-panel-busy {

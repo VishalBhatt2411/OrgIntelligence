@@ -115,6 +115,44 @@
   margin: var(--oi-space-2) 0 var(--oi-space-1) 0;
 }
 
+.oi-node-detail-panel-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--oi-space-2);
+  margin-bottom: var(--oi-space-3);
+}
+
+.oi-node-detail-panel-metric {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--oi-space-2) var(--oi-space-1);
+  border: var(--oi-border-width) solid var(--oi-color-border);
+  border-radius: var(--oi-radius-md);
+  background: var(--oi-color-surface-sunken);
+  text-align: center;
+}
+
+.oi-node-detail-panel-metric-value {
+  font-size: var(--oi-font-size-display);
+  font-weight: var(--oi-font-weight-bold);
+  line-height: var(--oi-line-height-tight);
+  color: var(--oi-color-text-primary);
+}
+
+.oi-node-detail-panel-metric-label {
+  overflow: hidden;
+  width: 100%;
+  margin-top: 2px;
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-micro);
+  line-height: var(--oi-line-height-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .oi-node-detail-panel-overview-cell {
   display: flex;
   flex-direction: column;

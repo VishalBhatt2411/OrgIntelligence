@@ -198,6 +198,32 @@ public with sharing class OI_NodeSelector {
   }
 
   /**
+   * Bounded, alphabetical enumeration of current nodes — optionally scoped to a single type —
+   * for oiSearchBar's click-to-browse panel (Sprint 10 follow-up: a suggestion list shown the
+   * moment the search box gets focus, before the user has typed anything, alongside the
+   * existing prefix-match search). ORDER BY Label__c ASC so the panel reads as a predictable
+   * A-Z list; bounded by maxResults exactly like every other Tier-2-style enumeration in this
+   * codebase (selectCurrentByTypeBounded above) — a result at exactly that size is a truncated
+   * browse, never a promise this is every node of that type.
+   */
+  public List<OI_Graph_Node__c> selectCurrentBrowse(
+    String typeKey,
+    Integer maxResults
+  ) {
+    Integer effectiveMax = maxResults == null ||
+      maxResults <= 0
+      ? 20
+      : maxResults;
+    String query =
+      'SELECT ' +
+      String.join(DETAIL_FIELDS, ', ') +
+      ' FROM OI_Graph_Node__c WHERE Is_Current__c = true AND State__c = \'Active\'' +
+      (String.isNotBlank(typeKey) ? ' AND Node_Type__c = :typeKey' : '') +
+      ' ORDER BY Label__c ASC LIMIT :effectiveMax';
+    return Database.query(query);
+  }
+
+  /**
    * Keyset-paginated, key-only projection of every currently-Active key for a given
    * typeKey — the enumeration retire-detection needs (GraphRepository.md §2, §9, §12).
    * Deliberately field-minimal: no Attributes_Json__c, no Label__c.

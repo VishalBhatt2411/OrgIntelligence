@@ -230,7 +230,7 @@
                 x={card.labelX}
                 y={card.labelY}
                 width="300"
-                height="24"
+                height="28"
                 class="oi-orc-label-slot"
               >
                 <div
@@ -255,7 +255,7 @@
                 x={card.labelX}
                 y={card.labelY}
                 width="300"
-                height="24"
+                height="28"
                 class="oi-orc-label-slot oi-orc-label-slot-right"
               >
                 <div
@@ -297,7 +297,7 @@
                 x={entry.labelX}
                 y={entry.labelY}
                 width={entry.labelWidth}
-                height="24"
+                height="28"
                 class="oi-orc-label-slot oi-orc-label-slot-self"
               >
                 <div
@@ -313,6 +313,26 @@
                 >
                   {entry.connectorLabel}
                 </div>
+              </foreignObject>
+            </template>
+
+            <!-- Contextual "Explore From Here" — appears only once a neighbor is selected, never a permanent per-card link. Rendered before the neighbor cards so a card always paints on top of it, even though ROW_GAP already reserves enough clearance to keep the two from touching. -->
+            <template lwc:if={diagram.exploreAction}>
+              <foreignObject
+                x={diagram.exploreAction.x}
+                y={diagram.exploreAction.y}
+                width={diagram.exploreAction.width}
+                height={diagram.exploreAction.height}
+              >
+                <button
+                  type="button"
+                  class="oi-orc-explore-button"
+                  data-id="explore-from-here"
+                  data-node-key={diagram.exploreAction.nodeKey}
+                  onclick={handleExploreFromHere}
+                >
+                  Explore From Here →
+                </button>
               </foreignObject>
             </template>
 
@@ -499,26 +519,6 @@
                   onclick={handleShowMoreOutgoing}
                 >
                   {diagram.outgoingShowMore.label}
-                </button>
-              </foreignObject>
-            </template>
-
-            <!-- Contextual "Explore From Here" — appears only once a neighbor is selected, never a permanent per-card link -->
-            <template lwc:if={diagram.exploreAction}>
-              <foreignObject
-                x={diagram.exploreAction.x}
-                y={diagram.exploreAction.y}
-                width={diagram.exploreAction.width}
-                height={diagram.exploreAction.height}
-              >
-                <button
-                  type="button"
-                  class="oi-orc-explore-button"
-                  data-id="explore-from-here"
-                  data-node-key={diagram.exploreAction.nodeKey}
-                  onclick={handleExploreFromHere}
-                >
-                  Explore From Here →
                 </button>
               </foreignObject>
             </template>

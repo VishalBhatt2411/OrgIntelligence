@@ -463,12 +463,17 @@
 .oi-orc-connector-label {
   display: inline-flex;
   align-items: center;
+  box-sizing: border-box;
+  min-height: 24px;
+  line-height: 1rem;
   font-size: var(--oi-font-size-caption);
   font-weight: var(--oi-font-weight-semibold);
   white-space: nowrap;
   padding: var(--oi-space-1) var(--oi-space-2);
   border-radius: var(--oi-radius-pill);
   cursor: pointer;
+  caret-color: transparent;
+  user-select: none;
   background: var(--oi-color-surface);
   border: var(--oi-border-width) solid transparent;
   /**
@@ -508,6 +513,22 @@
 }
 
 .oi-orc-label-slot-right .oi-orc-connector-label {
+  margin-left: auto;
+}
+
+.oi-orc-label-slot-self {
+  overflow: visible;
+}
+
+/**
+ * A foreignObject's SVG box does not reliably establish flex layout for its XHTML child in
+ * Lightning browsers. Center the self label on the child itself so it aligns to the self card's
+ * identical x/width geometry instead of remaining pinned to the slot's left edge.
+ */
+.oi-orc-label-slot-self .oi-orc-connector-label {
+  display: flex;
+  width: fit-content;
+  margin-right: auto;
   margin-left: auto;
 }
 
@@ -740,6 +761,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 2px var(--oi-space-2) 4px;
+  border-radius: var(--oi-radius-sm);
+  background: var(--oi-color-surface);
   text-align: center;
 }
 

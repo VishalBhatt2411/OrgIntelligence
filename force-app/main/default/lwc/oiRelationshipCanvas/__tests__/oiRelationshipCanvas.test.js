@@ -229,6 +229,23 @@ describe("c-oi-relationship-canvas", () => {
           '[data-id="self-connector"]'
         );
         expect(selfConnector.textContent).toContain("ParentId");
+        const captionSlot = element.shadowRoot.querySelector(
+          ".oi-orc-self-caption-slot"
+        );
+        const cardSlot = selfCard.closest("foreignObject");
+        const labelSlot = selfConnector.closest("foreignObject");
+        const captionBottom =
+          Number(captionSlot.getAttribute("y")) +
+          Number(captionSlot.getAttribute("height"));
+        const cardTop = Number(cardSlot.getAttribute("y"));
+        const cardBottom = cardTop + Number(cardSlot.getAttribute("height"));
+
+        expect(cardTop).toBeGreaterThan(captionBottom);
+        expect(Number(labelSlot.getAttribute("y"))).toBeGreaterThan(cardBottom);
+        expect(labelSlot.getAttribute("x")).toBe(cardSlot.getAttribute("x"));
+        expect(labelSlot.getAttribute("width")).toBe(
+          cardSlot.getAttribute("width")
+        );
         expect(
           element.shadowRoot.querySelector('[data-id="incoming-empty"]')
         ).not.toBeNull();
@@ -349,6 +366,23 @@ describe("c-oi-relationship-canvas", () => {
         );
         expect(incomingConnector.textContent).toContain("AccountId");
         expect(incomingConnector.textContent).toContain("Master-Detail");
+      });
+    });
+
+    it("reserves enough SVG viewport height for the interactive capsule border", () => {
+      const fixture = baseFixture();
+      const element = renderCanvas({ ...fixture, centerNodeKey: "account" });
+
+      return Promise.resolve().then(() => {
+        const incomingSlot = element.shadowRoot
+          .querySelector('[data-id="incoming-connector"]')
+          .closest("foreignObject");
+        const outgoingSlot = element.shadowRoot
+          .querySelector('[data-id="outgoing-connector"]')
+          .closest("foreignObject");
+
+        expect(incomingSlot.getAttribute("height")).toBe("28");
+        expect(outgoingSlot.getAttribute("height")).toBe("28");
       });
     });
 
@@ -552,6 +586,42 @@ describe("c-oi-relationship-canvas", () => {
         expect(detail.connector.counterpartObject.nodeKey).toBe("user");
         expect(detail.rootObject.nodeKey).toBe("account");
       });
+    });
+
+    it("clears persistent pill and connector emphasis when the detail lifecycle ends", () => {
+      const fixture = baseFixture();
+      const element = renderCanvas({ ...fixture, centerNodeKey: "account" });
+
+      return Promise.resolve()
+        .then(() => {
+          element.shadowRoot
+            .querySelector('[data-id="outgoing-connector"]')
+            .click();
+        })
+        .then(() => {
+          expect(
+            element.shadowRoot.querySelector(
+              '[data-id="outgoing-connector"].is-active'
+            )
+          ).not.toBeNull();
+          expect(
+            element.shadowRoot.querySelector(
+              ".oi-orc-connector-line-outgoing.is-active"
+            )
+          ).not.toBeNull();
+
+          element.clearConnectorSelection();
+        })
+        .then(() => {
+          expect(
+            element.shadowRoot.querySelector(
+              ".oi-orc-connector-label.is-active"
+            )
+          ).toBeNull();
+          expect(
+            element.shadowRoot.querySelector(".oi-orc-connector-line.is-active")
+          ).toBeNull();
+        });
     });
 
     it('reveals additional connectors client-side via "show more" without emitting any fetch-triggering event', () => {

@@ -1,6 +1,10 @@
 <template>
-  <lightning-card title="Scan Status" icon-name="standard:metrics">
-    <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+  <section class="oi-scan-command" aria-label="Metadata scan status">
+    <div class="oi-scan-command-identity" aria-hidden="true">
+      <span class="oi-scan-command-pulse"></span>
+      <span class="oi-scan-command-glyph">⌁</span>
+    </div>
+    <div class="oi-scan-command-content">
       <template if:true={isInitialLoading}>
         <c-oi-skeleton
           data-id="status-loading"
@@ -9,13 +13,16 @@
         ></c-oi-skeleton>
       </template>
       <template if:false={isInitialLoading}>
-        <p class="slds-text-heading_small">
-          Status: <strong>{statusLabel}</strong>
-        </p>
+        <div class="oi-scan-command-copy">
+          <span class="oi-scan-command-eyebrow">Metadata scan</span>
+          <p class="slds-text-heading_small oi-scan-command-status">
+            <strong>{statusLabel}</strong>
+          </p>
+        </div>
         <template if:true={message}>
-          <p class="slds-text-body_small slds-text-color_weak">{message}</p>
+          <p class="oi-scan-command-message">{message}</p>
         </template>
-        <div class="slds-m-top_small oi-scan-status-panel-actions">
+        <div class="oi-scan-status-panel-actions">
           <template if:false={isRunning}>
             <lightning-button
               data-id="start-scan-button"
@@ -45,5 +52,5 @@
         </div>
       </template>
     </div>
-  </lightning-card>
+  </section>
 </template>

@@ -9,6 +9,8 @@
         placeholder={placeholderText}
         value={queryTerm}
         onchange={handleInputChange}
+        onfocus={handleFocus}
+        onblur={handleBlur}
       ></lightning-input>
       <button
         type="button"
@@ -44,7 +46,7 @@
         class="oi-combobox-panel oi-combobox-results"
         data-id="search-results"
       >
-        <template for:each={results} for:item="result">
+        <template for:each={displayResults} for:item="result">
           <li key={result.recordId}>
             <button
               data-id="search-result-item"
@@ -52,7 +54,23 @@
               class="oi-combobox-option"
               onclick={handleResultClick}
             >
-              {result.label}
+              <span
+                class="oi-combobox-option-glyph oi-combobox-option-glyph_record"
+                aria-hidden="true"
+                >{result.initials}</span
+              >
+              <span class="oi-combobox-option-copy">
+                <strong class="oi-combobox-option-label">{result.label}</strong>
+                <span class="oi-combobox-option-secondary"
+                  >{result.recordId}</span
+                >
+              </span>
+              <span class="oi-combobox-option-meta">
+                <span class="oi-combobox-option-type">{objectApiName}</span>
+                <span class="oi-combobox-option-arrow" aria-hidden="true"
+                  >→</span
+                >
+              </span>
             </button>
           </li>
         </template>

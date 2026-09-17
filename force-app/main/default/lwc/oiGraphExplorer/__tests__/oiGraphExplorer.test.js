@@ -67,13 +67,11 @@ async function switchToFieldModeAndCenterOnField(
   await flushPromises();
 
   getGraphFragment.mockResolvedValueOnce(objectFragment);
-  element.shadowRoot
-    .querySelector("c-oi-search-bar")
-    .dispatchEvent(
-      new CustomEvent("select", {
-        detail: { nodeKey: objectFragment.centerNodeKey }
-      })
-    );
+  element.shadowRoot.querySelector("c-oi-search-bar").dispatchEvent(
+    new CustomEvent("select", {
+      detail: { nodeKey: objectFragment.centerNodeKey }
+    })
+  );
   await flushPromises();
 
   getGraphFragment.mockResolvedValueOnce(fieldCenterFragment);
@@ -449,11 +447,13 @@ describe("c-oi-graph-explorer", () => {
         isSystemRelationship: false
       };
       const rootObject = { nodeKey: "root", label: "Root" };
-      element.shadowRoot
-        .querySelector("c-oi-relationship-canvas")
-        .dispatchEvent(
-          new CustomEvent("edgeclick", { detail: { connector, rootObject } })
-        );
+      const relationshipCanvas = element.shadowRoot.querySelector(
+        "c-oi-relationship-canvas"
+      );
+      relationshipCanvas.clearConnectorSelection = jest.fn();
+      relationshipCanvas.dispatchEvent(
+        new CustomEvent("edgeclick", { detail: { connector, rootObject } })
+      );
       await flushPromises();
 
       const detail = element.shadowRoot.querySelector(
@@ -467,6 +467,9 @@ describe("c-oi-graph-explorer", () => {
       expect(
         element.shadowRoot.querySelector("c-oi-relationship-connector-detail")
       ).toBeNull();
+      expect(relationshipCanvas.clearConnectorSelection).toHaveBeenCalledTimes(
+        1
+      );
     });
 
     it("a highlightimpact event from the detail panel still merges into the shared view-state in Object mode (the reference-counting unification, GraphUI.md §7, is mode-agnostic) even though the merged node is not itself an object-to-object relationship", async () => {
@@ -751,13 +754,11 @@ describe("c-oi-graph-explorer", () => {
       edges: [],
       hasMore: false
     });
-    element.shadowRoot
-      .querySelector("c-oi-relationship-canvas")
-      .dispatchEvent(
-        new CustomEvent("explorefromhere", {
-          detail: { nodeKey: "Record::Contact::003x1" }
-        })
-      );
+    element.shadowRoot.querySelector("c-oi-relationship-canvas").dispatchEvent(
+      new CustomEvent("explorefromhere", {
+        detail: { nodeKey: "Record::Contact::003x1" }
+      })
+    );
     await flushPromises();
 
     expect(getRecordFragment).toHaveBeenLastCalledWith({
@@ -1115,13 +1116,11 @@ describe("c-oi-graph-explorer", () => {
           .isChecked
       ).toBe(false);
 
-      element.shadowRoot
-        .querySelector("c-oi-filter-panel")
-        .dispatchEvent(
-          new CustomEvent("edgetypetoggle", {
-            detail: { typeKey: "SalesforceMetadata.LOOKUP_TO" }
-          })
-        );
+      element.shadowRoot.querySelector("c-oi-filter-panel").dispatchEvent(
+        new CustomEvent("edgetypetoggle", {
+          detail: { typeKey: "SalesforceMetadata.LOOKUP_TO" }
+        })
+      );
       await flushPromises();
 
       expect(
@@ -1240,13 +1239,11 @@ describe("c-oi-graph-explorer", () => {
         }
       });
 
-      element.shadowRoot
-        .querySelector("c-oi-filter-panel")
-        .dispatchEvent(
-          new CustomEvent("directiontoggle", {
-            detail: { showParents: false, showChildren: false }
-          })
-        );
+      element.shadowRoot.querySelector("c-oi-filter-panel").dispatchEvent(
+        new CustomEvent("directiontoggle", {
+          detail: { showParents: false, showChildren: false }
+        })
+      );
       await flushPromises();
 
       expect(
@@ -1307,13 +1304,11 @@ describe("c-oi-graph-explorer", () => {
         element.shadowRoot.querySelector("c-oi-graph-canvas").nodes
       ).toHaveLength(3);
 
-      element.shadowRoot
-        .querySelector("c-oi-filter-panel")
-        .dispatchEvent(
-          new CustomEvent("depthtoggle", {
-            detail: { restrictToDirectOnly: true }
-          })
-        );
+      element.shadowRoot.querySelector("c-oi-filter-panel").dispatchEvent(
+        new CustomEvent("depthtoggle", {
+          detail: { restrictToDirectOnly: true }
+        })
+      );
       await flushPromises();
 
       const canvasNodeKeys = element.shadowRoot
@@ -1362,13 +1357,11 @@ describe("c-oi-graph-explorer", () => {
         }
       });
 
-      element.shadowRoot
-        .querySelector("c-oi-filter-panel")
-        .dispatchEvent(
-          new CustomEvent("edgetypetoggle", {
-            detail: { typeKey: "SalesforceMetadata.LOOKUP_TO" }
-          })
-        );
+      element.shadowRoot.querySelector("c-oi-filter-panel").dispatchEvent(
+        new CustomEvent("edgetypetoggle", {
+          detail: { typeKey: "SalesforceMetadata.LOOKUP_TO" }
+        })
+      );
       await flushPromises();
       expect(
         element.shadowRoot.querySelector("c-oi-filter-panel").edgeTypeOptions[0]

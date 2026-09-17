@@ -630,7 +630,12 @@ describe("c-oi-node-detail-panel", () => {
         }
       ],
       edges: [],
-      hasMore: false
+      hasMore: false,
+      recordOverview: {
+        ownerName: "Jane Admin",
+        createdDate: "2026-08-10T08:15:00.000Z",
+        lastModifiedDate: "2026-09-12T14:30:00.000Z"
+      }
     });
     const element = createElement("c-oi-node-detail-panel", {
       is: OiNodeDetailPanel
@@ -652,7 +657,14 @@ describe("c-oi-node-detail-panel", () => {
     expect(content.textContent).toContain("Acme Corp");
     expect(content.textContent).toContain("Account");
     expect(content.textContent).toContain("001x1");
+    expect(content.textContent).toContain("Jane Admin");
+    expect(content.textContent).toContain("Created");
+    expect(content.textContent).toContain("Last Modified");
     expect(content.textContent).not.toContain("API Name");
+    expect(getNodeIntelligence).not.toHaveBeenCalled();
+    expect(
+      element.shadowRoot.querySelector('[data-id="impact-analysis-section"]')
+    ).toBeNull();
   });
 
   it("derives a real Record Hierarchy section — parent lookups and child records grouped by object — directly from the SAME fragment's own edges, never a second query or fabricated data", async () => {
@@ -700,25 +712,29 @@ describe("c-oi-node-detail-panel", () => {
           edgeKey: "e1",
           typeKey: "SalesforceRecord.LOOKUP_TO",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::User::005x1"
+          targetNodeKey: "Record::User::005x1",
+          viaFieldApiName: "Manager__c"
         },
         {
           edgeKey: "e2",
           typeKey: "SalesforceRecord.CHILD_OF",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::Contact::003x1"
+          targetNodeKey: "Record::Contact::003x1",
+          viaFieldApiName: "AccountId"
         },
         {
           edgeKey: "e3",
           typeKey: "SalesforceRecord.CHILD_OF",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::Contact::003x2"
+          targetNodeKey: "Record::Contact::003x2",
+          viaFieldApiName: "AccountId"
         },
         {
           edgeKey: "e4",
           typeKey: "SalesforceRecord.CHILD_OF",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::Opportunity::006x1"
+          targetNodeKey: "Record::Opportunity::006x1",
+          viaFieldApiName: "AccountId"
         }
       ],
       hasMore: true
@@ -737,6 +753,7 @@ describe("c-oi-node-detail-panel", () => {
     expect(hierarchy).not.toBeNull();
     expect(hierarchy.textContent).toContain("User");
     expect(hierarchy.textContent).toContain("Jane Admin");
+    expect(hierarchy.textContent).toContain("Manager__c");
     expect(hierarchy.textContent).toContain("Contact");
     expect(hierarchy.textContent).toContain("Opportunity");
     // Two Contact children collapse into one grouped row with count 2 — not two flat rows.
@@ -1003,6 +1020,12 @@ describe("c-oi-node-detail-panel", () => {
     expect(content.textContent).toContain("Lookup To");
     expect(content.textContent).toContain("User");
     expect(content.textContent).toContain("Owner");
+    expect(
+      element.shadowRoot.querySelector('[data-id="field-relationship-section"]')
+    ).not.toBeNull();
+    expect(
+      element.shadowRoot.querySelector('[data-id="structural-connections"]')
+    ).toBeNull();
   });
 
   it("renders a sanitized error state when the Apex call fails", async () => {
@@ -1079,6 +1102,10 @@ describe("c-oi-node-detail-panel", () => {
         element.shadowRoot.querySelector('[data-id="show-fields-button"]')
       ).not.toBeNull();
       expect(getFieldSummaries).not.toHaveBeenCalled();
+      expect(
+        element.shadowRoot.querySelector('[data-id="field-metrics"]')
+          .textContent
+      ).toContain("—");
     });
 
     it("collapsing the Fields section header hides the Show Fields trigger, and re-expanding restores it", async () => {
@@ -1335,15 +1362,13 @@ describe("c-oi-node-detail-panel", () => {
     });
 
     it("selecting a new node resets the field browser back to its unloaded, unfiltered state", async () => {
-      getNodeDetail
-        .mockResolvedValueOnce(objectDetail())
-        .mockResolvedValueOnce(
-          objectDetail({
-            nodeKey: "contact",
-            label: "Contact",
-            secondaryKey: "Contact"
-          })
-        );
+      getNodeDetail.mockResolvedValueOnce(objectDetail()).mockResolvedValueOnce(
+        objectDetail({
+          nodeKey: "contact",
+          label: "Contact",
+          secondaryKey: "Contact"
+        })
+      );
       getFieldSummaries.mockResolvedValue([
         fieldSummary({ nodeKey: "f1", label: "Account Name" })
       ]);
@@ -1807,15 +1832,13 @@ describe("c-oi-node-detail-panel", () => {
     });
 
     it("selecting a new node resets the Impact Analysis section back to its unloaded state", async () => {
-      getNodeDetail
-        .mockResolvedValueOnce(objectDetail())
-        .mockResolvedValueOnce(
-          objectDetail({
-            nodeKey: "contact",
-            label: "Contact",
-            secondaryKey: "Contact"
-          })
-        );
+      getNodeDetail.mockResolvedValueOnce(objectDetail()).mockResolvedValueOnce(
+        objectDetail({
+          nodeKey: "contact",
+          label: "Contact",
+          secondaryKey: "Contact"
+        })
+      );
       getImpact.mockResolvedValue(impactResult());
       const element = createElement("c-oi-node-detail-panel", {
         is: OiNodeDetailPanel

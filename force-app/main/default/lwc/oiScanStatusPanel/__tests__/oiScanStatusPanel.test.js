@@ -56,6 +56,8 @@ describe("c-oi-scan-status-panel", () => {
       "p.slds-text-heading_small"
     );
     expect(statusEl.textContent).toContain("No scans yet");
+    expect(element.shadowRoot.querySelector(".oi-scan-command")).not.toBeNull();
+    expect(element.shadowRoot.querySelector("lightning-card")).toBeNull();
   });
 
   it("renders the most recent scan status on load", async () => {

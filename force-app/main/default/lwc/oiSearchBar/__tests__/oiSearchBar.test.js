@@ -1,15 +1,25 @@
 import { createElement } from "lwc";
 import OiSearchBar from "c/oiSearchBar";
 import search from "@salesforce/apex/OI_SearchController.search";
+import browse from "@salesforce/apex/OI_SearchController.browse";
 
 jest.mock(
   "@salesforce/apex/OI_SearchController.search",
   () => ({ default: jest.fn() }),
   { virtual: true }
 );
+jest.mock(
+  "@salesforce/apex/OI_SearchController.browse",
+  () => ({ default: jest.fn() }),
+  { virtual: true }
+);
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function flushPromises() {
+  return Promise.resolve().then(() => Promise.resolve());
 }
 
 describe("c-oi-search-bar", () => {
@@ -21,6 +31,8 @@ describe("c-oi-search-bar", () => {
 
   beforeEach(() => {
     search.mockReset();
+    browse.mockReset();
+    browse.mockResolvedValue([]);
   });
 
   it("debounces input and calls OI_SearchController.search with the typed term", async () => {
@@ -286,5 +298,107 @@ describe("c-oi-search-bar", () => {
     expect(
       element.shadowRoot.querySelector('[data-id="search-results"]')
     ).toBeNull();
+  });
+
+  it("focusing an empty box loads and shows the bounded alphabetical browse list, scoped to typeKeyFilter", async () => {
+    browse.mockResolvedValue([
+      {
+        nodeKey: "n1",
+        typeKey: "SalesforceMetadata.CustomObject",
+        label: "Account",
+        secondaryKey: "Account",
+        state: "Active"
+      },
+      {
+        nodeKey: "n2",
+        typeKey: "SalesforceMetadata.CustomObject",
+        label: "Contact",
+        secondaryKey: "Contact",
+        state: "Active"
+      }
+    ]);
+    const element = createElement("c-oi-search-bar", { is: OiSearchBar });
+    element.typeKeyFilter = "SalesforceMetadata.CustomObject";
+    document.body.appendChild(element);
+
+    const input = element.shadowRoot.querySelector("lightning-input");
+    input.dispatchEvent(new CustomEvent("focus"));
+    await flushPromises();
+
+    expect(browse).toHaveBeenCalledWith({
+      typeKey: "SalesforceMetadata.CustomObject"
+    });
+    const results = element.shadowRoot.querySelectorAll(
+      '[data-id="search-result-item"]'
+    );
+    expect(results).toHaveLength(2);
+    expect(results[0].textContent).toContain("Account");
+  });
+
+  it("never shows the browse list before the box is focused, and hides it again on blur", async () => {
+    browse.mockResolvedValue([
+      {
+        nodeKey: "n1",
+        typeKey: "T",
+        label: "Account",
+        secondaryKey: "Account",
+        state: "Active"
+      }
+    ]);
+    const element = createElement("c-oi-search-bar", { is: OiSearchBar });
+    document.body.appendChild(element);
+
+    expect(
+      element.shadowRoot.querySelector('[data-id="search-results"]')
+    ).toBeNull();
+
+    const input = element.shadowRoot.querySelector("lightning-input");
+    input.dispatchEvent(new CustomEvent("focus"));
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="search-results"]')
+    ).not.toBeNull();
+
+    input.dispatchEvent(new CustomEvent("blur"));
+    await wait(200);
+    expect(
+      element.shadowRoot.querySelector('[data-id="search-results"]')
+    ).toBeNull();
+  });
+
+  it("typing instantly filters the already-loaded browse list client-side, ahead of the debounced server search", async () => {
+    browse.mockResolvedValue([
+      {
+        nodeKey: "n1",
+        typeKey: "T",
+        label: "Account",
+        secondaryKey: "Account",
+        state: "Active"
+      },
+      {
+        nodeKey: "n2",
+        typeKey: "T",
+        label: "Contact",
+        secondaryKey: "Contact",
+        state: "Active"
+      }
+    ]);
+    search.mockResolvedValue([]);
+    const element = createElement("c-oi-search-bar", { is: OiSearchBar });
+    document.body.appendChild(element);
+
+    const input = element.shadowRoot.querySelector("lightning-input");
+    input.dispatchEvent(new CustomEvent("focus"));
+    await flushPromises();
+
+    input.value = "Acc";
+    input.dispatchEvent(new CustomEvent("change"));
+    await flushPromises();
+
+    const results = element.shadowRoot.querySelectorAll(
+      '[data-id="search-result-item"]'
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].textContent).toContain("Account");
   });
 });

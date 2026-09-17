@@ -176,7 +176,9 @@ export default class OiNodeDetailPanel extends LightningElement {
      * view. Impact Analysis is a multi-hop traversal answering a deliberate question, so it
      * stays opt-in.
      */
-    this.loadIntelligence();
+    if (!parseRecordNodeKey(value)) {
+      this.loadIntelligence();
+    }
   }
 
   resetIntelligence() {
@@ -486,6 +488,7 @@ export default class OiNodeDetailPanel extends LightningElement {
           ...summary,
           isRecord: true,
           recordRef,
+          recordOverview: fragment.recordOverview || {},
           ...this.deriveRecordHierarchy(fragment, requestedNodeKey),
           attributes: {},
           outgoingRelationshipCounts: {},
@@ -527,7 +530,7 @@ export default class OiNodeDetailPanel extends LightningElement {
       (fragment.nodes || []).map((n) => [n.nodeKey, n])
     );
     const parentRows = [];
-    const childCountsByTypeKey = new Map();
+    const childCountsByRelationship = new Map();
     for (const edge of fragment.edges || []) {
       if (edge.sourceNodeKey !== centerNodeKey) {
         continue;
@@ -537,25 +540,33 @@ export default class OiNodeDetailPanel extends LightningElement {
         continue;
       }
       if (edge.typeKey === RECORD_PARENT_EDGE_TYPE_KEY) {
+        if (
+          ["OwnerId", "CreatedById", "LastModifiedById"].includes(
+            edge.viaFieldApiName
+          )
+        ) {
+          continue;
+        }
         parentRows.push({
+          key: `${edge.viaFieldApiName || "parent"}::${target.nodeKey}`,
           nodeKey: target.nodeKey,
           label: target.label,
-          typeLabel: this.recordTypeDisplayLabel(target.typeKey)
+          typeLabel: this.recordTypeDisplayLabel(target.typeKey),
+          relationshipLabel: edge.viaFieldApiName || "Parent relationship"
         });
       } else if (edge.typeKey === RECORD_CHILD_EDGE_TYPE_KEY) {
-        childCountsByTypeKey.set(
-          target.typeKey,
-          (childCountsByTypeKey.get(target.typeKey) || 0) + 1
-        );
+        const relationshipKey = `${target.typeKey}::${edge.viaFieldApiName || "children"}`;
+        const existing = childCountsByRelationship.get(relationshipKey) || {
+          key: relationshipKey,
+          typeLabel: this.recordTypeDisplayLabel(target.typeKey),
+          relationshipLabel: edge.viaFieldApiName || "Child relationship",
+          count: 0
+        };
+        existing.count += 1;
+        childCountsByRelationship.set(relationshipKey, existing);
       }
     }
-    const childRows = Array.from(childCountsByTypeKey.entries()).map(
-      ([typeKey, count]) => ({
-        key: typeKey,
-        typeLabel: this.recordTypeDisplayLabel(typeKey),
-        count
-      })
-    );
+    const childRows = Array.from(childCountsByRelationship.values());
     return { parentRows, childRows, hasMoreRelationships: !!fragment.hasMore };
   }
 
@@ -584,6 +595,24 @@ export default class OiNodeDetailPanel extends LightningElement {
     return this.detail && this.detail.recordRef
       ? this.detail.recordRef.recordId
       : "";
+  }
+
+  get recordOverview() {
+    return (this.detail && this.detail.recordOverview) || {};
+  }
+
+  get recordOwnerName() {
+    return this.recordOverview.ownerName || null;
+  }
+
+  formatDateTime(value) {
+    if (!value) {
+      return null;
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(value));
   }
 
   get recordParentRows() {
@@ -628,6 +657,14 @@ export default class OiNodeDetailPanel extends LightningElement {
 
   get isField() {
     return !!this.detail && this.detail.typeKey === FIELD_TYPE_KEY;
+  }
+
+  get showMetadataIntelligence() {
+    return !this.isRecordDetail;
+  }
+
+  get showMetadataImpact() {
+    return !this.isRecordDetail;
   }
 
   get typeDisplayLabel() {
@@ -755,11 +792,33 @@ export default class OiNodeDetailPanel extends LightningElement {
       return [];
     }
     if (this.isRecordDetail) {
-      return [
+      const fields = [
         { key: "name", label: "Name", value: this.detail.label },
         { key: "object", label: "Object", value: this.recordObjectApiName },
         { key: "recordId", label: "Record Id", value: this.recordId }
       ];
+      if (this.recordOwnerName) {
+        fields.push({
+          key: "owner",
+          label: "Owner",
+          value: this.recordOwnerName
+        });
+      }
+      const created = this.formatDateTime(this.recordOverview.createdDate);
+      const modified = this.formatDateTime(
+        this.recordOverview.lastModifiedDate
+      );
+      if (created) {
+        fields.push({ key: "created", label: "Created", value: created });
+      }
+      if (modified) {
+        fields.push({
+          key: "modified",
+          label: "Last Modified",
+          value: modified
+        });
+      }
+      return fields;
     }
     const fields = [];
     /** A label that differs from the API name (e.g. a custom field's "Deal Size" vs. Deal_Size__c) is real identity information the API Name row alone can't carry — shown whenever the two actually differ, never as a redundant repeat of the same string. */
@@ -790,25 +849,6 @@ export default class OiNodeDetailPanel extends LightningElement {
           key: "parentObject",
           label: "Parent Object",
           value: this.parentObjectApiName
-        });
-      }
-      if (this.hasFieldRelationshipType) {
-        fields.push({
-          key: "relationshipType",
-          label: "Relationship Type",
-          value: this.fieldRelationshipTypeLabel
-        });
-      }
-      if (this.hasReferencedObjects) {
-        fields.push({
-          key: "referencedObjects",
-          label: "Referenced Object(s)",
-          value: this.referencedObjectsDisplay
-        });
-        fields.push({
-          key: "relationshipName",
-          label: "Relationship Name",
-          value: this.relationshipName
         });
       }
       return fields;
@@ -869,6 +909,41 @@ export default class OiNodeDetailPanel extends LightningElement {
     return rows;
   }
 
+  get hasFieldRelationshipSection() {
+    return (
+      this.isField &&
+      (this.hasFieldRelationshipType ||
+        this.hasReferencedObjects ||
+        !!this.relationshipName)
+    );
+  }
+
+  get fieldRelationshipFields() {
+    const rows = [];
+    if (this.hasFieldRelationshipType) {
+      rows.push({
+        key: "type",
+        label: "Relationship Type",
+        value: this.fieldRelationshipTypeLabel
+      });
+    }
+    if (this.hasReferencedObjects) {
+      rows.push({
+        key: "target",
+        label: "Target Object",
+        value: this.referencedObjectsDisplay
+      });
+    }
+    if (this.relationshipName) {
+      rows.push({
+        key: "name",
+        label: "Relationship Name",
+        value: this.relationshipName
+      });
+    }
+    return rows;
+  }
+
   /**
    * Opens the drill-down for one summary row. State lives here rather than in the child so the
    * child stays a pure, parameterised view that can be reused by any other surface later
@@ -910,7 +985,9 @@ export default class OiNodeDetailPanel extends LightningElement {
 
   get hasRelationshipCounts() {
     return (
-      this.hasCuratedRelationshipRows || this.relationshipCountRows.length > 0
+      !this.isField &&
+      !this.isRecordDetail &&
+      (this.hasCuratedRelationshipRows || this.relationshipCountRows.length > 0)
     );
   }
 
@@ -1052,6 +1129,38 @@ export default class OiNodeDetailPanel extends LightningElement {
     );
   }
 
+  get fieldMetricRows() {
+    const summaries = this.fieldSummaries || [];
+    const unloadedValue = this.areFieldsLoaded ? 0 : "—";
+    return [
+      { key: "total", label: "Total", value: this.fieldCount },
+      {
+        key: "standard",
+        label: "Standard",
+        value: this.areFieldsLoaded
+          ? summaries.filter((field) => field.isCustom === false).length
+          : unloadedValue
+      },
+      {
+        key: "custom",
+        label: "Custom",
+        value: this.areFieldsLoaded
+          ? summaries.filter((field) => field.isCustom === true).length
+          : unloadedValue
+      },
+      {
+        key: "relationship",
+        label: "Relationship",
+        value: this.areFieldsLoaded
+          ? summaries.filter(
+              (field) =>
+                Array.isArray(field.referenceTo) && field.referenceTo.length
+            ).length
+          : unloadedValue
+      }
+    ];
+  }
+
   get hasFieldsToShow() {
     return this.fieldCount > 0;
   }
@@ -1070,6 +1179,16 @@ export default class OiNodeDetailPanel extends LightningElement {
       this.fieldsVisible = true;
       return;
     }
+    await this.loadFieldSummaries();
+    if (this.areFieldsLoaded) {
+      this.fieldsVisible = true;
+    }
+  }
+
+  async loadFieldSummaries() {
+    if (this.areFieldsLoaded || this.isLoadingFields || !this._nodeKey) {
+      return;
+    }
     const requestId = ++this.fieldRequestId;
     const requestedNodeKey = this._nodeKey;
     this.isLoadingFields = true;
@@ -1082,7 +1201,6 @@ export default class OiNodeDetailPanel extends LightningElement {
         return;
       }
       this.fieldSummaries = summaries;
-      this.fieldsVisible = true;
     } catch (error) {
       if (requestId === this.fieldRequestId) {
         this.fieldSummaries = null;

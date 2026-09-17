@@ -27,178 +27,337 @@
  *              hasMore = true rather than a silent truncation (CLAUDE.md "no silent caps").
  */
 public with sharing class OI_RecordHierarchyService {
-    private static final Integer MAX_CHILDREN_PER_RELATIONSHIP = 10;
-    private static final Integer MAX_RELATIONSHIP_TYPES = 25;
-    private static final String PARENT_EDGE_TYPE_KEY = 'SalesforceRecord.LOOKUP_TO';
-    private static final String CHILD_EDGE_TYPE_KEY = 'SalesforceRecord.CHILD_OF';
+  private static final Integer MAX_CHILDREN_PER_RELATIONSHIP = 10;
+  private static final Integer MAX_RELATIONSHIP_TYPES = 25;
+  private static final String PARENT_EDGE_TYPE_KEY = 'SalesforceRecord.LOOKUP_TO';
+  private static final String CHILD_EDGE_TYPE_KEY = 'SalesforceRecord.CHILD_OF';
 
-    public OI_RecordFragmentDTO getRecordFragment(String objectApiName, String recordId) {
-        Schema.DescribeSObjectResult describe = OI_RecordSchemaUtil.describeAccessibleObject(objectApiName);
-        Id validatedRecordId = OI_RecordSchemaUtil.validateRecordIdForObject(describe, recordId);
+  public OI_RecordFragmentDTO getRecordFragment(
+    String objectApiName,
+    String recordId
+  ) {
+    Schema.DescribeSObjectResult describe = OI_RecordSchemaUtil.describeAccessibleObject(
+      objectApiName
+    );
+    Id validatedRecordId = OI_RecordSchemaUtil.validateRecordIdForObject(
+      describe,
+      recordId
+    );
 
-        SObject centerRecord = queryCenterRecord(describe, validatedRecordId);
-        if (centerRecord == null) {
-            return new OI_RecordFragmentDTO(null, new List<OI_NodeSummaryDTO>(), new List<OI_EdgeSummaryDTO>(), false);
-        }
-
-        String centerKey = OI_RecordSchemaUtil.recordNodeKey(describe.getName(), String.valueOf(validatedRecordId));
-        List<OI_NodeSummaryDTO> nodes = new List<OI_NodeSummaryDTO>();
-        List<OI_EdgeSummaryDTO> edges = new List<OI_EdgeSummaryDTO>();
-
-        String centerNameField = OI_RecordSchemaUtil.resolveNameField(describe);
-        String centerLabel = centerNameField == null ? recordId : OI_RecordSchemaUtil.labelFor(centerRecord, centerNameField);
-        nodes.add(new OI_NodeSummaryDTO(centerKey, OI_RecordSchemaUtil.recordTypeKey(describe.getName()), centerLabel, describe.getName(), 'Active'));
-
-        addParentLookups(describe, centerRecord, centerKey, nodes, edges);
-        Boolean hasMore = addChildRelationships(describe, String.valueOf(validatedRecordId), centerKey, nodes, edges);
-
-        return new OI_RecordFragmentDTO(centerKey, nodes, edges, hasMore);
+    SObject centerRecord = queryCenterRecord(describe, validatedRecordId);
+    if (centerRecord == null) {
+      return new OI_RecordFragmentDTO(
+        null,
+        new List<OI_NodeSummaryDTO>(),
+        new List<OI_EdgeSummaryDTO>(),
+        false
+      );
     }
 
-    /** One query, selecting every accessible reference field alongside the center row itself — never one query per lookup field. */
-    private SObject queryCenterRecord(Schema.DescribeSObjectResult describe, String recordId) {
-        Set<String> selectFields = new Set<String>{ 'Id' };
-        String nameField = OI_RecordSchemaUtil.resolveNameField(describe);
-        if (nameField != null) {
-            selectFields.add(nameField);
-        }
-        for (Schema.SObjectField field : describe.fields.getMap().values()) {
-            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-            if (fieldDescribe.getType() == Schema.DisplayType.REFERENCE && fieldDescribe.isAccessible()) {
-                selectFields.add(fieldDescribe.getName());
-            }
-        }
-        String soql = 'SELECT ' + String.join(new List<String>(selectFields), ', ') + ' FROM ' + describe.getName() + ' WHERE Id = :recordId LIMIT 1';
-        List<SObject> rows = Database.query(soql, AccessLevel.USER_MODE);
-        return rows.isEmpty() ? null : rows[0];
+    String centerKey = OI_RecordSchemaUtil.recordNodeKey(
+      describe.getName(),
+      String.valueOf(validatedRecordId)
+    );
+    List<OI_NodeSummaryDTO> nodes = new List<OI_NodeSummaryDTO>();
+    List<OI_EdgeSummaryDTO> edges = new List<OI_EdgeSummaryDTO>();
+
+    String centerNameField = OI_RecordSchemaUtil.resolveNameField(describe);
+    String centerLabel = centerNameField == null
+      ? recordId
+      : OI_RecordSchemaUtil.labelFor(centerRecord, centerNameField);
+    nodes.add(
+      new OI_NodeSummaryDTO(
+        centerKey,
+        OI_RecordSchemaUtil.recordTypeKey(describe.getName()),
+        centerLabel,
+        describe.getName(),
+        'Active'
+      )
+    );
+
+    addParentLookups(describe, centerRecord, centerKey, nodes, edges);
+    Boolean hasMore = addChildRelationships(
+      describe,
+      String.valueOf(validatedRecordId),
+      centerKey,
+      nodes,
+      edges
+    );
+    OI_RecordOverviewDTO recordOverview = new OI_RecordOverviewDTO(
+      resolveOwnerName(nodes, edges),
+      datetimeValue(centerRecord, 'CreatedDate'),
+      datetimeValue(centerRecord, 'LastModifiedDate')
+    );
+
+    return new OI_RecordFragmentDTO(
+      centerKey,
+      nodes,
+      edges,
+      hasMore,
+      recordOverview
+    );
+  }
+
+  /** One query, selecting every accessible reference field alongside the center row itself — never one query per lookup field. */
+  private SObject queryCenterRecord(
+    Schema.DescribeSObjectResult describe,
+    String recordId
+  ) {
+    Set<String> selectFields = new Set<String>{ 'Id' };
+    String nameField = OI_RecordSchemaUtil.resolveNameField(describe);
+    if (nameField != null) {
+      selectFields.add(nameField);
+    }
+    addAccessibleField(selectFields, describe, 'CreatedDate');
+    addAccessibleField(selectFields, describe, 'LastModifiedDate');
+    for (Schema.SObjectField field : describe.fields.getMap().values()) {
+      Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+      if (
+        fieldDescribe.getType() == Schema.DisplayType.REFERENCE &&
+        fieldDescribe.isAccessible()
+      ) {
+        selectFields.add(fieldDescribe.getName());
+      }
+    }
+    String soql =
+      'SELECT ' +
+      String.join(new List<String>(selectFields), ', ') +
+      ' FROM ' +
+      describe.getName() +
+      ' WHERE Id = :recordId LIMIT 1';
+    List<SObject> rows = Database.query(soql, AccessLevel.USER_MODE);
+    return rows.isEmpty() ? null : rows[0];
+  }
+
+  /** Batched per distinct target SObjectType (resolved from the actual Id value, not the field's static referenceTo — correct for polymorphic lookups like OwnerId with zero special-casing), never one query per field. */
+  private void addParentLookups(
+    Schema.DescribeSObjectResult describe,
+    SObject centerRecord,
+    String centerKey,
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges
+  ) {
+    Map<Schema.SObjectType, Set<Id>> idsByType = new Map<Schema.SObjectType, Set<Id>>();
+    Map<Id, Set<String>> fieldNamesByTargetId = new Map<Id, Set<String>>();
+    for (Schema.SObjectField field : describe.fields.getMap().values()) {
+      Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+      if (
+        fieldDescribe.getType() != Schema.DisplayType.REFERENCE ||
+        !fieldDescribe.isAccessible()
+      ) {
+        continue;
+      }
+      Object rawValue;
+      try {
+        rawValue = centerRecord.get(fieldDescribe.getName());
+      } catch (SObjectException e) {
+        continue;
+      }
+      if (rawValue == null) {
+        continue;
+      }
+      Id targetId = (Id) rawValue;
+      Schema.SObjectType targetType = targetId.getSObjectType();
+      if (targetType == null) {
+        continue;
+      }
+      if (!idsByType.containsKey(targetType)) {
+        idsByType.put(targetType, new Set<Id>());
+      }
+      idsByType.get(targetType).add(targetId);
+      if (!fieldNamesByTargetId.containsKey(targetId)) {
+        fieldNamesByTargetId.put(targetId, new Set<String>());
+      }
+      fieldNamesByTargetId.get(targetId).add(fieldDescribe.getName());
     }
 
-    /** Batched per distinct target SObjectType (resolved from the actual Id value, not the field's static referenceTo — correct for polymorphic lookups like OwnerId with zero special-casing), never one query per field. */
-    private void addParentLookups(Schema.DescribeSObjectResult describe, SObject centerRecord, String centerKey, List<OI_NodeSummaryDTO> nodes, List<OI_EdgeSummaryDTO> edges) {
-        Map<Schema.SObjectType, Set<Id>> idsByType = new Map<Schema.SObjectType, Set<Id>>();
-        for (Schema.SObjectField field : describe.fields.getMap().values()) {
-            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-            if (fieldDescribe.getType() != Schema.DisplayType.REFERENCE || !fieldDescribe.isAccessible()) {
-                continue;
-            }
-            Object rawValue;
-            try {
-                rawValue = centerRecord.get(fieldDescribe.getName());
-            } catch (SObjectException e) {
-                continue;
-            }
-            if (rawValue == null) {
-                continue;
-            }
-            Id targetId = (Id) rawValue;
-            Schema.SObjectType targetType = targetId.getSObjectType();
-            if (targetType == null) {
-                continue;
-            }
-            if (!idsByType.containsKey(targetType)) {
-                idsByType.put(targetType, new Set<Id>());
-            }
-            idsByType.get(targetType).add(targetId);
+    for (Schema.SObjectType targetType : idsByType.keySet()) {
+      Schema.DescribeSObjectResult targetDescribe = targetType.getDescribe();
+      if (!targetDescribe.isAccessible() || !targetDescribe.isQueryable()) {
+        continue;
+      }
+      String targetNameField = OI_RecordSchemaUtil.resolveNameField(
+        targetDescribe
+      );
+      if (targetNameField == null) {
+        continue;
+      }
+      Set<Id> ids = idsByType.get(targetType);
+      String soql =
+        'SELECT Id, ' +
+        targetNameField +
+        ' FROM ' +
+        targetDescribe.getName() +
+        ' WHERE Id IN :ids';
+      List<SObject> related;
+      try {
+        related = Database.query(soql, AccessLevel.USER_MODE);
+      } catch (QueryException e) {
+        /** A describe-listed field can still be unqueryable in practice (feature-gated objects, edition quirks) — CLAUDE.md §Metadata Assumptions: skip this one target type rather than fail the whole hierarchy. */
+        continue;
+      }
+      for (SObject relatedRecord : related) {
+        String relatedId = (String) relatedRecord.get('Id');
+        String relatedKey = OI_RecordSchemaUtil.recordNodeKey(
+          targetDescribe.getName(),
+          relatedId
+        );
+        nodes.add(
+          new OI_NodeSummaryDTO(
+            relatedKey,
+            OI_RecordSchemaUtil.recordTypeKey(targetDescribe.getName()),
+            OI_RecordSchemaUtil.labelFor(relatedRecord, targetNameField),
+            targetDescribe.getName(),
+            'Active'
+          )
+        );
+        for (
+          String fieldApiName : fieldNamesByTargetId.get(
+            (Id) relatedRecord.get('Id')
+          )
+        ) {
+          OI_EdgeSummaryDTO parentEdge = new OI_EdgeSummaryDTO(
+            centerKey + '::' + fieldApiName + '::' + relatedKey,
+            PARENT_EDGE_TYPE_KEY,
+            centerKey,
+            relatedKey
+          );
+          parentEdge.viaFieldApiName = fieldApiName;
+          edges.add(parentEdge);
         }
-
-        for (Schema.SObjectType targetType : idsByType.keySet()) {
-            Schema.DescribeSObjectResult targetDescribe = targetType.getDescribe();
-            if (!targetDescribe.isAccessible() || !targetDescribe.isQueryable()) {
-                continue;
-            }
-            String targetNameField = OI_RecordSchemaUtil.resolveNameField(targetDescribe);
-            if (targetNameField == null) {
-                continue;
-            }
-            Set<Id> ids = idsByType.get(targetType);
-            String soql = 'SELECT Id, ' + targetNameField + ' FROM ' + targetDescribe.getName() + ' WHERE Id IN :ids';
-            List<SObject> related;
-            try {
-                related = Database.query(soql, AccessLevel.USER_MODE);
-            } catch (QueryException e) {
-                /** A describe-listed field can still be unqueryable in practice (feature-gated objects, edition quirks) — CLAUDE.md §Metadata Assumptions: skip this one target type rather than fail the whole hierarchy. */
-                continue;
-            }
-            for (SObject relatedRecord : related) {
-                String relatedId = (String) relatedRecord.get('Id');
-                String relatedKey = OI_RecordSchemaUtil.recordNodeKey(targetDescribe.getName(), relatedId);
-                nodes.add(
-                    new OI_NodeSummaryDTO(
-                        relatedKey,
-                        OI_RecordSchemaUtil.recordTypeKey(targetDescribe.getName()),
-                        OI_RecordSchemaUtil.labelFor(relatedRecord, targetNameField),
-                        targetDescribe.getName(),
-                        'Active'
-                    )
-                );
-                edges.add(new OI_EdgeSummaryDTO(centerKey + '::' + relatedKey, PARENT_EDGE_TYPE_KEY, centerKey, relatedKey));
-            }
-        }
+      }
     }
+  }
 
-    /** Bounded on two axes at once (relationship types processed, rows per relationship) — see class doc for why both bounds are load-bearing, not cosmetic. Returns true if either bound was hit. */
-    private Boolean addChildRelationships(Schema.DescribeSObjectResult describe, String recordId, String centerKey, List<OI_NodeSummaryDTO> nodes, List<OI_EdgeSummaryDTO> edges) {
-        List<Schema.ChildRelationship> relationships = describe.getChildRelationships();
-        Boolean hasMore = relationships.size() > MAX_RELATIONSHIP_TYPES;
-        Integer relationshipsProcessed = 0;
+  /** Bounded on two axes at once (relationship types processed, rows per relationship) — see class doc for why both bounds are load-bearing, not cosmetic. Returns true if either bound was hit. */
+  private Boolean addChildRelationships(
+    Schema.DescribeSObjectResult describe,
+    String recordId,
+    String centerKey,
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges
+  ) {
+    List<Schema.ChildRelationship> relationships = describe.getChildRelationships();
+    Boolean hasMore = relationships.size() > MAX_RELATIONSHIP_TYPES;
+    Integer relationshipsProcessed = 0;
 
-        for (Schema.ChildRelationship relationship : relationships) {
-            if (relationshipsProcessed >= MAX_RELATIONSHIP_TYPES) {
-                break;
-            }
-            Schema.SObjectType childType = relationship.getChildSObject();
-            Schema.SObjectField relationshipField = relationship.getField();
-            if (childType == null || relationshipField == null) {
-                continue;
-            }
-            Schema.DescribeSObjectResult childDescribe = childType.getDescribe();
-            if (!childDescribe.isAccessible() || !childDescribe.isQueryable()) {
-                continue;
-            }
-            String childNameField = OI_RecordSchemaUtil.resolveNameField(childDescribe);
-            if (childNameField == null || !relationshipField.getDescribe().isAccessible()) {
-                continue;
-            }
-            relationshipsProcessed++;
+    for (Schema.ChildRelationship relationship : relationships) {
+      if (relationshipsProcessed >= MAX_RELATIONSHIP_TYPES) {
+        break;
+      }
+      Schema.SObjectType childType = relationship.getChildSObject();
+      Schema.SObjectField relationshipField = relationship.getField();
+      if (childType == null || relationshipField == null) {
+        continue;
+      }
+      Schema.DescribeSObjectResult childDescribe = childType.getDescribe();
+      if (!childDescribe.isAccessible() || !childDescribe.isQueryable()) {
+        continue;
+      }
+      String childNameField = OI_RecordSchemaUtil.resolveNameField(
+        childDescribe
+      );
+      if (
+        childNameField == null ||
+        !relationshipField.getDescribe().isAccessible()
+      ) {
+        continue;
+      }
+      relationshipsProcessed++;
 
-            Integer fetchLimit = MAX_CHILDREN_PER_RELATIONSHIP + 1;
-            String soql =
-                'SELECT Id, ' +
-                childNameField +
-                ' FROM ' +
-                childDescribe.getName() +
-                ' WHERE ' +
-                relationshipField.getDescribe().getName() +
-                ' = :recordId LIMIT :fetchLimit';
-            List<SObject> children;
-            try {
-                children = Database.query(soql, AccessLevel.USER_MODE);
-            } catch (QueryException e) {
-                /** Same rationale as addParentLookups' catch — a relationship listed in describe metadata is not a guarantee it's actually queryable in this org/edition (CLAUDE.md §Metadata Assumptions). */
-                continue;
-            }
+      Integer fetchLimit = MAX_CHILDREN_PER_RELATIONSHIP + 1;
+      String soql =
+        'SELECT Id, ' +
+        childNameField +
+        ' FROM ' +
+        childDescribe.getName() +
+        ' WHERE ' +
+        relationshipField.getDescribe().getName() +
+        ' = :recordId LIMIT :fetchLimit';
+      List<SObject> children;
+      try {
+        children = Database.query(soql, AccessLevel.USER_MODE);
+      } catch (QueryException e) {
+        /** Same rationale as addParentLookups' catch — a relationship listed in describe metadata is not a guarantee it's actually queryable in this org/edition (CLAUDE.md §Metadata Assumptions). */
+        continue;
+      }
 
-            Integer count = 0;
-            for (SObject child : children) {
-                if (count >= MAX_CHILDREN_PER_RELATIONSHIP) {
-                    hasMore = true;
-                    break;
-                }
-                String childId = (String) child.get('Id');
-                String childKey = OI_RecordSchemaUtil.recordNodeKey(childDescribe.getName(), childId);
-                nodes.add(
-                    new OI_NodeSummaryDTO(
-                        childKey,
-                        OI_RecordSchemaUtil.recordTypeKey(childDescribe.getName()),
-                        OI_RecordSchemaUtil.labelFor(child, childNameField),
-                        childDescribe.getName(),
-                        'Active'
-                    )
-                );
-                edges.add(new OI_EdgeSummaryDTO(centerKey + '::' + childKey, CHILD_EDGE_TYPE_KEY, centerKey, childKey));
-                count++;
-            }
+      Integer count = 0;
+      for (SObject child : children) {
+        if (count >= MAX_CHILDREN_PER_RELATIONSHIP) {
+          hasMore = true;
+          break;
         }
-        return hasMore;
+        String childId = (String) child.get('Id');
+        String childKey = OI_RecordSchemaUtil.recordNodeKey(
+          childDescribe.getName(),
+          childId
+        );
+        nodes.add(
+          new OI_NodeSummaryDTO(
+            childKey,
+            OI_RecordSchemaUtil.recordTypeKey(childDescribe.getName()),
+            OI_RecordSchemaUtil.labelFor(child, childNameField),
+            childDescribe.getName(),
+            'Active'
+          )
+        );
+        OI_EdgeSummaryDTO childEdge = new OI_EdgeSummaryDTO(
+          centerKey + '::' + childKey,
+          CHILD_EDGE_TYPE_KEY,
+          centerKey,
+          childKey
+        );
+        childEdge.viaFieldApiName = relationshipField.getDescribe().getName();
+        edges.add(childEdge);
+        count++;
+      }
     }
+    return hasMore;
+  }
+
+  private void addAccessibleField(
+    Set<String> selectFields,
+    Schema.DescribeSObjectResult describe,
+    String fieldApiName
+  ) {
+    Schema.SObjectField field = describe.fields.getMap().get(fieldApiName);
+    if (field != null && field.getDescribe().isAccessible()) {
+      selectFields.add(fieldApiName);
+    }
+  }
+
+  private Datetime datetimeValue(SObject recordValue, String fieldApiName) {
+    try {
+      Object rawValue = recordValue.get(fieldApiName);
+      return rawValue instanceof Datetime ? (Datetime) rawValue : null;
+    } catch (SObjectException e) {
+      return null;
+    }
+  }
+
+  private String resolveOwnerName(
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges
+  ) {
+    String ownerNodeKey;
+    for (OI_EdgeSummaryDTO edge : edges) {
+      if (
+        edge.typeKey == PARENT_EDGE_TYPE_KEY &&
+        edge.viaFieldApiName == 'OwnerId'
+      ) {
+        ownerNodeKey = edge.targetNodeKey;
+        break;
+      }
+    }
+    if (ownerNodeKey == null) {
+      return null;
+    }
+    for (OI_NodeSummaryDTO node : nodes) {
+      if (node.nodeKey == ownerNodeKey) {
+        return node.label;
+      }
+    }
+    return null;
+  }
 }

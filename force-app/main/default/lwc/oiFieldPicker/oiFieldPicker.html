@@ -1,0 +1,40 @@
+<template>
+  <div class="oi-field-picker">
+    <div class="oi-field-picker-search">
+      <span class="oi-field-picker-search-icon" aria-hidden="true">⌕</span>
+      <input
+        class="oi-field-picker-input"
+        type="search"
+        value={query}
+        placeholder="Search fields by label or API name..."
+        aria-label="Search fields"
+        oninput={handleInput}
+      />
+      <span class="oi-field-picker-count">{resultCountLabel}</span>
+    </div>
+    <div class="oi-field-picker-results" role="listbox" aria-label="Fields">
+      <template for:each={filteredOptions} for:item="option">
+        <button
+          key={option.value}
+          type="button"
+          class="oi-field-picker-option"
+          role="option"
+          data-value={option.value}
+          onclick={handleSelect}
+        >
+          <span class="oi-field-picker-glyph" aria-hidden="true">ƒ</span>
+          <span class="oi-field-picker-copy">
+            <strong>{option.displayLabel}</strong>
+            <span>{option.apiName}</span>
+          </span>
+          <span class="oi-field-picker-arrow" aria-hidden="true">→</span>
+        </button>
+      </template>
+      <template lwc:if={hasNoResults}>
+        <div class="oi-field-picker-empty">
+          No fields match this search. Try the field label or API name.
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
