@@ -444,6 +444,83 @@
 }
 
 /**
+ * Per-type group header inside an Automation/Code/Security section ("Apex Trigger — 3",
+ * "Flow — 5") — one level nested below the section header, same collapsible-button pattern and
+ * chevron rotation, just indented and quieter so the section header still reads as the primary
+ * heading.
+ */
+.oi-node-detail-panel-type-group {
+  margin: var(--oi-space-2) 0;
+}
+
+.oi-node-detail-panel-type-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--oi-space-2);
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: var(--oi-space-1) 0 var(--oi-space-1) var(--oi-space-4);
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.oi-node-detail-panel-type-group-header:hover
+  .oi-node-detail-panel-type-group-label {
+  color: var(--oi-color-accent);
+}
+
+.oi-node-detail-panel-type-group-label {
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  color: var(--oi-color-text-secondary);
+}
+
+.oi-node-detail-panel-type-group-header[aria-expanded="true"]
+  .oi-node-detail-panel-section-chevron {
+  transform: rotate(90deg);
+}
+
+.oi-node-detail-panel-type-group-count {
+  margin-left: auto;
+  font-size: var(--oi-font-size-caption);
+  font-weight: var(--oi-font-weight-bold);
+  color: var(--oi-color-text-muted);
+  background: var(--oi-color-surface-sunken);
+  border-radius: var(--oi-radius-pill);
+  padding: var(--oi-space-1) var(--oi-space-2);
+}
+
+/** Status badge on a Flow/Process Builder row (Active/Inactive/Draft/Obsolete) — reuses the same severity color tokens as the rest of the platform (never a raw green/amber/red) rather than inventing a one-off palette for this single badge. */
+.oi-node-detail-panel-status-badge {
+  display: inline-block;
+  margin-left: var(--oi-space-2);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+  white-space: nowrap;
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+
+.oi-node-detail-panel-status-badge.is-active {
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+}
+
+.oi-node-detail-panel-status-badge.is-inactive {
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+
+.oi-node-detail-panel-status-badge.is-obsolete {
+  background: var(--oi-color-severity-critical-wash);
+  color: var(--oi-color-severity-critical);
+}
+
+/**
  * Collapsible section header (GraphUI.md §42 Intelligence Panel rebuild) — a full-width button
  * so the entire row, not just the chevron, is a click target; keyboard focus and hover read
  * identically to every other interactive control in this panel.

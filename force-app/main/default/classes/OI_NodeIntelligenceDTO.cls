@@ -23,65 +23,107 @@
  * the data it qualifies so a caller cannot render one without the other.
  */
 public class OI_NodeIntelligenceDTO {
-    /** One named neighbour, already resolved to display-ready values. */
-    public class RelatedComponent {
-        @AuraEnabled
-        public String nodeKey;
-        @AuraEnabled
-        public String label;
-        @AuraEnabled
-        public String typeKey;
-        @AuraEnabled
-        public String typeLabel;
-        /** 'incoming' (it points at this node) or 'outgoing' (this node points at it) — direction is meaningful to the user: a trigger firing ON this object is incoming, a class this class CALLS is outgoing. */
-        @AuraEnabled
-        public String direction;
-
-        public RelatedComponent(String nodeKey, String label, String typeKey, String typeLabel, String direction) {
-            this.nodeKey = nodeKey;
-            this.label = label;
-            this.typeKey = typeKey;
-            this.typeLabel = typeLabel;
-            this.direction = direction;
-        }
-    }
-
-    /** One panel section: Automation, Code, or Security. */
-    public class Category {
-        @AuraEnabled
-        public String category;
-        @AuraEnabled
-        public List<RelatedComponent> items;
-        /** True when more neighbours exist than were returned — surfaced rather than silently truncated (GraphUI.md's no-silent-caps rule). */
-        @AuraEnabled
-        public Boolean truncated;
-        /** What the scanners behind this category do NOT cover, in plain language. Rendered even when items is empty, so an empty section reads as "nothing found, and here is what we can see" rather than an unexplained blank. */
-        @AuraEnabled
-        public String coverageNote;
-
-        public Category(String category, List<RelatedComponent> items, Boolean truncated, String coverageNote) {
-            this.category = category;
-            this.items = items;
-            this.truncated = truncated;
-            this.coverageNote = coverageNote;
-        }
-    }
-
+  /** One named neighbour, already resolved to display-ready values. */
+  public class RelatedComponent {
     @AuraEnabled
     public String nodeKey;
     @AuraEnabled
-    public List<Category> categories;
-    /** When the graph backing this payload was last scanned. Null when no scan has ever completed — which the UI must render as "never scanned", never as fresh data. */
+    public String label;
     @AuraEnabled
-    public Datetime lastScannedAt;
-    /** True when at least one scanner reported Partial or Degraded coverage on the most recent scan — the signal that this intelligence is knowingly incomplete. */
+    public String typeKey;
     @AuraEnabled
-    public Boolean hasCoverageLimitations;
+    public String typeLabel;
+    /** 'incoming' (it points at this node) or 'outgoing' (this node points at it) — direction is meaningful to the user: a trigger firing ON this object is incoming, a class this class CALLS is outgoing. */
+    @AuraEnabled
+    public String direction;
+    /** Optional lifecycle status read straight from the component's own attributes (e.g. a Flow's Active/Draft/Obsolete) — null when the type has no such concept. Never inferred; only ever a value the scanner itself recorded. */
+    @AuraEnabled
+    public String status;
+    /** Optional finer-grained grouping within typeKey (e.g. splitting Process Builder out from a modern Flow, both of which share the same underlying Flow typeKey) — null when the type has no sub-grouping. Falls back to typeKey/typeLabel for grouping when absent. */
+    @AuraEnabled
+    public String subTypeKey;
+    @AuraEnabled
+    public String subTypeLabel;
 
-    public OI_NodeIntelligenceDTO(String nodeKey, List<Category> categories, Datetime lastScannedAt, Boolean hasCoverageLimitations) {
-        this.nodeKey = nodeKey;
-        this.categories = categories == null ? new List<Category>() : categories;
-        this.lastScannedAt = lastScannedAt;
-        this.hasCoverageLimitations = hasCoverageLimitations == null ? false : hasCoverageLimitations;
+    public RelatedComponent(
+      String nodeKey,
+      String label,
+      String typeKey,
+      String typeLabel,
+      String direction
+    ) {
+      this(nodeKey, label, typeKey, typeLabel, direction, null, null, null);
     }
+
+    public RelatedComponent(
+      String nodeKey,
+      String label,
+      String typeKey,
+      String typeLabel,
+      String direction,
+      String status,
+      String subTypeKey,
+      String subTypeLabel
+    ) {
+      this.nodeKey = nodeKey;
+      this.label = label;
+      this.typeKey = typeKey;
+      this.typeLabel = typeLabel;
+      this.direction = direction;
+      this.status = status;
+      this.subTypeKey = subTypeKey;
+      this.subTypeLabel = subTypeLabel;
+    }
+  }
+
+  /** One panel section: Automation, Code, or Security. */
+  public class Category {
+    @AuraEnabled
+    public String category;
+    @AuraEnabled
+    public List<RelatedComponent> items;
+    /** True when more neighbours exist than were returned — surfaced rather than silently truncated (GraphUI.md's no-silent-caps rule). */
+    @AuraEnabled
+    public Boolean truncated;
+    /** What the scanners behind this category do NOT cover, in plain language. Rendered even when items is empty, so an empty section reads as "nothing found, and here is what we can see" rather than an unexplained blank. */
+    @AuraEnabled
+    public String coverageNote;
+
+    public Category(
+      String category,
+      List<RelatedComponent> items,
+      Boolean truncated,
+      String coverageNote
+    ) {
+      this.category = category;
+      this.items = items;
+      this.truncated = truncated;
+      this.coverageNote = coverageNote;
+    }
+  }
+
+  @AuraEnabled
+  public String nodeKey;
+  @AuraEnabled
+  public List<Category> categories;
+  /** When the graph backing this payload was last scanned. Null when no scan has ever completed — which the UI must render as "never scanned", never as fresh data. */
+  @AuraEnabled
+  public Datetime lastScannedAt;
+  /** True when at least one scanner reported Partial or Degraded coverage on the most recent scan — the signal that this intelligence is knowingly incomplete. */
+  @AuraEnabled
+  public Boolean hasCoverageLimitations;
+
+  public OI_NodeIntelligenceDTO(
+    String nodeKey,
+    List<Category> categories,
+    Datetime lastScannedAt,
+    Boolean hasCoverageLimitations
+  ) {
+    this.nodeKey = nodeKey;
+    this.categories = categories == null ? new List<Category>() : categories;
+    this.lastScannedAt = lastScannedAt;
+    this.hasCoverageLimitations = hasCoverageLimitations == null
+      ? false
+      : hasCoverageLimitations;
+  }
 }

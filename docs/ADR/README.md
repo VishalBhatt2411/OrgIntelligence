@@ -34,6 +34,7 @@ Index of ADRs for the Salesforce Org Intelligence Platform. Each record captures
 | [0026](0026-org-health-visual-contract-and-dashboard-architecture.md)   | Org Health Dashboard — Visual Contract and Compute-Tier Architecture                     | Accepted — extends 0025             |
 | [0027](0027-unified-org-health-finding-model.md)                        | Unified Org Health Finding Model and Remediation Lifecycle                               | Accepted — elaborates 0026          |
 | [0028](0028-unified-cross-surface-design-token-system.md)               | Unified Cross-Surface Design Token System                                                | Accepted — reconciles 0025, 0026    |
+| [0029](0029-tooling-api-self-callout-via-named-credential.md)           | Tooling API Self-Callout Authenticated via a Packaged Named Credential                   | Accepted                            |
 
 ## When to add a new ADR
 
