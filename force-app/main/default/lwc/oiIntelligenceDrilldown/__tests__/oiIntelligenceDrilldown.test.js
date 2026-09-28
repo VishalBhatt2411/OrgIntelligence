@@ -14,14 +14,15 @@ jest.mock(
   () => ({ default: jest.fn() }),
   { virtual: true }
 );
-jest.mock(
-  "c/metadataNavigation",
-  () => ({
-    navigateToTarget: jest.fn(() => ({ navigated: true, message: null })),
-    isNavigable: jest.fn(() => true)
-  }),
-  { virtual: true }
-);
+/**
+ * c/metadataNavigation is a real LWC module in this repo, so this mock must NOT be declared
+ * virtual: a virtual mock is keyed by the requiring file's directory, so the test and the
+ * component under test could resolve to two different module instances.
+ */
+jest.mock("c/metadataNavigation", () => ({
+  navigateToTarget: jest.fn(() => ({ navigated: true, message: null })),
+  isNavigable: jest.fn(() => true)
+}));
 
 function flushPromises() {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -63,7 +64,12 @@ describe("c-oi-intelligence-drilldown", () => {
     }
     getNodeConnections.mockReset();
     getNavigationTarget.mockReset();
-    navigateToTarget.mockClear();
+    // mockReset (not mockClear) also drains any unconsumed mockReturnValueOnce queue.
+    navigateToTarget.mockReset();
+    navigateToTarget.mockImplementation(() => ({
+      navigated: true,
+      message: null
+    }));
     jest.useRealTimers();
   });
 

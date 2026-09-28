@@ -106,20 +106,34 @@ private class OI_RecordHierarchyServiceTest {
     );
   }
 
+  /**
+   * Asserts on the two expected Contact node keys rather than a blind CHILD_OF count: a
+   * target org can carry other child relationships with real rows (e.g. managed-package
+   * automation that creates related records on Account insert), which would inflate a plain
+   * count and make the test depend on org configuration.
+   */
   @isTest
   static void testGetRecordFragmentResolvesChildRelationships() {
     Account parent = new Account(Name = 'Parent Co');
     insert parent;
-    insert new Contact(LastName = 'Kid One', AccountId = parent.Id);
-    insert new Contact(LastName = 'Kid Two', AccountId = parent.Id);
+    Contact kidOne = new Contact(LastName = 'Kid One', AccountId = parent.Id);
+    Contact kidTwo = new Contact(LastName = 'Kid Two', AccountId = parent.Id);
+    insert new List<Contact>{ kidOne, kidTwo };
 
     OI_RecordFragmentDTO fragment = new OI_RecordHierarchyService()
       .getRecordFragment('Account', parent.Id);
 
-    Integer childEdgeCount = 0;
+    Set<String> expectedChildKeys = new Set<String>{
+      OI_RecordSchemaUtil.recordNodeKey('Contact', kidOne.Id),
+      OI_RecordSchemaUtil.recordNodeKey('Contact', kidTwo.Id)
+    };
+    Set<String> foundChildKeys = new Set<String>();
     for (OI_EdgeSummaryDTO edge : fragment.edges) {
-      if (edge.typeKey == 'SalesforceRecord.CHILD_OF') {
-        childEdgeCount++;
+      if (
+        edge.typeKey == 'SalesforceRecord.CHILD_OF' &&
+        expectedChildKeys.contains(edge.targetNodeKey)
+      ) {
+        foundChildKeys.add(edge.targetNodeKey);
         System.assertEquals(
           'AccountId',
           edge.viaFieldApiName,
@@ -128,8 +142,8 @@ private class OI_RecordHierarchyServiceTest {
       }
     }
     System.assertEquals(
-      2,
-      childEdgeCount,
+      expectedChildKeys,
+      foundChildKeys,
       'Both child Contacts must appear as CHILD_OF edges from the Account.'
     );
   }
