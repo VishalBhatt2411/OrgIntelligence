@@ -15,8 +15,8 @@
  *                    domain-specific).
  * Dependencies: OI_GraphEngine, OI_SecurityService, OI_GraphFragmentDTO, OI_NodeDetailDTO,
  *               OI_FieldSummaryDTO, OI_RelationshipFieldDetailService,
- *               OI_RelationshipFieldDetailDTO, OI_ObjectSharingSettingsService,
- *               OI_ObjectSharingSettingsDTO.
+ *               OI_RelationshipFieldDetailDTO, OI_TargetObjectRecordCountsDTO,
+ *               OI_ObjectSharingSettingsService, OI_ObjectSharingSettingsDTO.
  * Limitations: getMiniMapSummary (API.md §2.1) is not implemented — mini-map is deferred
  *              alongside oiMiniMap (Backlog UI-6, Phase 3), consistent with Sprint 10's
  *              MVP scope. getGraphFragment does not yet accept nodeTypeFilter[]/
@@ -181,13 +181,10 @@ public with sharing class OI_GraphController {
 
   /**
    * The Object panel's reworked Relationships section (outgoing side) — per-field Lookup/
-   * Master-Detail detail plus a live per-target-object record count, replacing the old flat
-   * "Outgoing Lookups — N" count (see OI_RelationshipFieldDetailService's own doc comment).
-   *
-   * Deliberately NOT cacheable, unlike getFieldSummaries above: this payload's whole purpose
-   * includes a live COUNT() per target object, and a platform-cached response would present a
-   * stale record count as current — the same trust concern getNodeIntelligence's own doc
-   * comment raises for stale scan timestamps.
+   * Master-Detail detail (required-ness, cascade delete), replacing the old flat "Outgoing
+   * Lookups — N" count (see OI_RelationshipFieldDetailService's own doc comment). Target-object
+   * record counts are a separate, explicit call — see getRelationshipTargetObjectRecordCounts
+   * below.
    */
   @AuraEnabled
   public static OI_RelationshipFieldDetailDTO getRelationshipFieldDetail(
@@ -197,6 +194,30 @@ public with sharing class OI_GraphController {
       OI_SecurityService.assertPermission('OI_View_Graph');
       return new OI_RelationshipFieldDetailService()
         .getRelationshipFieldDetail(objectNodeKey);
+    } catch (Exception e) {
+      throw translate(e);
+    }
+  }
+
+  /**
+   * On-demand companion to getRelationshipFieldDetail above: live per-target-object record
+   * counts, split into their own round-trip after live-org profiling showed computing every
+   * relationship field's target-object COUNT() synchronously on section expand made wide-fanout
+   * objects (e.g. a polymorphic WhatId/WhoId field spanning dozens of targets) slow to open. The
+   * LWC requests this only when a user explicitly triggers "Load record counts".
+   *
+   * Deliberately NOT cacheable, same rationale as the old inline behavior it replaces: a
+   * platform-cached response would present a stale record count as current — the same trust
+   * concern getNodeIntelligence's own doc comment raises for stale scan timestamps.
+   */
+  @AuraEnabled
+  public static OI_TargetObjectRecordCountsDTO getRelationshipTargetObjectRecordCounts(
+    List<String> objectApiNames
+  ) {
+    try {
+      OI_SecurityService.assertPermission('OI_View_Graph');
+      return new OI_RelationshipFieldDetailService()
+        .getTargetObjectRecordCounts(objectApiNames);
     } catch (Exception e) {
       throw translate(e);
     }

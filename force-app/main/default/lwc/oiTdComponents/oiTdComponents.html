@@ -1,0 +1,386 @@
+<template>
+  <template lwc:if={loading}>
+    <p class="body1 p4">Loading...</p>
+  </template>
+  <template lwc:elseif={noData}>
+    <p class="body1 p4">No component data yet.</p>
+  </template>
+  <div lwc:else class="page">
+    <!-- Used vs unused by type -->
+    <div class="paper p3 mb3">
+      <div class="row-between chart-head">
+        <p class="subtitle1">Used vs unused by type</p>
+        <div class="row legend">
+          <span class="row legend-item"
+            ><span class="legend-dot used-dot"></span
+            ><span class="caption muted">Used</span></span
+          >
+          <span class="row legend-item"
+            ><span class="legend-dot unused-dot"></span
+            ><span class="caption muted">Unused</span></span
+          >
+        </div>
+      </div>
+      <template for:each={chartRows} for:item="d">
+        <div key={d.name} class={d.rowClass}>
+          <span class="body2">{d.name}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style={d.barStyle}></div>
+          </div>
+          <span class="caption muted right">{d.caption}</span>
+        </div>
+      </template>
+    </div>
+
+    <!-- Object / field browser -->
+    <div class="paper mb3 browser">
+      <div class="obj-pane">
+        <div class="pane-head">
+          <p class="subtitle1 gutter">Objects ({objectCount})</p>
+          <input
+            class="input full"
+            type="text"
+            placeholder="Search objects…"
+            value={objectSearch}
+            oninput={handleObjectSearch}
+          />
+        </div>
+        <hr class="divider" />
+        <div class="obj-list">
+          <template for:each={objectRows} for:item="o">
+            <div
+              key={o.key}
+              class={o.rowClass}
+              data-name={o.apiName}
+              onclick={handleSelectObject}
+              role="button"
+              tabindex="0"
+            >
+              <span class="body2 nowrap mono-name grow">{o.apiName}</span>
+              <template lwc:if={o.used}>
+                <span class="chip chip-used">{o.usedLabel}</span>
+              </template>
+              <template lwc:else>
+                <span class="chip chip-outlined">Unused</span>
+              </template>
+              <c-oi-td-open-in-salesforce
+                scan-id={scanId}
+                type="SfObject"
+                name={o.apiName}
+              ></c-oi-td-open-in-salesforce>
+            </div>
+          </template>
+          <template lwc:if={noObjectsMatch}>
+            <p class="body2 muted p2">No objects match "{objectSearch}".</p>
+          </template>
+        </div>
+      </div>
+      <div class="field-pane">
+        <div class="pane-head">
+          <p class="subtitle1 nowrap">{fieldsTitle}</p>
+        </div>
+        <hr class="divider" />
+        <div class="field-list">
+          <template lwc:if={showFieldsLoading}>
+            <div class="p2"><span class="spinner spinner-24"></span></div>
+          </template>
+          <template lwc:if={fieldsError}>
+            <p class="body2 error-text p2">Couldn't load fields — try again.</p>
+          </template>
+          <template for:each={fieldRows} for:item="f">
+            <c-oi-td-usage-row
+              key={f.key}
+              name={f.name}
+              used-in={f.usedIn}
+              references={f.references}
+              scan-id={scanId}
+              link-type="SfField"
+              link-name={f.linkName}
+              access-object={f.objectName}
+              access-field={f.fieldName}
+            ></c-oi-td-usage-row>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apex Classes / Triggers -->
+    <div class="grid12 mb3">
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Apex Classes</p>
+            <span class="chip chip-count">{classCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={classGroups} for:item="g">
+              <div key={g.key}>
+                <button
+                  class="plain-btn group-head"
+                  data-key={g.key}
+                  onclick={handleToggleGroup}
+                >
+                  <span class="caption bold">{g.label}</span>
+                  <span class="caption">{g.caret}</span>
+                </button>
+                <template lwc:if={g.open}>
+                  <template for:each={g.rows} for:item="r">
+                    <c-oi-td-usage-row
+                      key={r.key}
+                      name={r.name}
+                      used-in={r.item.usedIn}
+                      references={r.item.references}
+                      scan-id={scanId}
+                      link-type="ApexClass"
+                      link-name={r.linkName}
+                    ></c-oi-td-usage-row>
+                  </template>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Triggers</p>
+            <span class="chip chip-count">{triggerCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={triggers} for:item="t">
+              <c-oi-td-usage-row
+                key={t.name}
+                name={t.name}
+                used-in={t.usedIn}
+                references={t.references}
+                scan-id={scanId}
+                link-type="ApexTrigger"
+                link-name={t.name}
+              ></c-oi-td-usage-row>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flows / LWC -->
+    <div class="grid12 mb3">
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Flows</p>
+            <span class="chip chip-count">{flowCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={flowGroups} for:item="g">
+              <div key={g.key}>
+                <button
+                  class="plain-btn group-head"
+                  data-key={g.key}
+                  onclick={handleToggleGroup}
+                >
+                  <span class="caption bold">{g.label}</span>
+                  <span class="caption">{g.caret}</span>
+                </button>
+                <template lwc:if={g.open}>
+                  <template for:each={g.rows} for:item="r">
+                    <c-oi-td-usage-row
+                      key={r.key}
+                      name={r.name}
+                      used-in={r.item.usedIn}
+                      references={r.item.references}
+                      scan-id={scanId}
+                      link-type="Flow"
+                      link-name={r.linkName}
+                    ></c-oi-td-usage-row>
+                  </template>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Lightning Web Components</p>
+            <span class="chip chip-count">{lwcCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={lwc} for:item="l">
+              <c-oi-td-usage-row
+                key={l.apiName}
+                name={l.apiName}
+                used-in={l.usedIn}
+                references={l.references}
+                scan-id={scanId}
+                link-type="LightningWebComponent"
+                link-name={l.apiName}
+              ></c-oi-td-usage-row>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow Rules / Process Builder -->
+    <div class="grid12 mb3">
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Workflow Rules</p>
+            <span class="chip chip-count">{workflowCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={workflowRules} for:item="w">
+              <c-oi-td-usage-row
+                key={w.key}
+                name={w.name}
+                used-in={w.item.usedIn}
+                references={w.item.references}
+                scan-id={scanId}
+                link-type="WorkflowRule"
+                link-name={w.linkName}
+                badge-label={w.badge}
+                badge-active={w.active}
+              ></c-oi-td-usage-row>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Process Builder</p>
+            <span class="chip chip-count">{processBuilderCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={processBuilderFlows} for:item="f">
+              <c-oi-td-usage-row
+                key={f.key}
+                name={f.name}
+                used-in={f.item.usedIn}
+                references={f.item.references}
+                scan-id={scanId}
+                link-type="Flow"
+                link-name={f.key}
+              ></c-oi-td-usage-row>
+            </template>
+            <template lwc:if={noProcessBuilder}>
+              <p class="body2 muted p2">No Process Builder flows found.</p>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visualforce -->
+    <div class="grid12 mb3">
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Visualforce Pages</p>
+            <span class="chip chip-count">{vfPageCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={vfPages} for:item="p">
+              <c-oi-td-usage-row
+                key={p.name}
+                name={p.name}
+                used-in={p.usedIn}
+                references={p.references}
+                scan-id={scanId}
+                link-type="ApexPage"
+                link-name={p.name}
+              ></c-oi-td-usage-row>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Visualforce Components</p>
+            <span class="chip chip-count">{vfComponentCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={vfComponents} for:item="c">
+              <c-oi-td-usage-row
+                key={c.name}
+                name={c.name}
+                used-in={c.usedIn}
+                references={c.references}
+                scan-id={scanId}
+                link-type="ApexComponent"
+                link-name={c.name}
+              ></c-oi-td-usage-row>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email Templates / Installed Packages -->
+    <div class="grid12 mb3">
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Email Templates</p>
+            <span class="chip chip-count">{emailCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={emailTemplates} for:item="t">
+              <div key={t.key} class="row plain-row">
+                <div class="grow">
+                  <p class="body2 nowrap">{t.name}</p>
+                  <span class="caption muted">{t.templateType}</span>
+                </div>
+                <span class={t.chipClass}>{t.label}</span>
+              </div>
+            </template>
+            <template lwc:if={noEmailTemplates}>
+              <p class="body2 muted p2">No email templates found.</p>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="paper section">
+          <div class="row section-head">
+            <p class="subtitle1">Installed Packages</p>
+            <span class="chip chip-count">{packageCount}</span>
+          </div>
+          <hr class="divider" />
+          <div class="section-body">
+            <template for:each={packages} for:item="p">
+              <div key={p.key} class="row plain-row">
+                <div class="grow">
+                  <p class="body2 nowrap">{p.name}</p>
+                  <span class="caption muted">{p.namespacePrefix}</span>
+                </div>
+                <template lwc:if={p.version}>
+                  <span class="chip chip-version">{p.version}</span>
+                </template>
+              </div>
+            </template>
+            <template lwc:if={noPackages}>
+              <p class="body2 muted p2">
+                No managed/unlocked packages installed.
+              </p>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

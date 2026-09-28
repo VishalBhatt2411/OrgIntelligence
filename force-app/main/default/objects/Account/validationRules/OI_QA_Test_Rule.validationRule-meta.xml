@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>OI_QA_Test_Rule</fullName>
+    <active>false</active>
+    <description
+  >QA-only rule created to verify the Object Intelligence Panel's Automation section renders real Validation Rule data. Inactive and always-false by design — no behavior change. Safe to remove once the panel's Automation rendering has been confirmed.</description>
+    <errorConditionFormula>1 = 2</errorConditionFormula>
+    <errorMessage>QA test rule — should never fire.</errorMessage>
+</ValidationRule>

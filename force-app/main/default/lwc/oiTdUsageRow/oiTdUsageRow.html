@@ -1,0 +1,66 @@
+<template>
+  <div class="usage-row">
+    <div class="row head">
+      <button
+        class="plain-btn name-btn"
+        onclick={handleToggle}
+        aria-expanded={open}
+      >
+        <span class="body2 nowrap mono-name">{name}</span>
+      </button>
+      <template lwc:if={hasBadge}>
+        <span class={badgeClass}>{badgeLabel}</span>
+      </template>
+      <template lwc:if={used}>
+        <span class="chip chip-used">{usedLabel}</span>
+      </template>
+      <template lwc:else>
+        <span class="chip chip-outlined">Unused</span>
+      </template>
+      <c-oi-td-open-in-salesforce
+        scan-id={scanId}
+        type={linkType}
+        name={linkName}
+      ></c-oi-td-open-in-salesforce>
+    </div>
+    <template lwc:if={open}>
+      <div class="detail" style={detailStyle}>
+        <span class="caption bold block">{riskLabel}</span>
+        <template lwc:if={safeToDelete}>
+          <span class="caption muted block"
+            >No references found in scanned Apex, triggers, flows, or LWC — safe
+            to delete.</span
+          >
+        </template>
+        <template lwc:if={usedInText}>
+          <span class="caption muted block">Used in: {usedInText}</span>
+        </template>
+        <template lwc:if={referencesText}>
+          <span class="caption muted block">References: {referencesText}</span>
+        </template>
+        <template lwc:if={hasAccess}>
+          <span class="caption muted block">Access: {accessText}</span>
+        </template>
+        <template lwc:if={explanation}>
+          <span class="caption block italic explanation">{explanation}</span>
+        </template>
+        <template lwc:else>
+          <div class="explain">
+            <button
+              class="link-btn"
+              onclick={handleExplain}
+              disabled={explaining}
+            >
+              {explainLabel}
+            </button>
+            <template lwc:if={explainError}>
+              <span class="caption error-text block"
+                >Couldn't get an explanation — try again.</span
+              >
+            </template>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+</template>

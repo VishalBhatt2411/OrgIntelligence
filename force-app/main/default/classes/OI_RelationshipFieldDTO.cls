@@ -4,8 +4,11 @@
  *          count with the actual fields behind it — see OI_RelationshipFieldDetailService's own
  *          doc comment for why).
  * Responsibilities: Carry one field's relationship shape — type, required-ness, cascade-delete
- *                    behavior where knowable, and its target object(s) with a live record count
- *                    each. Pure data; all derivation lives in OI_RelationshipFieldDetailService.
+ *                    behavior where knowable, and its target object(s) by api name. Record counts
+ *                    per target object are never carried here — they are a separate, on-demand
+ *                    call (OI_RelationshipFieldDetailService.getTargetObjectRecordCounts) keyed
+ *                    by objectApiName. Pure data; all derivation lives in
+ *                    OI_RelationshipFieldDetailService.
  * Dependencies: None.
  * Limitations: cascadeDeleteBehavior is populated only for Master-Detail ('Cascade', a fixed
  *              platform invariant); a Lookup field's own configured delete constraint
@@ -17,13 +20,9 @@ public class OI_RelationshipFieldDTO {
   public class TargetObjectCardinality {
     @AuraEnabled
     public String objectApiName;
-    /** Null when the count could not be resolved (object inaccessible, unqueryable, or beyond MAX_TARGET_OBJECTS_FOR_CARDINALITY) — never a fabricated zero. */
-    @AuraEnabled
-    public Integer recordCount;
 
-    public TargetObjectCardinality(String objectApiName, Integer recordCount) {
+    public TargetObjectCardinality(String objectApiName) {
       this.objectApiName = objectApiName;
-      this.recordCount = recordCount;
     }
   }
 

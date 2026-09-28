@@ -44,6 +44,9 @@ public class OI_NodeIntelligenceDTO {
     public String subTypeKey;
     @AuraEnabled
     public String subTypeLabel;
+    /** The edge type this neighbour was reached through (e.g. 'SalesforceMetadata.EXECUTES_ON') — never rendered directly (that would put a raw key in front of a user), but lets the LWC decide whether every item in a group shares one (direction, edgeTypeKey) pair and can therefore open the exact same drill-down that answers a summary count. Null only if the traversal genuinely could not attribute an edge, which should not happen in practice. */
+    @AuraEnabled
+    public String edgeTypeKey;
 
     public RelatedComponent(
       String nodeKey,

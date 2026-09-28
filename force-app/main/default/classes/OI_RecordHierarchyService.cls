@@ -17,18 +17,24 @@
  * Dependencies: OI_RecordSchemaUtil, OI_RecordFragmentDTO, OI_NodeSummaryDTO,
  *               OI_EdgeSummaryDTO.
  * Limitations: Governor-limit bounded by design, not merely by accident — every populated
- *              lookup on the center record and every one of an object's child relationships
- *              (Account alone can have 60+) would otherwise mean one SOQL call each,
- *              risking the 100-query-per-transaction ceiling on exactly the kind of hub
- *              object this feature exists to visualize. Parent lookups are batched per
- *              distinct target SObjectType (one query per type, not per field). Child
- *              relationships are capped at MAX_RELATIONSHIP_TYPES processed and
- *              MAX_CHILDREN_PER_RELATIONSHIP rows each; both caps surface as an honest
- *              hasMore = true rather than a silent truncation (CLAUDE.md "no silent caps").
+ *              lookup on the center record would otherwise mean one SOQL call each, risking the
+ *              100-query-per-transaction ceiling on exactly the kind of hub object this feature
+ *              exists to visualize. Parent lookups are batched per distinct target SObjectType
+ *              (one query per type, not per field). Child relationships are batched into
+ *              parent-to-children subqueries, up to CHILD_RELATIONSHIP_QUERY_BATCH_SIZE
+ *              relationship types per SOQL call (Salesforce's documented per-query subquery
+ *              ceiling, live-verified against this org), so MAX_RELATIONSHIP_TYPES can afford to
+ *              be a generous safety ceiling rather than a tight bound driven by SOQL call count —
+ *              a schema-heavy org with 200+ child relationship types on one object still costs
+ *              roughly TYPES/20 queries, not TYPES queries. Rows per relationship are capped at
+ *              MAX_CHILDREN_PER_RELATIONSHIP; both this cap and the (now rarely hit)
+ *              MAX_RELATIONSHIP_TYPES cap surface as an honest hasMore = true rather than a
+ *              silent truncation (CLAUDE.md "no silent caps").
  */
 public with sharing class OI_RecordHierarchyService {
   private static final Integer MAX_CHILDREN_PER_RELATIONSHIP = 10;
-  private static final Integer MAX_RELATIONSHIP_TYPES = 25;
+  private static final Integer MAX_RELATIONSHIP_TYPES = 200;
+  private static final Integer CHILD_RELATIONSHIP_QUERY_BATCH_SIZE = 20;
   private static final String PARENT_EDGE_TYPE_KEY = 'SalesforceRecord.LOOKUP_TO';
   private static final String CHILD_EDGE_TYPE_KEY = 'SalesforceRecord.CHILD_OF';
 
@@ -229,7 +235,24 @@ public with sharing class OI_RecordHierarchyService {
     }
   }
 
-  /** Bounded on two axes at once (relationship types processed, rows per relationship) — see class doc for why both bounds are load-bearing, not cosmetic. Returns true if either bound was hit. */
+  /**
+   * Bounded on two axes at once (relationship types processed, rows per relationship) — see
+   * class doc for why both bounds are load-bearing, not cosmetic. Returns true if either bound
+   * was hit.
+   *
+   * Queries relationship types in batches of up to CHILD_RELATIONSHIP_QUERY_BATCH_SIZE using one
+   * parent-to-children SOQL query per batch (a subquery per relationship type in that batch),
+   * rather than the one-query-per-relationship-type approach this method used before. That
+   * earlier approach forced MAX_RELATIONSHIP_TYPES down to 25 purely to bound SOQL call count —
+   * which, in a schema-heavy org (this org's Account has 219 total child relationships, 123
+   * eligible after describe-level accessibility filtering), silently buried near-universal
+   * relationships like Contact (alphabetically 37th) behind describe metadata's platform-internal
+   * ordering. Batching relationships into subqueries (live-verified against this org: 20
+   * subqueries in one query succeeds — Salesforce's documented per-query subquery ceiling) means
+   * covering all 123 eligible relationship types here costs ~7 SOQL calls instead of 123,
+   * letting MAX_RELATIONSHIP_TYPES be raised to a generous safety ceiling that in practice is
+   * never hit, rather than a heuristic prioritization standing in for real coverage.
+   */
   private Boolean addChildRelationships(
     Schema.DescribeSObjectResult describe,
     String recordId,
@@ -237,17 +260,19 @@ public with sharing class OI_RecordHierarchyService {
     List<OI_NodeSummaryDTO> nodes,
     List<OI_EdgeSummaryDTO> edges
   ) {
-    List<Schema.ChildRelationship> relationships = describe.getChildRelationships();
-    Boolean hasMore = relationships.size() > MAX_RELATIONSHIP_TYPES;
-    Integer relationshipsProcessed = 0;
-
-    for (Schema.ChildRelationship relationship : relationships) {
-      if (relationshipsProcessed >= MAX_RELATIONSHIP_TYPES) {
-        break;
-      }
+    List<EligibleChildRelationship> eligible = new List<EligibleChildRelationship>();
+    for (
+      Schema.ChildRelationship relationship : describe.getChildRelationships()
+    ) {
+      String relationshipName = relationship.getRelationshipName();
       Schema.SObjectType childType = relationship.getChildSObject();
       Schema.SObjectField relationshipField = relationship.getField();
-      if (childType == null || relationshipField == null) {
+      if (
+        relationshipName == null ||
+        childType == null ||
+        relationshipField == null
+      ) {
+        /** A relationship with no queryable relationship name (some system/junction relationships) can't be used in a subquery and was never resolvable by the prior single-query approach either. */
         continue;
       }
       Schema.DescribeSObjectResult childDescribe = childType.getDescribe();
@@ -263,57 +288,183 @@ public with sharing class OI_RecordHierarchyService {
       ) {
         continue;
       }
-      relationshipsProcessed++;
+      eligible.add(
+        new EligibleChildRelationship(
+          relationshipName,
+          childDescribe,
+          relationshipField,
+          childNameField
+        )
+      );
+    }
 
-      Integer fetchLimit = MAX_CHILDREN_PER_RELATIONSHIP + 1;
+    Boolean hasMore = eligible.size() > MAX_RELATIONSHIP_TYPES;
+    Integer typesToProcess = Math.min(eligible.size(), MAX_RELATIONSHIP_TYPES);
+    Integer fetchLimit = MAX_CHILDREN_PER_RELATIONSHIP + 1;
+
+    for (
+      Integer batchStart = 0;
+      batchStart < typesToProcess;
+      batchStart += CHILD_RELATIONSHIP_QUERY_BATCH_SIZE
+    ) {
+      Integer batchEnd = Math.min(
+        batchStart + CHILD_RELATIONSHIP_QUERY_BATCH_SIZE,
+        typesToProcess
+      );
+      List<EligibleChildRelationship> batch = new List<EligibleChildRelationship>();
+      List<String> subqueries = new List<String>();
+      for (Integer i = batchStart; i < batchEnd; i++) {
+        EligibleChildRelationship candidate = eligible[i];
+        batch.add(candidate);
+        subqueries.add(
+          '(SELECT Id, ' +
+            candidate.childNameField +
+            ' FROM ' +
+            candidate.relationshipName +
+            ' LIMIT ' +
+            fetchLimit +
+            ')'
+        );
+      }
       String soql =
         'SELECT Id, ' +
-        childNameField +
+        String.join(subqueries, ', ') +
         ' FROM ' +
-        childDescribe.getName() +
+        describe.getName() +
+        ' WHERE Id = :recordId';
+      List<SObject> parentRows;
+      try {
+        parentRows = Database.query(soql, AccessLevel.USER_MODE);
+      } catch (QueryException e) {
+        /** One relationship in this batch turning out not to be queryable in this org/edition (despite passing describe-level checks — CLAUDE.md §Metadata Assumptions) would otherwise take out the whole batch's data with it. Falling back to one query per relationship in just this batch isolates the bad relationship without losing the other (up to 19) good ones. */
+        hasMore =
+          addChildRelationshipsIndividually(
+            batch,
+            recordId,
+            fetchLimit,
+            centerKey,
+            nodes,
+            edges
+          ) || hasMore;
+        continue;
+      }
+      if (parentRows.isEmpty()) {
+        continue;
+      }
+      SObject parentRow = parentRows[0];
+      for (EligibleChildRelationship candidate : batch) {
+        List<SObject> children;
+        try {
+          children = parentRow.getSObjects(candidate.relationshipName);
+        } catch (Exception e) {
+          continue;
+        }
+        if (children == null) {
+          continue;
+        }
+        hasMore =
+          appendChildEdges(children, candidate, centerKey, nodes, edges) ||
+          hasMore;
+      }
+    }
+    return hasMore;
+  }
+
+  /** Per-relationship fallback used only when a batched subquery for that relationship's batch fails — same one-query-per-relationship shape as this method used before batching existed. */
+  private Boolean addChildRelationshipsIndividually(
+    List<EligibleChildRelationship> batch,
+    String recordId,
+    Integer fetchLimit,
+    String centerKey,
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges
+  ) {
+    Boolean hasMore = false;
+    for (EligibleChildRelationship candidate : batch) {
+      String soql =
+        'SELECT Id, ' +
+        candidate.childNameField +
+        ' FROM ' +
+        candidate.childDescribe.getName() +
         ' WHERE ' +
-        relationshipField.getDescribe().getName() +
+        candidate.relationshipField.getDescribe().getName() +
         ' = :recordId LIMIT :fetchLimit';
       List<SObject> children;
       try {
         children = Database.query(soql, AccessLevel.USER_MODE);
       } catch (QueryException e) {
-        /** Same rationale as addParentLookups' catch — a relationship listed in describe metadata is not a guarantee it's actually queryable in this org/edition (CLAUDE.md §Metadata Assumptions). */
         continue;
       }
-
-      Integer count = 0;
-      for (SObject child : children) {
-        if (count >= MAX_CHILDREN_PER_RELATIONSHIP) {
-          hasMore = true;
-          break;
-        }
-        String childId = (String) child.get('Id');
-        String childKey = OI_RecordSchemaUtil.recordNodeKey(
-          childDescribe.getName(),
-          childId
-        );
-        nodes.add(
-          new OI_NodeSummaryDTO(
-            childKey,
-            OI_RecordSchemaUtil.recordTypeKey(childDescribe.getName()),
-            OI_RecordSchemaUtil.labelFor(child, childNameField),
-            childDescribe.getName(),
-            'Active'
-          )
-        );
-        OI_EdgeSummaryDTO childEdge = new OI_EdgeSummaryDTO(
-          centerKey + '::' + childKey,
-          CHILD_EDGE_TYPE_KEY,
-          centerKey,
-          childKey
-        );
-        childEdge.viaFieldApiName = relationshipField.getDescribe().getName();
-        edges.add(childEdge);
-        count++;
-      }
+      hasMore =
+        appendChildEdges(children, candidate, centerKey, nodes, edges) ||
+        hasMore;
     }
     return hasMore;
+  }
+
+  /** Shared node/edge construction for one relationship type's child rows, enforcing MAX_CHILDREN_PER_RELATIONSHIP. Returns true if this relationship type had more rows than the cap. */
+  private Boolean appendChildEdges(
+    List<SObject> children,
+    EligibleChildRelationship candidate,
+    String centerKey,
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges
+  ) {
+    Schema.DescribeSObjectResult childDescribe = candidate.childDescribe;
+    String childNameField = candidate.childNameField;
+    Boolean hasMore = false;
+    Integer count = 0;
+    for (SObject child : children) {
+      if (count >= MAX_CHILDREN_PER_RELATIONSHIP) {
+        hasMore = true;
+        break;
+      }
+      String childId = (String) child.get('Id');
+      String childKey = OI_RecordSchemaUtil.recordNodeKey(
+        childDescribe.getName(),
+        childId
+      );
+      nodes.add(
+        new OI_NodeSummaryDTO(
+          childKey,
+          OI_RecordSchemaUtil.recordTypeKey(childDescribe.getName()),
+          OI_RecordSchemaUtil.labelFor(child, childNameField),
+          childDescribe.getName(),
+          'Active'
+        )
+      );
+      OI_EdgeSummaryDTO childEdge = new OI_EdgeSummaryDTO(
+        centerKey + '::' + childKey,
+        CHILD_EDGE_TYPE_KEY,
+        centerKey,
+        childKey
+      );
+      childEdge.viaFieldApiName = candidate.relationshipField.getDescribe()
+        .getName();
+      edges.add(childEdge);
+      count++;
+    }
+    return hasMore;
+  }
+
+  /** One eligible child relationship type, pre-filtered for accessibility (describe-only — no SOQL cost) before batching into subqueries. */
+  private class EligibleChildRelationship {
+    private final String relationshipName;
+    private final Schema.DescribeSObjectResult childDescribe;
+    private final Schema.SObjectField relationshipField;
+    private final String childNameField;
+
+    private EligibleChildRelationship(
+      String relationshipName,
+      Schema.DescribeSObjectResult childDescribe,
+      Schema.SObjectField relationshipField,
+      String childNameField
+    ) {
+      this.relationshipName = relationshipName;
+      this.childDescribe = childDescribe;
+      this.relationshipField = relationshipField;
+      this.childNameField = childNameField;
+    }
   }
 
   private void addAccessibleField(

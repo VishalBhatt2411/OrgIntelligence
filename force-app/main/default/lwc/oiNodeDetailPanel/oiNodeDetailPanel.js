@@ -68,6 +68,7 @@ import { LightningElement, api } from "lwc";
 import getNodeDetail from "@salesforce/apex/OI_GraphController.getNodeDetail";
 import getFieldSummaries from "@salesforce/apex/OI_GraphController.getFieldSummaries";
 import getRelationshipFieldDetail from "@salesforce/apex/OI_GraphController.getRelationshipFieldDetail";
+import getRelationshipTargetObjectRecordCounts from "@salesforce/apex/OI_GraphController.getRelationshipTargetObjectRecordCounts";
 import getObjectSharingSettings from "@salesforce/apex/OI_GraphController.getObjectSharingSettings";
 import getRecordFragment from "@salesforce/apex/OI_RecordHierarchyController.getRecordFragment";
 import getRecordSharing from "@salesforce/apex/OI_RecordHierarchyController.getRecordSharing";
@@ -177,6 +178,12 @@ export default class OiNodeDetailPanel extends LightningElement {
   isLoadingRelationshipFieldDetail = false;
   relationshipFieldDetailErrorMessage = null;
   relationshipFieldDetailRequestId = 0;
+  /** On-demand target-object record counts for the Relationships section (see OI_RelationshipFieldDetailService's own doc comment on why counts are a separate, explicit action rather than part of the detail load above — live-org profiling showed computing them inline made wide-fanout objects slow to open). Keyed by object API name; a key's absence means that object's count is not yet loaded or could not be resolved. */
+  targetObjectRecordCounts = null;
+  isLoadingTargetObjectRecordCounts = false;
+  targetObjectRecordCountsErrorMessage = null;
+  targetObjectRecordCountsTruncated = false;
+  targetObjectRecordCountsRequestId = 0;
   /** Object mode's Sharing Settings section (Org-Wide Default) — this platform's first Tooling-API-sourced fact (see OI_ObjectSharingSettingsDTO's own doc comment on why Apex Describe cannot answer this). Lazy-loaded the moment the section is expanded, mirroring Relationships' own explicit-action gate, since it is a live, non-cacheable read. */
   objectSharingSettings = null;
   isLoadingObjectSharingSettings = false;
@@ -354,11 +361,20 @@ export default class OiNodeDetailPanel extends LightningElement {
     }
     return Array.from(groupsByKey.values()).map((group) => {
       const groupKey = `${category.category}::${group.key}`;
+      const drilldownSelector = this.resolveGroupDrilldownSelector(group.items);
       return {
         key: groupKey,
         typeLabel: group.typeLabel,
         countLabel: `${group.items.length}`,
         isExpanded: this.expandedIntelligenceTypeGroups.has(groupKey),
+        isDrilldownEligible: !!drilldownSelector,
+        drilldownDirection: drilldownSelector
+          ? drilldownSelector.direction
+          : null,
+        drilldownEdgeTypeKey: drilldownSelector
+          ? drilldownSelector.edgeTypeKey
+          : null,
+        headerTitle: drilldownSelector ? "Show these connections" : null,
         items: group.items.map((item) => ({
           ...item,
           directionLabel:
@@ -373,10 +389,63 @@ export default class OiNodeDetailPanel extends LightningElement {
     });
   }
 
-  /** Opens/closes one type group's component list — independent of the section's own collapse state, exactly like handleCoverageDetailsToggle above. */
+  /**
+   * A type group can open the exact drill-down that answers its own count only when every item
+   * in it was reached the same way — one direction, one edge type — the same pair
+   * OI_NodeConnectionsService needs to page it. A mixed-provenance group (e.g. Code holding both
+   * a REFERENCES-reached class and an EXECUTES_ON-reached trigger) has no single pair a
+   * drill-down query could describe, so it is left ineligible and keeps today's inline-expand
+   * behavior instead of promising a drill-down that would silently omit some of its own rows.
+   * Deliberately not category-gated: eligibility is a structural fact about the group's own
+   * items, not a per-category allowlist.
+   */
+  resolveGroupDrilldownSelector(items) {
+    if (!items.length) {
+      return null;
+    }
+    const first = items[0];
+    if (!first.direction || !first.edgeTypeKey) {
+      return null;
+    }
+    const isUniform = items.every(
+      (item) =>
+        item.direction === first.direction &&
+        item.edgeTypeKey === first.edgeTypeKey
+    );
+    return isUniform
+      ? { direction: first.direction, edgeTypeKey: first.edgeTypeKey }
+      : null;
+  }
+
+  /** Locates one type group by its groupKey across every category — mirrors handleDrilldownOpen's own row lookup against the getter's current output, the same "recompute rather than cache a second copy" convention already used for relationshipCountRows. */
+  findTypeGroupByKey(groupKey) {
+    for (const section of this.intelligenceSections) {
+      const match = section.typeGroups.find((group) => group.key === groupKey);
+      if (match) {
+        return match;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Opens the drill-down for a type group when every item within it shares one
+   * (direction, edgeTypeKey) pair — the same product promise as the summary rows above (see
+   * handleDrilldownOpen), just reached from a per-type group instead of a per-edge-type summary
+   * row. A mixed-provenance group falls back to today's inline expand/collapse, unchanged.
+   */
   handleTypeGroupToggle(event) {
     event.stopPropagation();
     const groupKey = event.currentTarget.dataset.groupKey;
+    const group = this.findTypeGroupByKey(groupKey);
+    if (group && group.isDrilldownEligible) {
+      this.drilldown = {
+        direction: group.drilldownDirection,
+        edgeTypeKey: group.drilldownEdgeTypeKey,
+        relationshipLabel: group.typeLabel
+      };
+      return;
+    }
     const updated = new Set(this.expandedIntelligenceTypeGroups);
     if (updated.has(groupKey)) {
       updated.delete(groupKey);
@@ -598,6 +667,11 @@ export default class OiNodeDetailPanel extends LightningElement {
     this.relationshipFieldDetail = null;
     this.isLoadingRelationshipFieldDetail = false;
     this.relationshipFieldDetailErrorMessage = null;
+    this.targetObjectRecordCountsRequestId++;
+    this.targetObjectRecordCounts = null;
+    this.isLoadingTargetObjectRecordCounts = false;
+    this.targetObjectRecordCountsErrorMessage = null;
+    this.targetObjectRecordCountsTruncated = false;
   }
 
   /** A fresh node selection is a fresh Sharing Settings section — a previous object's OWD must never bleed into the newly-selected object's panel. */
@@ -1387,11 +1461,12 @@ export default class OiNodeDetailPanel extends LightningElement {
     return !!this.relationshipFieldDetailErrorMessage;
   }
 
-  /** One row per outgoing Lookup/Master-Detail field, each target object's live record count formatted for display — {objectApiName: "1,204 records"} rather than raw numbers, and an honest "—" while a target's count could not be resolved (never a fabricated zero). */
+  /** One row per outgoing Lookup/Master-Detail field. Target-object record counts are loaded on demand (see targetObjectRecordCounts) rather than eagerly: before that explicit load, every target reads "(load counts to see)"; a loaded-but-unresolved count reads "(count unavailable)" — never a fabricated zero either way. */
   get relationshipFieldRows() {
     const fields =
       (this.relationshipFieldDetail && this.relationshipFieldDetail.fields) ||
       [];
+    const counts = this.targetObjectRecordCounts;
     return fields.map((field) => ({
       ...field,
       requiredLabel:
@@ -1403,9 +1478,13 @@ export default class OiNodeDetailPanel extends LightningElement {
       cascadeDeleteLabel: field.cascadeDeleteBehavior || "Not available",
       targetObjectsDisplay: (field.targetObjects || [])
         .map((target) => {
-          return target.recordCount === null || target.recordCount === undefined
+          if (!counts) {
+            return target.objectApiName;
+          }
+          const recordCount = counts[target.objectApiName];
+          return recordCount === null || recordCount === undefined
             ? `${target.objectApiName} (count unavailable)`
-            : `${target.objectApiName} (${target.recordCount.toLocaleString()} records)`;
+            : `${target.objectApiName} (${recordCount.toLocaleString()} records)`;
         })
         .join(", ")
     }));
@@ -1415,10 +1494,37 @@ export default class OiNodeDetailPanel extends LightningElement {
     return this.relationshipFieldRows.length > 0;
   }
 
-  get relationshipFieldDetailTruncated() {
-    return !!(
-      this.relationshipFieldDetail &&
-      this.relationshipFieldDetail.cardinalityTruncated
+  /** Every distinct target object API name across the currently-loaded relationship fields — the exact request payload for the on-demand record-count load, deduplicated client-side so a shared target (e.g. two fields both pointing at Account) is requested once. */
+  get distinctRelationshipTargetObjectApiNames() {
+    const fields =
+      (this.relationshipFieldDetail && this.relationshipFieldDetail.fields) ||
+      [];
+    const names = new Set();
+    fields.forEach((field) => {
+      (field.targetObjects || []).forEach((target) => {
+        if (target.objectApiName) {
+          names.add(target.objectApiName);
+        }
+      });
+    });
+    return Array.from(names);
+  }
+
+  get isTargetObjectRecordCountsLoaded() {
+    return this.targetObjectRecordCounts !== null;
+  }
+
+  get hasTargetObjectRecordCountsError() {
+    return !!this.targetObjectRecordCountsErrorMessage;
+  }
+
+  /** The "Load record counts" action is only offered once there is something to count for, and hides itself once counts are loaded (or loading) — mirroring every other explicit-action gate in this panel (Impact Analysis, Relationships detail itself). Gated on distinctRelationshipTargetObjectApiNames rather than hasRelationshipFieldRows alone: a field row can exist with no usable target object api name (e.g. a corrupted/blank referenceTo entry), which would otherwise leave the button visible but permanently inert, since loadTargetObjectRecordCounts no-ops on an empty request list. */
+  get canLoadTargetObjectRecordCounts() {
+    return (
+      this.hasRelationshipFieldRows &&
+      this.distinctRelationshipTargetObjectApiNames.length > 0 &&
+      !this.isTargetObjectRecordCountsLoaded &&
+      !this.isLoadingTargetObjectRecordCounts
     );
   }
 
@@ -1459,6 +1565,52 @@ export default class OiNodeDetailPanel extends LightningElement {
   handleRelationshipFieldDetailRetry() {
     this.relationshipFieldDetail = null;
     this.loadRelationshipFieldDetail();
+  }
+
+  /** The explicit "Load record counts" action (see canLoadTargetObjectRecordCounts) — never fired automatically, since this is the exact synchronous-COUNT()-per-target-object cost that made the old inline behavior slow on wide-fanout objects. */
+  async handleLoadTargetObjectRecordCounts() {
+    await this.loadTargetObjectRecordCounts();
+  }
+
+  handleTargetObjectRecordCountsRetry() {
+    this.targetObjectRecordCounts = null;
+    this.targetObjectRecordCountsErrorMessage = null;
+    this.loadTargetObjectRecordCounts();
+  }
+
+  async loadTargetObjectRecordCounts() {
+    const objectApiNames = this.distinctRelationshipTargetObjectApiNames;
+    if (
+      this.isTargetObjectRecordCountsLoaded ||
+      this.isLoadingTargetObjectRecordCounts ||
+      objectApiNames.length === 0
+    ) {
+      return;
+    }
+    const requestId = ++this.targetObjectRecordCountsRequestId;
+    this.isLoadingTargetObjectRecordCounts = true;
+    this.targetObjectRecordCountsErrorMessage = null;
+    try {
+      const result = await getRelationshipTargetObjectRecordCounts({
+        objectApiNames
+      });
+      if (requestId !== this.targetObjectRecordCountsRequestId) {
+        return;
+      }
+      this.targetObjectRecordCounts = result.countsByObjectApiName || {};
+      this.targetObjectRecordCountsTruncated = !!result.truncated;
+    } catch (error) {
+      if (requestId === this.targetObjectRecordCountsRequestId) {
+        this.targetObjectRecordCounts = null;
+        this.targetObjectRecordCountsErrorMessage =
+          (error && error.body && error.body.message) ||
+          "Something went wrong loading record counts.";
+      }
+    } finally {
+      if (requestId === this.targetObjectRecordCountsRequestId) {
+        this.isLoadingTargetObjectRecordCounts = false;
+      }
+    }
   }
 
   get isObjectSharingSettingsLoaded() {

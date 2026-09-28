@@ -356,4 +356,103 @@ private class OI_NodeIntelligenceServiceTest {
     );
     System.assertEquals('Process Builder', processBuilder.subTypeLabel);
   }
+
+  /**
+   * Every related component must know which edge type reached it, not just its direction — the
+   * LWC needs (direction, edgeTypeKey) to decide whether a whole group can open the exact same
+   * drill-down that answers its summary count. Asserted against the fixture's three distinct
+   * edge types so a copy-paste of the wrong edge could not pass by accident.
+   */
+  @isTest
+  static void testEdgeTypeKeyIsAttachedToEachRelatedComponent() {
+    OI_NodeIntelligenceDTO dto = new OI_NodeIntelligenceService()
+      .getIntelligence('objAccount');
+
+    Map<String, OI_NodeIntelligenceDTO.Category> byCategory = new Map<String, OI_NodeIntelligenceDTO.Category>();
+    for (OI_NodeIntelligenceDTO.Category c : dto.categories) {
+      byCategory.put(c.category, c);
+    }
+
+    System.assertEquals(
+      'SalesforceMetadata.EXECUTES_ON',
+      byCategory.get('Automation').items[0].edgeTypeKey,
+      'The trigger reached this object through EXECUTES_ON, and the item must say so.'
+    );
+    System.assertEquals(
+      'SalesforceMetadata.GRANTS_ACCESS_TO',
+      byCategory.get('Security').items[0].edgeTypeKey,
+      'The permission set reached this object through GRANTS_ACCESS_TO, and the item must say so.'
+    );
+    for (
+      OI_NodeIntelligenceDTO.RelatedComponent item : byCategory.get('Code')
+        .items
+    ) {
+      System.assert(
+        item.edgeTypeKey == 'SalesforceMetadata.EXECUTES_ON' ||
+          item.edgeTypeKey == 'SalesforceMetadata.REFERENCES',
+        'Code holds both the referencing class (REFERENCES) and the dual-registered trigger (EXECUTES_ON).'
+      );
+    }
+  }
+
+  /**
+   * Status normalization must not be Flow-only: a WorkflowRule (boolean `active`) and an
+   * ApprovalProcess (tri-state `state`) both already have their raw attribute persisted by their
+   * own scanners, so the Intelligence panel must surface both through the same shared
+   * OI_ComponentStatusUtil the Flow case already relies on.
+   */
+  @isTest
+  static void testNonFlowItemsGetStatusFromTheSharedAttributeShapes() {
+    OI_Graph_Node__c activeWorkflowRule = node(
+      'wfrActive',
+      'SalesforceMetadata.WorkflowRule',
+      'Escalate_High_Value'
+    );
+    activeWorkflowRule.Attributes_Json__c = JSON.serialize(
+      new Map<String, Object>{ 'active' => true }
+    );
+    OI_Graph_Node__c obsoleteApproval = node(
+      'apObsolete',
+      'SalesforceMetadata.ApprovalProcess',
+      'Legacy_Discount_Approval'
+    );
+    obsoleteApproval.Attributes_Json__c = JSON.serialize(
+      new Map<String, Object>{ 'state' => 'Obsolete' }
+    );
+    insert new List<OI_Graph_Node__c>{ activeWorkflowRule, obsoleteApproval };
+    insert new List<OI_Graph_Edge__c>{
+      edge(
+        'e-wfr',
+        'SalesforceMetadata.EXECUTES_ON',
+        'wfrActive',
+        'objAccount'
+      ),
+      edge('e-ap', 'SalesforceMetadata.EXECUTES_ON', 'apObsolete', 'objAccount')
+    };
+
+    OI_NodeIntelligenceDTO dto = new OI_NodeIntelligenceService()
+      .getIntelligence('objAccount');
+
+    OI_NodeIntelligenceDTO.Category automation;
+    for (OI_NodeIntelligenceDTO.Category c : dto.categories) {
+      if (c.category == 'Automation') {
+        automation = c;
+      }
+    }
+    Map<String, OI_NodeIntelligenceDTO.RelatedComponent> byLabel = new Map<String, OI_NodeIntelligenceDTO.RelatedComponent>();
+    for (OI_NodeIntelligenceDTO.RelatedComponent item : automation.items) {
+      byLabel.put(item.label, item);
+    }
+
+    System.assertEquals(
+      'Active',
+      byLabel.get('Escalate_High_Value').status,
+      'A WorkflowRule\'s boolean active=true must normalize to Active, same as Flow does.'
+    );
+    System.assertEquals(
+      'Obsolete',
+      byLabel.get('Legacy_Discount_Approval').status,
+      'An ApprovalProcess\'s tri-state state must pass through verbatim.'
+    );
+  }
 }

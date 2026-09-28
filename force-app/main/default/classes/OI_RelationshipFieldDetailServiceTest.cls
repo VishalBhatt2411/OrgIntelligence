@@ -101,11 +101,6 @@ private class OI_RelationshipFieldDetailServiceTest {
     );
     System.assertEquals(1, lookup.targetObjects.size());
     System.assertEquals('User', lookup.targetObjects[0].objectApiName);
-    System.assertNotEquals(
-      null,
-      lookup.targetObjects[0].recordCount,
-      'User is always accessible/queryable, so its live count must resolve.'
-    );
 
     OI_RelationshipFieldDTO masterDetail = byApiName.get('TestObj.Parent__c');
     System.assertNotEquals(null, masterDetail);
@@ -121,8 +116,6 @@ private class OI_RelationshipFieldDetailServiceTest {
       'Master-Detail cascade-delete is a fixed platform invariant, always known.'
     );
     System.assertEquals('Account', masterDetail.targetObjects[0].objectApiName);
-
-    System.assertEquals(false, result.cardinalityTruncated);
   }
 
   @isTest
@@ -154,7 +147,6 @@ private class OI_RelationshipFieldDetailServiceTest {
       .getRelationshipFieldDetail('testObjNoRefs');
 
     System.assertEquals(0, result.fields.size());
-    System.assertEquals(false, result.cardinalityTruncated);
   }
 
   /**
@@ -195,6 +187,60 @@ private class OI_RelationshipFieldDetailServiceTest {
       2,
       result.fields[0].targetObjects.size(),
       'Account and Opportunity must both appear as their own rows, never merged into one count.'
+    );
+  }
+
+  @isTest
+  static void testGetTargetObjectRecordCountsResolvesOneCountPerDistinctObject() {
+    OI_TargetObjectRecordCountsDTO result = new OI_RelationshipFieldDetailService()
+      .getTargetObjectRecordCounts(
+        new List<String>{ 'User', 'User', 'Account' }
+      );
+
+    System.assertEquals(
+      false,
+      result.truncated,
+      'Two distinct objects is well under the cardinality bound.'
+    );
+    System.assertNotEquals(
+      null,
+      result.countsByObjectApiName.get('User'),
+      'User is always accessible/queryable, so its live count must resolve.'
+    );
+    System.assertNotEquals(
+      null,
+      result.countsByObjectApiName.get('Account'),
+      'Account is always accessible/queryable, so its live count must resolve.'
+    );
+  }
+
+  @isTest
+  static void testGetTargetObjectRecordCountsSkipsAnUnknownObjectApiNameWithoutFailingTheCall() {
+    OI_TargetObjectRecordCountsDTO result = new OI_RelationshipFieldDetailService()
+      .getTargetObjectRecordCounts(new List<String>{ 'Not_A_Real_Object__c' });
+
+    System.assertEquals(false, result.truncated);
+    System.assertEquals(
+      false,
+      result.countsByObjectApiName.containsKey('Not_A_Real_Object__c'),
+      'An object that does not resolve via global describe must be absent from the map, never a fabricated zero.'
+    );
+  }
+
+  @isTest
+  static void testGetTargetObjectRecordCountsReportsTruncatedBeyondTheCardinalityBound() {
+    List<String> manyObjectApiNames = new List<String>();
+    for (Integer i = 0; i < 60; i++) {
+      manyObjectApiNames.add('FakeObject' + i + '__c');
+    }
+
+    OI_TargetObjectRecordCountsDTO result = new OI_RelationshipFieldDetailService()
+      .getTargetObjectRecordCounts(manyObjectApiNames);
+
+    System.assertEquals(
+      true,
+      result.truncated,
+      '60 distinct requested objects exceeds MAX_TARGET_OBJECTS_FOR_CARDINALITY (50).'
     );
   }
 }

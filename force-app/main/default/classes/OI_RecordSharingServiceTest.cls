@@ -29,11 +29,11 @@ private class OI_RecordSharingServiceTest {
   }
 
   /**
-   * Salesforce inserts an implicit "Owner" share row whenever org-wide default does not already
-   * grant Edit to everyone — reliable for Opportunity specifically because a manual insert's
-   * allowed access levels are themselves OWD-dependent, which a portable unit test must not
-   * assume (CLAUDE.md §Metadata Assumptions). Using the owner-record's own guaranteed row
-   * sidesteps needing to know or match this org's OWD at all.
+   * Salesforce inserts an implicit "Owner" share row only when the org-wide default does not
+   * already grant Edit to everyone — under a Public Read/Write OWD, OpportunityShare stays empty.
+   * Rather than assume either OWD (CLAUDE.md §Metadata Assumptions), the test reads the platform's
+   * own OpportunityShare table as ground truth and asserts the service agrees with it: owner row
+   * resolved to a real Name when the platform created one, the empty-list coverage note otherwise.
    */
   @isTest
   static void testOpportunityReturnsSupportsSharingTrueWithOwnerRowAndResolvedUserLabel() {
@@ -44,6 +44,12 @@ private class OI_RecordSharingServiceTest {
       CloseDate = Date.today().addDays(30)
     );
     insert opp;
+    Boolean platformCreatedOwnerRow =
+      [
+        SELECT COUNT()
+        FROM OpportunityShare
+        WHERE OpportunityId = :opp.Id AND RowCause = 'Owner'
+      ] > 0;
 
     OI_RecordSharingDTO sharing = serviceWithFakeOrgWideDefault()
       .getRecordSharing('Opportunity', opp.Id);
@@ -53,6 +59,31 @@ private class OI_RecordSharingServiceTest {
       sharing.supportsSharing,
       'Opportunity has its own OpportunityShare table.'
     );
+    System.assertEquals(false, sharing.truncated);
+    System.assertNotEquals(
+      null,
+      sharing.orgWideDefault,
+      'The object\'s Org-Wide Default must be embedded alongside the record\'s own share rows.'
+    );
+    System.assertEquals(true, sharing.orgWideDefault.supported);
+    System.assertEquals(
+      'ReadWrite',
+      sharing.orgWideDefault.internalSharingModel
+    );
+
+    if (!platformCreatedOwnerRow) {
+      System.assert(
+        sharing.shareRows.isEmpty(),
+        'With no platform share rows (Public Read/Write OWD), the service must report none.'
+      );
+      System.assertNotEquals(
+        null,
+        sharing.coverageNote,
+        'An empty share list must carry the "nothing found" coverage note.'
+      );
+      return;
+    }
+
     System.assert(
       !sharing.shareRows.isEmpty(),
       'The owner must be represented by at least its own implicit share row.'
@@ -81,17 +112,6 @@ private class OI_RecordSharingServiceTest {
       null,
       sharing.coverageNote,
       'A non-empty share list needs no "nothing found" coverage note.'
-    );
-    System.assertEquals(false, sharing.truncated);
-    System.assertNotEquals(
-      null,
-      sharing.orgWideDefault,
-      'The object\'s Org-Wide Default must be embedded alongside the record\'s own share rows.'
-    );
-    System.assertEquals(true, sharing.orgWideDefault.supported);
-    System.assertEquals(
-      'ReadWrite',
-      sharing.orgWideDefault.internalSharingModel
     );
   }
 
@@ -210,5 +230,37 @@ private class OI_RecordSharingServiceTest {
       'More than MAX_SHARE_ROWS rows exist and must be reported as truncated, not silently capped.'
     );
     System.assertEquals(200, sharing.shareRows.size());
+  }
+
+  /**
+   * Standard system groups (e.g. "All Internal Users") are platform-seeded with a blank Name —
+   * only DeveloperName is populated — and the platform does not allow inserting a manual share
+   * row against one via DML, so the fallback is exercised directly against the extracted pure
+   * function rather than through a full getRecordSharing(...) round trip.
+   */
+  @isTest
+  static void testGroupLabelFallsBackToDeveloperNameWhenNameIsBlank() {
+    System.assertEquals(
+      'AllInternalUsers (Organization)',
+      OI_RecordSharingService.buildGroupLabel(
+        null,
+        'AllInternalUsers',
+        'Organization'
+      ),
+      'System groups ship with a blank Name; the label must fall back to DeveloperName instead of rendering the literal string "null".'
+    );
+  }
+
+  @isTest
+  static void testGroupLabelUsesNameWhenPresent() {
+    System.assertEquals(
+      'Sales Queue (Queue)',
+      OI_RecordSharingService.buildGroupLabel(
+        'Sales Queue',
+        'Sales_Queue',
+        'Queue'
+      ),
+      'A populated Name must always win over DeveloperName.'
+    );
   }
 }

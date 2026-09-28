@@ -1,0 +1,38 @@
+@import "c/oiTdStyles";
+
+.empty {
+  padding: 16px 0;
+}
+
+.scan-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  border-bottom: 1px solid var(--td-divider);
+}
+
+.scan-row-last {
+  border-bottom: none;
+}
+
+.scan-row:hover {
+  background: var(--td-hover);
+}
+
+.scan-row-active,
+.scan-row-active:hover {
+  background: var(--td-selected);
+}
+
+.score {
+  min-width: 32px;
+  text-align: right;
+}
+
+.status-chip {
+  min-width: 90px;
+  justify-content: center;
+}

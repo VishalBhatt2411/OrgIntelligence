@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI TD Scan</label>
+    <pluralLabel>OI TD Scans</pluralLabel>
+    <nameField>
+        <label>OI TD Scan Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>TDS-{0000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description
+  >One row per Tech Debt scan of the running org. Application-internal; access is gated at the Apex boundary (OI_TD_Controller).</description>
+</CustomObject>

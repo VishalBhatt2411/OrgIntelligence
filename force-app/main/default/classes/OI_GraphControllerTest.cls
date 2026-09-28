@@ -445,6 +445,35 @@ private class OI_GraphControllerTest {
   }
 
   @isTest
+  static void testGetRelationshipTargetObjectRecordCountsResolvesLiveCounts() {
+    OI_TargetObjectRecordCountsDTO result = OI_GraphController.getRelationshipTargetObjectRecordCounts(
+      new List<String>{ 'User', 'Account' }
+    );
+
+    System.assertEquals(false, result.truncated);
+    System.assertNotEquals(null, result.countsByObjectApiName.get('User'));
+    System.assertNotEquals(null, result.countsByObjectApiName.get('Account'));
+  }
+
+  @isTest
+  static void testGetRelationshipTargetObjectRecordCountsWithoutPermissionThrowsAuraHandledException() {
+    User unprivileged = createUnprivilegedTestUser();
+    System.runAs(unprivileged) {
+      try {
+        OI_GraphController.getRelationshipTargetObjectRecordCounts(
+          new List<String>{ 'Account' }
+        );
+        System.assert(
+          false,
+          'Expected AuraHandledException when OI_View_Graph is not assigned.'
+        );
+      } catch (AuraHandledException e) {
+        System.assert(true);
+      }
+    }
+  }
+
+  @isTest
   static void testGetObjectSharingSettingsReturnsTheSharingModelForAnAccessibleObject() {
     Test.setMock(
       HttpCalloutMock.class,

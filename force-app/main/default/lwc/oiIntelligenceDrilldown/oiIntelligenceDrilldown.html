@@ -132,6 +132,9 @@
                     </button>
                   </th>
                   <th scope="col">Relationship</th>
+                  <template lwc:if={showStatusColumn}>
+                    <th scope="col">Status</th>
+                  </template>
                   <template lwc:if={showDataTypeColumn}>
                     <th scope="col">Data Type</th>
                   </template>
@@ -156,6 +159,17 @@
                     <td data-label="Relationship">
                       <span class="oi-drilldown-role">{row.roleLabel}</span>
                     </td>
+                    <template lwc:if={showStatusColumn}>
+                      <td data-label="Status">
+                        <template lwc:if={row.hasStatus}>
+                          <span
+                            class={row.statusBadgeClass}
+                            data-id="drilldown-status-badge"
+                            >{row.status}</span
+                          >
+                        </template>
+                      </td>
+                    </template>
                     <template lwc:if={showDataTypeColumn}>
                       <td data-label="Data Type">{row.dataType}</td>
                     </template>

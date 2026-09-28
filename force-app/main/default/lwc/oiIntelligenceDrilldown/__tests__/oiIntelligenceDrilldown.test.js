@@ -122,6 +122,39 @@ describe("c-oi-intelligence-drilldown", () => {
     expect(tableText).not.toContain("SalesforceMetadata.");
   });
 
+  /** Status is a badge, not a plain cell — and the column itself must not appear at all for a connection type with no lifecycle-status concept (e.g. plain fields), never render as an empty "Status" column of blank cells. */
+  it("omits the Status column entirely when no row carries a status", async () => {
+    getNodeConnections.mockResolvedValue(page());
+    const element = createDrilldown();
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector('[data-id="drilldown-status-badge"]')
+    ).toBeNull();
+    const headerText = element.shadowRoot.querySelector(
+      '[data-id="drilldown-table"] thead'
+    ).textContent;
+    expect(headerText).not.toContain("Status");
+  });
+
+  it("renders a status badge for rows that carry a normalized status", async () => {
+    getNodeConnections.mockResolvedValue(
+      page({ rows: [row({ status: "Active" })], totalCount: 1 })
+    );
+    const element = createDrilldown();
+    await flushPromises();
+
+    const headerText = element.shadowRoot.querySelector(
+      '[data-id="drilldown-table"] thead'
+    ).textContent;
+    expect(headerText).toContain("Status");
+    const badge = element.shadowRoot.querySelector(
+      '[data-id="drilldown-status-badge"]'
+    );
+    expect(badge.textContent).toBe("Active");
+    expect(badge.className).toContain("is-active");
+  });
+
   it("shows a loading state while the first page is in flight", async () => {
     let resolvePromise;
     getNodeConnections.mockReturnValue(

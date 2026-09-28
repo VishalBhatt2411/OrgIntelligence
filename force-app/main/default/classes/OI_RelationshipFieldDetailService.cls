@@ -5,16 +5,17 @@
  *          are read from the exact same LOOKUP_TO/MASTER_DETAIL_TO edges the canvas already
  *          renders (low marginal value next to the graph). This service surfaces relationship
  *          *quality* data the graph does not show instead: required-ness, cascade-delete
- *          behavior where knowable, and a live per-target-object record count.
+ *          behavior where knowable, and (on explicit request) a live per-target-object record
+ *          count.
  * Responsibilities: Read this object's own HAS_FIELD members from the persisted graph (same
  *                    source OI_GraphController.getFieldSummaries already uses — never a live
- *                    Describe re-scan), filter to reference fields, classify each as Lookup or
- *                    Master-Detail from the field's own scanned 'masterDetail' attribute
- *                    (OI_FieldScanner), and attach a live, non-cacheable COUNT() per distinct
- *                    target object — the one piece of this payload that must never be scanned
- *                    data, since record counts change constantly and a scanned figure would go
- *                    stale immediately (same rationale as OI_RecordSharingService).
- * Dependencies: OI_GraphEngine, OI_RelationshipFieldDTO, OI_RelationshipFieldDetailDTO.
+ *                    Describe re-scan), filter to reference fields, and classify each as Lookup
+ *                    or Master-Detail from the field's own scanned 'masterDetail' attribute
+ *                    (OI_FieldScanner). Target-object record counts are a separate, explicit
+ *                    on-demand call (getTargetObjectRecordCounts) rather than part of this read
+ *                    — see below for why.
+ * Dependencies: OI_GraphEngine, OI_RelationshipFieldDTO, OI_RelationshipFieldDetailDTO,
+ *               OI_TargetObjectRecordCountsDTO.
  * Limitations: Outgoing relationships only — the object's own fields are what Describe/the graph
  *              scan can answer without a second, cross-object query; incoming relationships
  *              (other objects' fields that reference this one) keep their existing aggregate
@@ -23,11 +24,20 @@
  *              not built here. A Lookup field's configured delete constraint
  *              (Clear/Restrict/Cascade-on-special-lookups) is Metadata/Tooling API-only
  *              information with no Apex Describe accessor — left null, never guessed (see
- *              OI_RelationshipFieldDTO's own doc comment). Bounded at
+ *              OI_RelationshipFieldDTO's own doc comment). Record-count resolution is bounded at
  *              MAX_TARGET_OBJECTS_FOR_CARDINALITY distinct target objects per call (a
  *              polymorphic field like Task/Event's WhatId can reference dozens of objects);
- *              rows beyond that bound still appear, just without a record count, and
- *              cardinalityTruncated is set rather than the excess being silently dropped.
+ *              objects beyond that bound still appear as rows, just without a count, and
+ *              OI_TargetObjectRecordCountsDTO.truncated is set rather than the excess being
+ *              silently dropped.
+ *
+ * Why record counts moved out of getRelationshipFieldDetail (originally computed inline on
+ * every call): live-org profiling showed a wide-fanout object's Relationships section — one
+ * with many reference fields, or a polymorphic field spanning dozens of target objects —
+ * issued a COUNT() per distinct target synchronously on section expand, which was slow enough
+ * to be felt as panel lag. Splitting it into its own round-trip lets the field/type/required/
+ * cascade table (cheap — no SOQL beyond the graph read) render immediately, with counts loaded
+ * only when a user explicitly asks for them.
  */
 public with sharing class OI_RelationshipFieldDetailService {
   private static final String HAS_FIELD_EDGE_TYPE_KEY = 'SalesforceMetadata.HAS_FIELD';
@@ -40,7 +50,6 @@ public with sharing class OI_RelationshipFieldDetailService {
       .getMembersByEdgeType(objectNodeKey, HAS_FIELD_EDGE_TYPE_KEY);
 
     List<OI_RelationshipFieldDTO> rows = new List<OI_RelationshipFieldDTO>();
-    Set<String> distinctTargetObjects = new Set<String>();
     for (OI_VersionRecord fieldVersion : fieldVersions) {
       List<String> referenceTo = toStringList(
         fieldVersion.attributes.get('referenceTo')
@@ -54,7 +63,6 @@ public with sharing class OI_RelationshipFieldDetailService {
       Boolean isRequired = nillableRaw instanceof Boolean
         ? !((Boolean) nillableRaw)
         : null;
-      distinctTargetObjects.addAll(referenceTo);
       rows.add(
         new OI_RelationshipFieldDTO(
           fieldVersion.key,
@@ -63,38 +71,42 @@ public with sharing class OI_RelationshipFieldDetailService {
           isMasterDetail ? 'Master-Detail' : 'Lookup',
           isRequired,
           isMasterDetail ? 'Cascade' : null,
-          toCardinalityRows(referenceTo, new Map<String, Integer>())
+          toCardinalityRows(referenceTo)
         )
       );
     }
 
-    Boolean cardinalityTruncated =
-      distinctTargetObjects.size() > MAX_TARGET_OBJECTS_FOR_CARDINALITY;
-    Map<String, Integer> countsByObject = resolveRecordCounts(
-      distinctTargetObjects
-    );
-    for (OI_RelationshipFieldDTO row : rows) {
-      for (
-        OI_RelationshipFieldDTO.TargetObjectCardinality target : row.targetObjects
-      ) {
-        target.recordCount = countsByObject.get(target.objectApiName);
-      }
-    }
+    return new OI_RelationshipFieldDetailDTO(rows);
+  }
 
-    return new OI_RelationshipFieldDetailDTO(rows, cardinalityTruncated);
+  /**
+   * On-demand companion to getRelationshipFieldDetail above: resolves one live COUNT() per
+   * DISTINCT target object across the object's relationship fields, never one query per field —
+   * a polymorphic field's several targets, or two fields sharing a target, must not multiply
+   * query count. Called only when a user explicitly asks for record counts (see this class's
+   * own doc comment for why this is not part of the default read).
+   */
+  public OI_TargetObjectRecordCountsDTO getTargetObjectRecordCounts(
+    List<String> objectApiNames
+  ) {
+    Set<String> distinctObjectApiNames = new Set<String>(
+      objectApiNames == null ? new List<String>() : objectApiNames
+    );
+    Boolean truncated =
+      distinctObjectApiNames.size() > MAX_TARGET_OBJECTS_FOR_CARDINALITY;
+    Map<String, Integer> countsByObject = resolveRecordCounts(
+      distinctObjectApiNames
+    );
+    return new OI_TargetObjectRecordCountsDTO(countsByObject, truncated);
   }
 
   private List<OI_RelationshipFieldDTO.TargetObjectCardinality> toCardinalityRows(
-    List<String> objectApiNames,
-    Map<String, Integer> countsByObject
+    List<String> objectApiNames
   ) {
     List<OI_RelationshipFieldDTO.TargetObjectCardinality> rows = new List<OI_RelationshipFieldDTO.TargetObjectCardinality>();
     for (String objectApiName : objectApiNames) {
       rows.add(
-        new OI_RelationshipFieldDTO.TargetObjectCardinality(
-          objectApiName,
-          countsByObject.get(objectApiName)
-        )
+        new OI_RelationshipFieldDTO.TargetObjectCardinality(objectApiName)
       );
     }
     return rows;

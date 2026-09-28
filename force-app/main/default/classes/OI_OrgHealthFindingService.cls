@@ -217,20 +217,23 @@ public with sharing class OI_OrgHealthFindingService {
     Map<String, Schema.SObjectField> fieldMap = Schema.SObjectType.OI_Org_Health_Finding__c.fields.getMap();
     List<OI_FindingHistoryDTO> history = new List<OI_FindingHistoryDTO>();
     for (
-      OI_Org_Health_Finding__History historyRow : historySelector.selectByFindingId(
+      OI_FindingHistoryRowDTO historyRow : historySelector.selectByFindingId(
         findingId
       )
     ) {
       OI_FindingHistoryDTO entry = new OI_FindingHistoryDTO();
-      entry.fieldLabel = resolveHistoryFieldLabel(historyRow.Field, fieldMap);
-      entry.oldValue = historyRow.OldValue == null
+      entry.fieldLabel = resolveHistoryFieldLabel(
+        historyRow.fieldApiName,
+        fieldMap
+      );
+      entry.oldValue = historyRow.oldValue == null
         ? null
-        : String.valueOf(historyRow.OldValue);
-      entry.newValue = historyRow.NewValue == null
+        : String.valueOf(historyRow.oldValue);
+      entry.newValue = historyRow.newValue == null
         ? null
-        : String.valueOf(historyRow.NewValue);
-      entry.changedDate = historyRow.CreatedDate;
-      entry.changedByName = historyRow.CreatedBy?.Name;
+        : String.valueOf(historyRow.newValue);
+      entry.changedDate = historyRow.changedDate;
+      entry.changedByName = historyRow.changedByName;
       history.add(entry);
     }
     return history;

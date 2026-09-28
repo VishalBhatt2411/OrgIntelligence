@@ -3,6 +3,7 @@ import OiNodeDetailPanel from "c/oiNodeDetailPanel";
 import getNodeDetail from "@salesforce/apex/OI_GraphController.getNodeDetail";
 import getFieldSummaries from "@salesforce/apex/OI_GraphController.getFieldSummaries";
 import getRelationshipFieldDetail from "@salesforce/apex/OI_GraphController.getRelationshipFieldDetail";
+import getRelationshipTargetObjectRecordCounts from "@salesforce/apex/OI_GraphController.getRelationshipTargetObjectRecordCounts";
 import getObjectSharingSettings from "@salesforce/apex/OI_GraphController.getObjectSharingSettings";
 import getRecordFragment from "@salesforce/apex/OI_RecordHierarchyController.getRecordFragment";
 import getRecordSharing from "@salesforce/apex/OI_RecordHierarchyController.getRecordSharing";
@@ -21,6 +22,11 @@ jest.mock(
 );
 jest.mock(
   "@salesforce/apex/OI_GraphController.getRelationshipFieldDetail",
+  () => ({ default: jest.fn() }),
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/OI_GraphController.getRelationshipTargetObjectRecordCounts",
   () => ({ default: jest.fn() }),
   { virtual: true }
 );
@@ -114,6 +120,7 @@ describe("c-oi-node-detail-panel", () => {
     getRecordFragment.mockReset();
     getRecordSharing.mockReset();
     getRelationshipFieldDetail.mockReset();
+    getRelationshipTargetObjectRecordCounts.mockReset();
     getObjectSharingSettings.mockReset();
     getImpact.mockReset();
     getNodeIntelligence.mockReset();
@@ -693,6 +700,163 @@ describe("c-oi-node-detail-panel", () => {
           automationSection.querySelector(
             '[data-id="intelligence-status-badge"]'
           )
+        ).toBeNull();
+      });
+
+      it("opens the drill-down for a type group whose items all share one direction and edge type", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(
+          intelligence({
+            categories: [
+              {
+                category: "Automation",
+                items: [
+                  {
+                    nodeKey: "flow1",
+                    label: "Account_After_Save",
+                    typeKey: "SalesforceMetadata.Flow",
+                    typeLabel: "Flow",
+                    direction: "incoming",
+                    edgeTypeKey: "SalesforceMetadata.EXECUTES_ON",
+                    status: "Active",
+                    subTypeKey: "SalesforceMetadata.Flow",
+                    subTypeLabel: "Flow"
+                  },
+                  {
+                    nodeKey: "flow2",
+                    label: "Old_Discount_Process",
+                    typeKey: "SalesforceMetadata.Flow",
+                    typeLabel: "Flow",
+                    direction: "incoming",
+                    edgeTypeKey: "SalesforceMetadata.EXECUTES_ON",
+                    status: "Inactive",
+                    subTypeKey: "SalesforceMetadata.Flow",
+                    subTypeLabel: "Flow"
+                  }
+                ],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Code",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Security",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              }
+            ]
+          })
+        );
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Automation");
+
+        expect(
+          element.shadowRoot.querySelector('[data-id="drilldown-host"]')
+        ).toBeNull();
+
+        const automationSection = element.shadowRoot.querySelector(
+          '[data-category="Automation"]'
+        );
+        automationSection
+          .querySelector('[data-id="intelligence-type-group-toggle"]')
+          .click();
+        await flushPromises();
+
+        const host = element.shadowRoot.querySelector(
+          '[data-id="drilldown-host"]'
+        );
+        expect(host).not.toBeNull();
+        expect(host.direction).toBe("incoming");
+        expect(host.edgeTypeKey).toBe("SalesforceMetadata.EXECUTES_ON");
+        expect(host.relationshipLabel).toBe("Flow");
+        /** A drill-down-eligible group opens the modal instead of the inline expand fallback — its items never render inline underneath the collapsed header. */
+        expect(automationSection.textContent).not.toContain(
+          "Account_After_Save"
+        );
+      });
+
+      it("falls back to the inline expand/collapse when a type group's items were reached through different directions or edge types", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(
+          intelligence({
+            categories: [
+              {
+                category: "Automation",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Code",
+                items: [
+                  {
+                    nodeKey: "cls1",
+                    label: "AccountService",
+                    typeKey: "SalesforceMetadata.ApexClass",
+                    typeLabel: "Apex Class",
+                    direction: "incoming",
+                    edgeTypeKey: "SalesforceMetadata.REFERENCES",
+                    subTypeKey: "SalesforceMetadata.ApexClass",
+                    subTypeLabel: "Apex Class"
+                  },
+                  {
+                    nodeKey: "cls2",
+                    label: "AccountHelper",
+                    typeKey: "SalesforceMetadata.ApexClass",
+                    typeLabel: "Apex Class",
+                    direction: "outgoing",
+                    edgeTypeKey: "SalesforceMetadata.EXECUTES_ON",
+                    subTypeKey: "SalesforceMetadata.ApexClass",
+                    subTypeLabel: "Apex Class"
+                  }
+                ],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Security",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              }
+            ]
+          })
+        );
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Code");
+
+        const codeSection = element.shadowRoot.querySelector(
+          '[data-category="Code"]'
+        );
+        const toggle = codeSection.querySelector(
+          '[data-id="intelligence-type-group-toggle"]'
+        );
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+        expect(codeSection.textContent).not.toContain("AccountService");
+
+        toggle.click();
+        await flushPromises();
+
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+        expect(codeSection.textContent).toContain("AccountService");
+        expect(codeSection.textContent).toContain("AccountHelper");
+        expect(
+          element.shadowRoot.querySelector('[data-id="drilldown-host"]')
         ).toBeNull();
       });
     });
@@ -1485,10 +1649,13 @@ describe("c-oi-node-detail-panel", () => {
           relationshipType: "Lookup",
           isRequired: false,
           cascadeDeleteBehavior: null,
-          targetObjects: [{ objectApiName: "User", recordCount: 42 }]
+          targetObjects: [{ objectApiName: "User", recordCount: null }]
         }
-      ],
-      cardinalityTruncated: false
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockResolvedValue({
+      countsByObjectApiName: { User: 42 },
+      truncated: false
     });
     const element = createElement("c-oi-node-detail-panel", {
       is: OiNodeDetailPanel
@@ -1544,6 +1711,19 @@ describe("c-oi-node-detail-panel", () => {
     expect(relationshipFieldTable).not.toBeNull();
     expect(relationshipFieldTable.textContent).toContain("Owner");
     expect(relationshipFieldTable.textContent).toContain("Lookup");
+    /** Record counts are on-demand (see the "Load record counts" tests below) — before that explicit action, the target object appears without any count at all, never a stale/fabricated one. */
+    expect(relationshipFieldTable.textContent).toContain("User");
+    expect(relationshipFieldTable.textContent).not.toContain("records)");
+    expect(getRelationshipTargetObjectRecordCounts).not.toHaveBeenCalled();
+
+    structural
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+
+    expect(getRelationshipTargetObjectRecordCounts).toHaveBeenCalledWith({
+      objectApiNames: ["User"]
+    });
     expect(relationshipFieldTable.textContent).toContain("User (42 records)");
 
     /** Raw attributes now live behind Technical Details, collapsed by default — the data is preserved, only its prominence changed. */
@@ -1598,7 +1778,7 @@ describe("c-oi-node-detail-panel", () => {
       )
     ).not.toBeNull();
 
-    resolveDetail({ fields: [], cardinalityTruncated: false });
+    resolveDetail({ fields: [] });
     await flushPromises();
 
     expect(
@@ -1644,8 +1824,7 @@ describe("c-oi-node-detail-panel", () => {
     ).not.toBeNull();
 
     getRelationshipFieldDetail.mockResolvedValue({
-      fields: [],
-      cardinalityTruncated: false
+      fields: []
     });
     errorBanner.dispatchEvent(new CustomEvent("retry"));
     await flushPromises();
@@ -1662,7 +1841,7 @@ describe("c-oi-node-detail-panel", () => {
     ).not.toBeNull();
   });
 
-  it("shows a truncated note when cardinalityTruncated is true, without dropping the rows that were returned", async () => {
+  it("shows a truncated note when the on-demand record-count load reports truncated, and an honest 'count unavailable' for a target that did not resolve", async () => {
     getNodeDetail.mockResolvedValue({
       nodeKey: "taskObj",
       typeKey: "SalesforceMetadata.CustomObject",
@@ -1683,12 +1862,15 @@ describe("c-oi-node-detail-panel", () => {
           isRequired: false,
           cascadeDeleteBehavior: null,
           targetObjects: [
-            { objectApiName: "Account", recordCount: 10 },
+            { objectApiName: "Account", recordCount: null },
             { objectApiName: "Opportunity", recordCount: null }
           ]
         }
-      ],
-      cardinalityTruncated: true
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockResolvedValue({
+      countsByObjectApiName: { Account: 10 },
+      truncated: true
     });
     const element = createElement("c-oi-node-detail-panel", {
       is: OiNodeDetailPanel
@@ -1696,6 +1878,10 @@ describe("c-oi-node-detail-panel", () => {
     document.body.appendChild(element);
 
     element.nodeKey = "taskObj";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
     await flushPromises();
 
     expect(
@@ -1708,6 +1894,75 @@ describe("c-oi-node-detail-panel", () => {
     );
     expect(table.textContent).toContain("Account (10 records)");
     expect(table.textContent).toContain("Opportunity (count unavailable)");
+  });
+
+  it("renders a retryable error banner when getRelationshipTargetObjectRecordCounts fails, without discarding the already-loaded field rows", async () => {
+    getNodeDetail.mockResolvedValue({
+      nodeKey: "acct",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Account",
+      secondaryKey: "Account",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    getRelationshipFieldDetail.mockResolvedValue({
+      fields: [
+        {
+          fieldNodeKey: "acctField.OwnerId",
+          label: "Owner",
+          apiName: "Account.OwnerId",
+          relationshipType: "Lookup",
+          isRequired: false,
+          cascadeDeleteBehavior: null,
+          targetObjects: [{ objectApiName: "User", recordCount: null }]
+        }
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockRejectedValue({
+      body: { message: "Something went wrong loading record counts." }
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "acct";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+
+    const errorBanner = element.shadowRoot.querySelector(
+      '[data-id="target-object-record-counts-error"]'
+    );
+    expect(errorBanner).not.toBeNull();
+    expect(errorBanner.message).toBe(
+      "Something went wrong loading record counts."
+    );
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("Owner");
+
+    getRelationshipTargetObjectRecordCounts.mockResolvedValue({
+      countsByObjectApiName: { User: 7 },
+      truncated: false
+    });
+    errorBanner.dispatchEvent(new CustomEvent("retry"));
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="target-object-record-counts-error"]'
+      )
+    ).toBeNull();
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("User (7 records)");
   });
 
   it("clears relationship field detail when the selected object changes, so a previous object's fields never bleed into the newly-selected one", async () => {
@@ -1730,10 +1985,13 @@ describe("c-oi-node-detail-panel", () => {
           relationshipType: "Lookup",
           isRequired: false,
           cascadeDeleteBehavior: null,
-          targetObjects: [{ objectApiName: "Account", recordCount: 5 }]
+          targetObjects: [{ objectApiName: "Account", recordCount: null }]
         }
-      ],
-      cardinalityTruncated: false
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockResolvedValueOnce({
+      countsByObjectApiName: { Account: 5 },
+      truncated: false
     });
     const element = createElement("c-oi-node-detail-panel", {
       is: OiNodeDetailPanel
@@ -1746,6 +2004,14 @@ describe("c-oi-node-detail-panel", () => {
       element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
         .textContent
     ).toContain("Ref");
+    element.shadowRoot
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("Account (5 records)");
 
     getNodeDetail.mockResolvedValueOnce({
       nodeKey: "objB",
@@ -1758,8 +2024,7 @@ describe("c-oi-node-detail-panel", () => {
       directConnectionCount: 0
     });
     getRelationshipFieldDetail.mockResolvedValueOnce({
-      fields: [],
-      cardinalityTruncated: false
+      fields: []
     });
     element.nodeKey = "objB";
     await flushPromises();
@@ -2860,15 +3125,13 @@ describe("c-oi-node-detail-panel", () => {
     });
 
     it("clears sharing settings when the selected object changes, so a previous object's OWD never bleeds into the newly-selected one", async () => {
-      getNodeDetail
-        .mockResolvedValueOnce(objectDetail())
-        .mockResolvedValueOnce(
-          objectDetail({
-            nodeKey: "contact",
-            label: "Contact",
-            secondaryKey: "Contact"
-          })
-        );
+      getNodeDetail.mockResolvedValueOnce(objectDetail()).mockResolvedValueOnce(
+        objectDetail({
+          nodeKey: "contact",
+          label: "Contact",
+          secondaryKey: "Contact"
+        })
+      );
       getObjectSharingSettings.mockResolvedValueOnce({
         supported: true,
         unavailableReason: null,

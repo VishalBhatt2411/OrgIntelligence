@@ -8,8 +8,15 @@ private class OI_FieldScannerTest {
   @isTest
   static void testAccountNameFieldHasCorrectParentAndHasFieldRelationship() {
     OI_FieldScanner scanner = new OI_FieldScanner();
+    /** Scoped to just Account — this test only asserts on Account.Name, so there's no need to pay the CPU cost of describing every object in the org (this org's total object count, shared with an unrelated project, now pushes an unscoped scan() over the synchronous Apex CPU time limit; confirmed by reproducing the failure with an unscoped context). The unscoped/full-org code path has its own coverage elsewhere (integration-level scan tests). */
     OI_DiscoveryBatch batch = scanner.scan(
-      new OI_ScanContext(null, 100, null, 'Describe')
+      new OI_ScanContext(
+        null,
+        100,
+        null,
+        'Describe',
+        new Set<String>{ 'Account' }
+      )
     );
 
     System.assertEquals('CustomField', batch.componentKind);

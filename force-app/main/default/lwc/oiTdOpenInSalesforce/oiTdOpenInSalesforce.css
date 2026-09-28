@@ -1,0 +1,5 @@
+@import "c/oiTdStyles";
+
+:host {
+  display: inline-flex;
+}

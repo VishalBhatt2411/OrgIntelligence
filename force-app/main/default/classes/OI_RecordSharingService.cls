@@ -223,15 +223,31 @@ public with sharing class OI_RecordSharingService {
     }
     if (!groupIds.isEmpty()) {
       for (Group g : [
-        SELECT Id, Name, Type
+        SELECT Id, Name, DeveloperName, Type
         FROM Group
         WHERE Id IN :groupIds
         WITH USER_MODE
       ]) {
-        labelById.put(g.Id, g.Name + ' (' + g.Type + ')');
+        labelById.put(g.Id, buildGroupLabel(g.Name, g.DeveloperName, g.Type));
       }
     }
     return labelById;
+  }
+
+  /**
+   * Standard system groups (e.g. "All Internal Users") ship with Name left blank by the
+   * platform — only DeveloperName is populated. Falling back avoids rendering "null (...)".
+   * Extracted as a pure function so the fallback is unit-testable without inserting a share
+   * row against a real system group, which the platform does not allow via DML.
+   */
+  @TestVisible
+  private static String buildGroupLabel(
+    String groupName,
+    String developerName,
+    String groupType
+  ) {
+    String label = String.isNotBlank(groupName) ? groupName : developerName;
+    return label + ' (' + groupType + ')';
   }
 
   /**

@@ -1,0 +1,343 @@
+<template>
+  <template lwc:if={isLoading}>
+    <p class="body1 p4">Loading...</p>
+  </template>
+  <template lwc:elseif={noHealth}>
+    <p class="body1 p4">No health data yet.</p>
+  </template>
+  <div lwc:else class="page">
+    <div class="row-between overview-head">
+      <p class="h6">Overview</p>
+      <div class="export-wrap">
+        <button
+          class="btn btn-outlined btn-small"
+          onclick={toggleExport}
+          disabled={exporting}
+        >
+          <template lwc:if={exporting}
+            ><span class="spinner spinner-16 export-spin"></span
+          ></template>
+          Export Report
+        </button>
+        <template lwc:if={exportOpen}>
+          <div class="menu-scrim" onclick={closeExport}></div>
+          <div class="menu export-menu" role="menu">
+            <button class="menu-item" role="menuitem" onclick={handlePdf}>
+              Download as PDF
+            </button>
+            <button class="menu-item" role="menuitem" onclick={handleExcel}>
+              Download as Excel
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="grid12">
+      <!-- Org health score -->
+      <div class="col-4">
+        <div class="paper p3 card-320 health-card">
+          <div class="row-between">
+            <p class="subtitle1">Org health score</p>
+            <span class="pill" style={pill.style}>{pill.label}</span>
+          </div>
+          <div class="gauge-box">
+            <svg class="gauge" viewBox="0 0 200 128" aria-hidden="true">
+              <path
+                d="M 20 110 A 80 80 0 0 1 180 110"
+                fill="none"
+                stroke="#E9EDF2"
+                stroke-width="16"
+                stroke-linecap="round"
+              ></path>
+              <path
+                d="M 20 110 A 80 80 0 0 1 180 110"
+                fill="none"
+                stroke={gaugeColor}
+                stroke-width="16"
+                stroke-linecap="round"
+                stroke-dasharray={gaugeDash}
+              ></path>
+              <text
+                x="100"
+                y="102"
+                text-anchor="middle"
+                class="gauge-text"
+                font-size="46"
+                font-weight="500"
+                fill="#11151B"
+              >
+                {overall}
+              </text>
+            </svg>
+          </div>
+          <p class="body2 muted center out-of">{outOfText}</p>
+          <hr class="divider health-divider" />
+          <div class="stack-1">
+            <template lwc:if={weakest}>
+              <div class="row-between">
+                <span class="body2 muted">Weakest category</span>
+                <span class="body2">{weakest}</span>
+              </div>
+            </template>
+            <template lwc:if={strongest}>
+              <div class="row-between">
+                <span class="body2 muted">Strongest</span>
+                <span class="body2">{strongest}</span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Findings by severity -->
+      <div class="col-8">
+        <div class="paper p3 card-320 sev-card">
+          <p class="subtitle1 gutter">Findings by Severity</p>
+          <template lwc:if={hasSeverity}>
+            <div class="sev-body">
+              <div class="sev-legend">
+                <template for:each={severityLegend} for:item="d">
+                  <div
+                    key={d.name}
+                    class="row sev-legend-row"
+                    data-name={d.name}
+                    onclick={handleSeverityNav}
+                  >
+                    <span class="legend-dot-10" style={d.dotStyle}></span>
+                    <span class="body2 capitalize grow">{d.name}</span>
+                    <span class="body2 bold">{d.value}</span>
+                  </div>
+                </template>
+              </div>
+              <div class="donut-box">
+                <svg class="donut" width="100%" height="100%">
+                  <svg x="50%" y="50%" overflow="visible">
+                    <template for:each={slices} for:item="s">
+                      <g key={s.name}>
+                        <path d={s.line} stroke="#D8DEE7" fill="none"></path>
+                        <path
+                          class="slice"
+                          d={s.path}
+                          fill={s.fill}
+                          stroke="#fff"
+                          fill-rule="evenodd"
+                          data-name={s.name}
+                          onclick={handleSeverityNav}
+                          onmousemove={handleSliceMove}
+                          onmouseleave={handleSliceLeave}
+                        ></path>
+                        <text
+                          x={s.lx}
+                          y={s.ly}
+                          text-anchor={s.anchor}
+                          dominant-baseline="central"
+                          font-size="13"
+                          font-weight="700"
+                          fill="#11151B"
+                        >
+                          {s.value}
+                        </text>
+                      </g>
+                    </template>
+                  </svg>
+                </svg>
+                <div class="donut-center">
+                  <p class="h5 bold donut-count">{openCount}</p>
+                  <span class="caption muted">open</span>
+                </div>
+                <template lwc:if={showPieTip}>
+                  <div class="chart-tip" style={pieTipStyle}>
+                    <span class="pie-tip-text" style={pieTipColor}
+                      >{pieTipText}</span
+                    >
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <template lwc:else>
+            <p class="body1 muted sev-empty">
+              No open findings — nice and clean.
+            </p>
+          </template>
+        </div>
+      </div>
+
+      <!-- Since last scan -->
+      <template lwc:if={hasDiff}>
+        <div class="col-4">
+          <div class="paper p3 full-h">
+            <p class="subtitle1 gutter">Since Last Scan</p>
+            <div class="row diff-chips">
+              <span
+                class={newChipClass}
+                role="button"
+                tabindex="0"
+                onclick={toggleNew}
+                >{newChipLabel}</span
+              >
+              <span
+                class={resolvedChipClass}
+                role="button"
+                tabindex="0"
+                onclick={toggleResolved}
+                >{resolvedChipLabel}</span
+              >
+            </div>
+            <template lwc:if={showDiffList}>
+              <div class="diff-list">
+                <template for:each={diffList} for:item="f">
+                  <div key={f.id} class="row diff-item">
+                    <span class={f.chipClass}>{f.severity}</span>
+                    <span class="body2 nowrap">{f.title}</span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Health score trend -->
+      <template lwc:if={showTrend}>
+        <div class="col-8">
+          <div class="paper p3 full-h">
+            <p class="subtitle1 gutter">Health Score Trend</p>
+            <div class="trend-box">
+              <svg
+                class="trend"
+                viewBox={trendViewBox}
+                width="100%"
+                height="180"
+                preserveAspectRatio="none"
+                onmousemove={handleTrendMove}
+                onmouseleave={handleTrendLeave}
+              >
+                <template for:each={yTicks} for:item="t">
+                  <g key={t.v}>
+                    <line
+                      x1={t.x1}
+                      x2={t.x2}
+                      y1={t.y}
+                      y2={t.y}
+                      stroke="#E9EDF2"
+                      stroke-dasharray="3 3"
+                    ></line>
+                    <text
+                      x={t.tx}
+                      y={t.y}
+                      dy="0.355em"
+                      text-anchor="end"
+                      font-size="12"
+                      fill="#5E6878"
+                    >
+                      {t.v}
+                    </text>
+                  </g>
+                </template>
+                <line
+                  x1={xAxis.x1}
+                  x2={xAxis.x2}
+                  y1={xAxis.y}
+                  y2={xAxis.y}
+                  stroke="#D8DEE7"
+                ></line>
+                <template for:each={xTicks} for:item="t">
+                  <g key={t.key}>
+                    <line
+                      x1={t.x}
+                      x2={t.x}
+                      y1={t.y1}
+                      y2={t.y2}
+                      stroke="#666"
+                    ></line>
+                    <text
+                      x={t.x}
+                      y={t.ty}
+                      dy="0.71em"
+                      text-anchor="middle"
+                      font-size="12"
+                      fill="#5E6878"
+                    >
+                      {t.label}
+                    </text>
+                  </g>
+                </template>
+                <template lwc:if={trendCursor}>
+                  <line
+                    x1={trendCursor.x}
+                    x2={trendCursor.x}
+                    y1={trendCursor.y1}
+                    y2={trendCursor.y2}
+                    stroke="#ccc"
+                  ></line>
+                </template>
+                <path
+                  d={trendPath}
+                  fill="none"
+                  stroke={trendColor}
+                  stroke-width="2.5"
+                ></path>
+                <template for:each={trendPoints} for:item="p">
+                  <circle
+                    key={p.key}
+                    cx={p.x}
+                    cy={p.y}
+                    r="3"
+                    fill="#fff"
+                    stroke={trendColor}
+                    stroke-width="2.5"
+                  ></circle>
+                </template>
+              </svg>
+              <template lwc:if={showTrendTip}>
+                <div class="paper-tip" style={trendTipStyle}>
+                  <span class="caption muted block">{trendTipDate}</span>
+                  <span class="body2 bold">{trendTipValue}</span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="col-12 details-head">
+        <p class="h6">Details</p>
+      </div>
+
+      <!-- Category scores -->
+      <div class="col-12">
+        <div class="paper p3">
+          <div class="cat-head">
+            <p class="subtitle1 gutter">Category Scores</p>
+            <div class="row cat-legend">
+              <template for:each={categoryLegend} for:item="s">
+                <span key={s.key} class="row cat-legend-item">
+                  <span class="legend-dot-8" style={s.dotStyle}></span>
+                  <span class="caption muted">{s.label}</span>
+                </span>
+              </template>
+            </div>
+          </div>
+          <div class="cat-list">
+            <template for:each={categoryRows} for:item="c">
+              <div
+                key={c.rawCategory}
+                class={c.rowClass}
+                data-category={c.rawCategory}
+                onclick={handleCategoryNav}
+              >
+                <span class="body2">{c.category}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style={c.barStyle}></div>
+                </div>
+                <span class="body2 semibold right tabular">{c.score}</span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

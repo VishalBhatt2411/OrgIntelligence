@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>OI TD Scan Data</label>
+    <pluralLabel>OI TD Scan Data</pluralLabel>
+    <nameField>
+        <label>OI TD Scan Data Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>TDD-{0000000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <visibility>Public</visibility>
+    <description
+  >Chunked JSON payloads captured by a Tech Debt scan (component inventory, usage, dependencies). Stored as large chunks to stay within Developer Edition data storage.</description>
+</CustomObject>

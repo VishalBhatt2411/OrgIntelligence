@@ -28,12 +28,14 @@
  * Trigger is both an automation trigger point and a piece of Apex code); it is listed once per
  * category it is registered for, never merged into a single section.
  *
- * Flow items additionally carry a status/subType split (Active/Draft/Obsolete; Flow vs. Process
- * Builder) read from the node's own attributes — see enrichFlowItems. This is a small, named
- * exception to "no Salesforce type knowledge here" for exactly the reason this class exists at
- * all: distinguishing a Flow from a Process Builder is domain knowledge an admin needs and the
- * Graph Engine must never learn (ADR-0013), so it belongs here, not in a generic registry field
- * that would otherwise need one bespoke value-mapping mechanism for a single type.
+ * Every item additionally carries a lifecycle status (Active/Inactive, or a tri-state
+ * Active/Inactive/Obsolete for ApprovalProcess) read from the node's own attributes through the
+ * shared OI_ComponentStatusUtil — see enrichItemAttributes. Flow items further carry a subType
+ * split (Flow vs. Process Builder), which stays a small, named exception to "no Salesforce type
+ * knowledge here" for exactly the reason this class exists at all: distinguishing a Flow from a
+ * Process Builder is domain knowledge an admin needs and the Graph Engine must never learn
+ * (ADR-0013), so it belongs here, not in a generic registry field that would otherwise need one
+ * bespoke value-mapping mechanism for a single type.
  *
  * Limitations: 1 hop only, by design — these sections answer "what directly touches this?",
  *              which is a different question from Impact Analysis's multi-hop blast radius and
@@ -72,9 +74,9 @@ public inherited sharing class OI_NodeIntelligenceService {
    * different statements to an admin and an empty list alone cannot distinguish them.
    */
   private static final Map<String, String> COVERAGE_NOTE_BY_CATEGORY = new Map<String, String>{
-    CATEGORY_AUTOMATION => 'Detected: the object each Apex trigger and record-triggered Flow fires on. Not detected: what a Flow reads or updates internally, or Validation Rule logic.',
+    CATEGORY_AUTOMATION => 'Detected: the object each Apex trigger, record-triggered Flow, Workflow Rule, Validation Rule, and Approval Process fires on/validates/applies to, each Workflow Rule\'s Email Alert actions, and whether each Workflow Rule, Validation Rule, or Approval Process is active. Not detected: what a Flow reads or updates internally, which specific fields a Validation Rule\'s formula references (see the Field dependency section for that), a Workflow Rule\'s field-update/task/outbound-message actions, an Email Alert\'s recipients or template, or an Approval Process\'s entry criteria, steps, and approvers.',
     CATEGORY_CODE => 'Detected: Apex class and trigger references matched by name against source. Not detected: dynamic Apex (Type.forName) or interface indirection.',
-    CATEGORY_SECURITY => 'Detected: object-level and Apex-class grants from permission sets. Not detected: field-level grants, or grants from profiles.'
+    CATEGORY_SECURITY => 'Detected: object-level and Apex-class grants from permission sets, and the object each Sharing Rule extends access to. Not detected: field-level grants, grants from profiles, or a Sharing Rule\'s criteria/owner rule and recipient groups.'
   };
 
   private final OI_GraphEngine graphEngine;
@@ -127,7 +129,7 @@ public inherited sharing class OI_NodeIntelligenceService {
       itemsByCategory,
       truncatedByCategory
     );
-    enrichFlowItems(itemsByCategory);
+    enrichItemAttributes(itemsByCategory);
 
     List<OI_NodeIntelligenceDTO.Category> categories = new List<OI_NodeIntelligenceDTO.Category>();
     for (String category : SECTION_CATEGORIES) {
@@ -169,6 +171,10 @@ public inherited sharing class OI_NodeIntelligenceService {
       1,
       MAX_NEIGHBOURS
     );
+    Map<String, String> edgeTypeKeyByNeighbourKey = buildEdgeTypeKeyByNeighbour(
+      fragment.edges,
+      nodeKey
+    );
     for (OI_NodeSummary summary : fragment.nodes) {
       if (summary.nodeKey == nodeKey) {
         continue;
@@ -194,17 +200,17 @@ public inherited sharing class OI_NodeIntelligenceService {
           truncatedByCategory.put(descriptor.category, true);
           continue;
         }
-        bucket.add(
-          new OI_NodeIntelligenceDTO.RelatedComponent(
-            summary.nodeKey,
-            summary.label,
-            summary.typeKey,
-            descriptor.displayLabel == null
-              ? summary.typeKey
-              : descriptor.displayLabel,
-            userFacingDirection
-          )
+        OI_NodeIntelligenceDTO.RelatedComponent component = new OI_NodeIntelligenceDTO.RelatedComponent(
+          summary.nodeKey,
+          summary.label,
+          summary.typeKey,
+          descriptor.displayLabel == null
+            ? summary.typeKey
+            : descriptor.displayLabel,
+          userFacingDirection
         );
+        component.edgeTypeKey = edgeTypeKeyByNeighbourKey.get(summary.nodeKey);
+        bucket.add(component);
       }
     }
     if (fragment.hasMore == true) {
@@ -225,6 +231,34 @@ public inherited sharing class OI_NodeIntelligenceService {
       }
     }
     return false;
+  }
+
+  /**
+   * Maps each neighbour reached in this traversal to the edge type that reached it — the other
+   * end of whichever edge touches the anchor nodeKey. A neighbour reachable through more than one
+   * edge type keeps the first one encountered, the same "first reaches it, wins" rule
+   * collectNeighbours already applies to bucket membership itself.
+   */
+  private Map<String, String> buildEdgeTypeKeyByNeighbour(
+    List<OI_EdgeSummary> edges,
+    String nodeKey
+  ) {
+    Map<String, String> edgeTypeKeyByNeighbour = new Map<String, String>();
+    for (OI_EdgeSummary edgeSummary : edges) {
+      String neighbourKey = null;
+      if (edgeSummary.sourceNodeKey == nodeKey) {
+        neighbourKey = edgeSummary.targetNodeKey;
+      } else if (edgeSummary.targetNodeKey == nodeKey) {
+        neighbourKey = edgeSummary.sourceNodeKey;
+      }
+      if (
+        neighbourKey != null &&
+        !edgeTypeKeyByNeighbour.containsKey(neighbourKey)
+      ) {
+        edgeTypeKeyByNeighbour.put(neighbourKey, edgeSummary.typeKey);
+      }
+    }
+    return edgeTypeKeyByNeighbour;
   }
 
   /**
@@ -258,49 +292,49 @@ public inherited sharing class OI_NodeIntelligenceService {
   }
 
   /**
-   * Splits the Automation category's Flow items into Flow vs. Process Builder and attaches an
-   * Active/Draft/Obsolete status badge to each — both read from attributes FlowScanner already
-   * persists (processType, isActive), never a second scan or a live org read. Runs once, after
-   * both traversal directions have populated itemsByCategory, over the union of Flow nodeKeys
-   * actually collected (never the whole neighbourhood) to keep this a single small bulk query.
+   * Attaches each item's lifecycle status through the shared OI_ComponentStatusUtil (so the same
+   * component reports the same status here and in the connections drill-down), and, for Flow
+   * items only, the Flow-vs-Process-Builder subType split — all read from attributes the scanners
+   * already persist (isActive/active/state, processType), never a second scan or a live org read.
+   * Runs once, after both traversal directions have populated itemsByCategory, over the union of
+   * every collected nodeKey (never the whole neighbourhood) to keep this a single small bulk
+   * query.
    */
-  private void enrichFlowItems(
+  private void enrichItemAttributes(
     Map<String, List<OI_NodeIntelligenceDTO.RelatedComponent>> itemsByCategory
   ) {
-    List<OI_NodeIntelligenceDTO.RelatedComponent> flowItems = new List<OI_NodeIntelligenceDTO.RelatedComponent>();
-    Set<String> flowNodeKeys = new Set<String>();
+    List<OI_NodeIntelligenceDTO.RelatedComponent> allItems = new List<OI_NodeIntelligenceDTO.RelatedComponent>();
+    Set<String> allNodeKeys = new Set<String>();
     for (
       List<OI_NodeIntelligenceDTO.RelatedComponent> bucket : itemsByCategory.values()
     ) {
       for (OI_NodeIntelligenceDTO.RelatedComponent item : bucket) {
-        if (item.typeKey == FLOW_TYPE_KEY) {
-          flowItems.add(item);
-          flowNodeKeys.add(item.nodeKey);
-        }
+        allItems.add(item);
+        allNodeKeys.add(item.nodeKey);
       }
     }
-    if (flowItems.isEmpty()) {
+    if (allItems.isEmpty()) {
       return;
     }
     Map<String, Map<String, Object>> attributesByNodeKey = new Map<String, Map<String, Object>>();
     for (
       OI_Graph_Node__c node : new OI_NodeSelector()
-        .selectCurrentByKeys(flowNodeKeys)
+        .selectCurrentByKeys(allNodeKeys)
     ) {
       attributesByNodeKey.put(
         node.Node_Key__c,
         OI_JsonUtil.toMap(node.Attributes_Json__c)
       );
     }
-    for (OI_NodeIntelligenceDTO.RelatedComponent item : flowItems) {
+    for (OI_NodeIntelligenceDTO.RelatedComponent item : allItems) {
       Map<String, Object> attributes = attributesByNodeKey.get(item.nodeKey);
       if (attributes == null) {
         continue;
       }
-      Boolean isActive = (Boolean) attributes.get('isActive');
-      item.status = isActive == null
-        ? null
-        : (isActive ? 'Active' : 'Inactive');
+      item.status = OI_ComponentStatusUtil.normalizeStatus(attributes);
+      if (item.typeKey != FLOW_TYPE_KEY) {
+        continue;
+      }
       String processType = (String) attributes.get('processType');
       if (processType == PROCESS_BUILDER_PROCESS_TYPE) {
         item.subTypeKey = PROCESS_BUILDER_SUBTYPE_KEY;

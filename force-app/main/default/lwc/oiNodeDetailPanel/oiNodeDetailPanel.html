@@ -393,7 +393,33 @@
                         </template>
                       </tbody>
                     </table>
-                    <template lwc:if={relationshipFieldDetailTruncated}>
+                    <template lwc:if={canLoadTargetObjectRecordCounts}>
+                      <button
+                        type="button"
+                        class="oi-node-detail-panel-show-fields-button"
+                        data-id="load-target-object-record-counts-button"
+                        title="Fetch a live record count for every target object above"
+                        onclick={handleLoadTargetObjectRecordCounts}
+                      >
+                        Load record counts
+                      </button>
+                    </template>
+                    <template lwc:if={isLoadingTargetObjectRecordCounts}>
+                      <c-oi-skeleton
+                        lines="1"
+                        label="Loading record counts"
+                      ></c-oi-skeleton>
+                    </template>
+                    <template lwc:if={hasTargetObjectRecordCountsError}>
+                      <c-oi-state-banner
+                        data-id="target-object-record-counts-error"
+                        state="error"
+                        title="Couldn't load record counts"
+                        message={targetObjectRecordCountsErrorMessage}
+                        onretry={handleTargetObjectRecordCountsRetry}
+                      ></c-oi-state-banner>
+                    </template>
+                    <template lwc:if={targetObjectRecordCountsTruncated}>
                       <p
                         class="oi-node-detail-panel-section-note"
                         data-id="relationship-cardinality-truncated-note"
@@ -591,6 +617,7 @@
                             class="oi-node-detail-panel-type-group-header"
                             data-id="intelligence-type-group-toggle"
                             data-group-key={group.key}
+                            title={group.headerTitle}
                             aria-expanded={group.isExpanded}
                             onclick={handleTypeGroupToggle}
                           >

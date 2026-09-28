@@ -1,0 +1,354 @@
+<template>
+  <div class="shell">
+    <!-- Mobile top bar -->
+    <div class="mobile-bar">
+      <button
+        class="icon-btn mobile-menu"
+        aria-label="Open navigation"
+        onclick={openDrawer}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"
+          ></path>
+        </svg>
+      </button>
+      <span class="brand-mark">td</span>
+      <span class="subtitle1 bold">Tech Debt AI</span>
+    </div>
+
+    <template lwc:if={drawerOpen}>
+      <div class="drawer-scrim" onclick={closeDrawer}></div>
+    </template>
+
+    <!-- Sidebar -->
+    <nav class={sidebarClass}>
+      <div class="brand">
+        <span class="brand-mark">td</span>
+        <div>
+          <p class="brand-title">Tech Debt AI</p>
+          <span class="caption brand-sub">Salesforce org health</span>
+        </div>
+      </div>
+      <hr class="side-divider" />
+
+      <span class="nav-section">MONITOR</span>
+      <div class="nav-list">
+        <template for:each={monitorItems} for:item="i">
+          <button
+            key={i.key}
+            class={i.itemClass}
+            data-key={i.key}
+            onclick={handleNav}
+          >
+            <span class={i.dotClass}></span>
+            <span class="nav-label">{i.label}</span>
+            <template lwc:if={i.hasCount}
+              ><span class="caption nav-count tabular"
+                >{i.count}</span
+              ></template
+            >
+          </button>
+        </template>
+      </div>
+
+      <span class="nav-section nav-section-2">WORKSPACE</span>
+      <div class="nav-list">
+        <template for:each={workspaceItems} for:item="i">
+          <button
+            key={i.key}
+            class={i.itemClass}
+            data-key={i.key}
+            onclick={handleNav}
+          >
+            <span class={i.dotClass}></span>
+            <span class="nav-label">{i.label}</span>
+          </button>
+        </template>
+      </div>
+
+      <div class="grow"></div>
+
+      <!-- Org menu -->
+      <div class="org-row">
+        <span class="avatar">{avatarLetter}</span>
+        <div class="grow">
+          <p class="body2 org-user nowrap">{ctx.username}</p>
+          <span class="caption org-connected">Connected org</span>
+        </div>
+        <button
+          class="icon-btn org-more"
+          aria-label="Org menu"
+          onclick={toggleOrgMenu}
+        >
+          ⋮
+        </button>
+        <template lwc:if={orgMenuOpen}>
+          <div class="menu-scrim" onclick={closeOrgMenu}></div>
+          <div class="menu org-menu" role="menu">
+            <button class="menu-item" role="menuitem" onclick={handleOrgInfo}>
+              Org Info
+            </button>
+            <button class="menu-item" role="menuitem" onclick={handleSchedule}>
+              Scan Schedule
+            </button>
+            <button class="menu-item" role="menuitem" onclick={handleLogout}>
+              Logout
+            </button>
+          </div>
+        </template>
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <div class="main">
+      <header class="topbar">
+        <div class="row crumbs">
+          <span class="body2 muted">Monitor</span>
+          <span class="body2 crumb-sep">/</span>
+          <span class="body2 crumb-title">{pageTitle}</span>
+          <span class="org-pill">
+            <span class="dot pill-dot"></span>
+            <span class="caption">Production org</span>
+          </span>
+        </div>
+        <div class="row top-actions">
+          <div class="gs">
+            <div class="gs-box">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                class="gs-icon"
+              >
+                <path
+                  fill="currentColor"
+                  d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                ></path>
+              </svg>
+              <input
+                class="gs-input"
+                type="text"
+                placeholder="Search findings, objects…"
+                oninput={handleSearchInput}
+                onfocus={handleSearchFocus}
+                onblur={handleSearchBlur}
+                onkeydown={handleSearchKey}
+              />
+              <span class="gs-hint mono">⌘K</span>
+            </div>
+            <template lwc:if={showSearchDropdown}>
+              <div class="gs-dropdown">
+                <template lwc:if={hasSearchFindings}>
+                  <span class="gs-section">FINDINGS</span>
+                  <template for:each={searchFindings} for:item="f">
+                    <button
+                      key={f.id}
+                      class="gs-item"
+                      data-id={f.id}
+                      onmousedown={pickFinding}
+                    >
+                      <span class={f.chipClass}>{f.severity}</span>
+                      <span class="body2 nowrap">{f.title}</span>
+                    </button>
+                  </template>
+                </template>
+                <template lwc:if={hasSearchObjects}>
+                  <span class="gs-section">OBJECTS</span>
+                  <template for:each={searchObjects} for:item="o">
+                    <button
+                      key={o.apiName}
+                      class="gs-item gs-item-col"
+                      data-api={o.apiName}
+                      onmousedown={pickObject}
+                    >
+                      <span class="body2">{o.label}</span>
+                      <span class="caption muted mono">{o.apiName}</span>
+                    </button>
+                  </template>
+                </template>
+                <template lwc:if={noSearchResults}>
+                  <p class="body2 muted gs-empty">{noResultsText}</p>
+                </template>
+              </div>
+            </template>
+          </div>
+          <button
+            class="btn btn-outlined export-btn"
+            onclick={handleExportReport}
+          >
+            Export report
+          </button>
+          <button
+            class="btn btn-contained"
+            disabled={runDisabled}
+            onclick={handleRunScan}
+          >
+            <template lwc:if={isScanning}
+              ><span class="spinner spinner-18 spinner-inherit run-spin"></span
+            ></template>
+            Run Scan
+          </button>
+        </div>
+      </header>
+
+      <template lwc:if={showOldBanner}>
+        <div class="old-banner">
+          <span class="body2 old-text"
+            >Viewing scan from {viewedScanLabel} — not the latest.</span
+          >
+          <button class="btn btn-small" onclick={handleBackToLatest}>
+            Back to latest
+          </button>
+        </div>
+      </template>
+
+      <div
+        class="content"
+        onfindingchange={handleFindingChange}
+        ontoast={handleChildToast}
+      >
+        <template lwc:if={showScanning}>
+          <div class="scanning">
+            <div class="paper p5 scanning-card">
+              <span class="spinner spinner-48 scanning-spin"></span>
+              <p class="h6 gutter">Scanning your Salesforce org</p>
+              <p class="body1 muted scanning-stage">{scanningStage}</p>
+              <div class="linear"></div>
+              <p class="caption muted scanning-note">
+                This can take a minute or two for larger orgs.
+              </p>
+            </div>
+          </div>
+        </template>
+        <template lwc:elseif={showInitialLoading}>
+          <p class="body1 p4">Loading...</p>
+        </template>
+        <template lwc:elseif={showNoScans}>
+          <div class="no-scans">
+            <div class="paper p5 no-scans-card">
+              <p class="h6 gutter">No scans yet</p>
+              <p class="body1 muted">
+                Click <b>Run Scan</b> above to analyze the connected org and
+                generate your first health report.
+              </p>
+            </div>
+          </div>
+        </template>
+        <template lwc:elseif={showPages}>
+          <template lwc:if={isDashboard}>
+            <c-oi-td-dashboard
+              scan-id={activeScanId}
+              findings={findings}
+              findings-loading={findingsLoading}
+              onnavigatefindings={handleNavigateFindings}
+            ></c-oi-td-dashboard>
+          </template>
+          <template lwc:if={isFindings}>
+            <c-oi-td-findings
+              scan-id={activeScanId}
+              findings={findings}
+              loading={findingsLoading}
+              can-manage={ctx.canManageFindings}
+              initial-filter={findingsFilter}
+            ></c-oi-td-findings>
+          </template>
+          <template lwc:if={isComponents}>
+            <c-oi-td-components
+              scan-id={activeScanId}
+              usage={usage}
+              loading={componentsLoading}
+              initial-search={componentsSearch}
+            ></c-oi-td-components>
+          </template>
+        </template>
+        <template lwc:if={isHistory}>
+          <template lwc:if={showPages}>
+            <c-oi-td-scan-history
+              scans={scans}
+              active-scan-id={activeScanId}
+              loading={scansLoading}
+              onviewscan={handleViewScan}
+            ></c-oi-td-scan-history>
+          </template>
+        </template>
+      </div>
+    </div>
+
+    <!-- Org info dialog -->
+    <template lwc:if={orgInfoOpen}>
+      <div class="dialog-scrim" onclick={closeOrgInfo}>
+        <div class="dialog" role="dialog" aria-modal="true" onclick={stop}>
+          <div class="row-between dialog-title">
+            <p class="h6">Org Info</p>
+            <button class="icon-btn" aria-label="Close" onclick={closeOrgInfo}>
+              ✕
+            </button>
+          </div>
+          <div class="dialog-body">
+            <span class="overline muted">Organization Name</span>
+            <p class="body1 dialog-value">{orgName}</p>
+            <span class="overline muted">Organization Edition</span>
+            <p class="body1 dialog-value">{orgEdition}</p>
+            <button
+              class="btn btn-outlined"
+              disabled={advancedDisabled}
+              onclick={handleAdvanced}
+            >
+              Advanced Details
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Schedule dialog -->
+    <template lwc:if={scheduleOpen}>
+      <div class="dialog-scrim" onclick={closeSchedule}>
+        <div class="dialog" role="dialog" aria-modal="true" onclick={stop}>
+          <div class="row-between dialog-title">
+            <p class="h6">Scan Schedule</p>
+            <button class="icon-btn" aria-label="Close" onclick={closeSchedule}>
+              ✕
+            </button>
+          </div>
+          <div class="dialog-body">
+            <p class="body2 muted sched-text">
+              Automatically re-scan this org on a recurring interval.
+            </p>
+            <div class="row sched-buttons">
+              <template for:each={frequencyButtons} for:item="f">
+                <button
+                  key={f.value}
+                  class={f.btnClass}
+                  data-value={f.value}
+                  disabled={f.disabled}
+                  onclick={handleFrequency}
+                >
+                  {f.label}
+                </button>
+              </template>
+            </div>
+            <template lwc:if={showNextScan}>
+              <span class="caption muted block sched-next"
+                >{nextScanLabel}</span
+              >
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Toast -->
+    <template lwc:if={toast}>
+      <div class={toastClass} role="alert">
+        <span class="toast-msg">{toast.message}</span>
+        <button class="toast-close" aria-label="Close" onclick={closeToast}>
+          ✕
+        </button>
+      </div>
+    </template>
+  </div>
+</template>

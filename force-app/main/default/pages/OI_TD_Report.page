@@ -1,0 +1,114 @@
+<apex:page
+  controller="OI_TD_ReportController"
+  renderAs="pdf"
+  showHeader="false"
+  sidebar="false"
+  standardStylesheets="false"
+  applyHtmlTag="false"
+  applyBodyTag="false"
+>
+  <html>
+    <head>
+      <style type="text/css">
+        @page {
+          size: A4;
+          margin: 40pt;
+        }
+        body {
+          font-family: Helvetica, Arial, sans-serif;
+          font-size: 10pt;
+          color: #000;
+        }
+        h1 {
+          font-size: 20pt;
+          font-weight: normal;
+          margin: 0 0 8pt 0;
+        }
+        .meta {
+          font-size: 10pt;
+          color: #555;
+          margin: 0;
+        }
+        .score {
+          font-size: 14pt;
+          margin: 14pt 0 0 0;
+        }
+        .total {
+          font-size: 10pt;
+          margin: 0 0 7pt 0;
+        }
+        .cat {
+          font-size: 10pt;
+          margin: 0;
+        }
+        h2 {
+          font-size: 14pt;
+          font-weight: normal;
+          text-decoration: underline;
+          margin: 14pt 0 7pt 0;
+        }
+        .finding {
+          margin: 0 0 9pt 0;
+          page-break-inside: avoid;
+        }
+        .ftitle {
+          font-size: 11pt;
+          color: #000;
+        }
+        .fmeta {
+          font-size: 9pt;
+          color: #555;
+        }
+        .fdetail {
+          font-size: 9pt;
+          color: #333;
+        }
+      </style>
+    </head>
+    <body>
+      <apex:outputPanel rendered="{!NOT(hasReport)}">
+        <h1>Salesforce Tech Debt Report</h1>
+        <p class="meta"><apex:outputText value="{!errorMessage}" /></p>
+      </apex:outputPanel>
+      <apex:outputPanel rendered="{!hasReport}">
+        <h1>Salesforce Tech Debt Report</h1>
+        <p class="meta">Org: <apex:outputText value="{!report.org}" /></p>
+        <p class="meta">
+          Scan date: <apex:outputText value="{!report.scanDate}" />
+        </p>
+        <p class="score">
+          Overall Health Score: <apex:outputText value="{!report.overall}" /> /
+          100
+        </p>
+        <p class="total">
+          <apex:outputText value="{!report.totalFindings}" /> total findings
+        </p>
+        <apex:repeat value="{!report.categoryScores}" var="c">
+          <p class="cat">
+            <apex:outputText value="{!c.category}" />:
+            <apex:outputText value="{!c.score}" /> / 100
+          </p>
+        </apex:repeat>
+        <h2>Findings</h2>
+        <apex:repeat value="{!report.findings}" var="f">
+          <div class="finding">
+            <div class="ftitle">
+              [<apex:outputText value="{!UPPER(f.severity)}" />]
+              <apex:outputText value="{!f.title}" />
+            </div>
+            <div class="fmeta">
+              <apex:outputText value="{!SUBSTITUTE(f.category, '_', ' ')}" /> ·
+              <apex:outputText value="{!f.componentType}" /> "<apex:outputText
+                value="{!f.componentName}"
+              />" · <apex:outputText value="{!f.status}" /><apex:outputText
+                rendered="{!NOT(ISBLANK(f.assignedTo))}"
+                value=" · assigned to {!f.assignedTo}"
+              />
+            </div>
+            <div class="fdetail"><apex:outputText value="{!f.detail}" /></div>
+          </div>
+        </apex:repeat>
+      </apex:outputPanel>
+    </body>
+  </html>
+</apex:page>
