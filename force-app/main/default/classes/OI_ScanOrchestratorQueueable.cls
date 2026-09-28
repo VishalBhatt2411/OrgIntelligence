@@ -293,10 +293,19 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
 
   /** A Cancelled run simply stops chaining — no further type is begun. Any type already dispatched to a Batchable runs to completion (best-effort, API.md §2.4). */
   private Boolean isRunCancelled() {
+    return isRunCancelled(scanRunId);
+  }
+
+  /**
+   * Static form, also used by the interim ingest-progress signals so a batch that keeps
+   * running after the user cancels never publishes a 'Running' event that would flip the
+   * UI back from Cancelled.
+   */
+  private static Boolean isRunCancelled(Id runId) {
     List<OI_Scan_Run__c> runs = [
       SELECT Status__c
       FROM OI_Scan_Run__c
-      WHERE Id = :scanRunId
+      WHERE Id = :runId
       LIMIT 1
     ];
     return !runs.isEmpty() && runs[0].Status__c == STATUS_CANCELLED;
@@ -621,6 +630,93 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
   }
 
   /**
+   * Best-effort interim progress signal for a type's component-ingestion phase, once that
+   * phase has been dispatched to OI_ScanComponentIngestBatchable (Sprint 9.1). Without
+   * this, a type whose component count exceeds CHUNK_SIZE — any type at real-world org
+   * scale — is completely silent from beginScanTask's initial "Scanning X..." message all
+   * the way to completeTypeAndAdvance, which on a large org can be tens of minutes later:
+   * observably indistinguishable from a hang (confirmed against a real sandbox scan —
+   * CustomField's component phase alone ran ~26 minutes with Records_Scanned__c sitting at
+   * 0 the entire time, on an org with 25,916 fields). recordsScannedSoFar is always safe to
+   * write early: it is the true running count of distinct nodeKeys observed, the same value
+   * completeTask writes as the authoritative final count once the type actually finishes,
+   * so an interim write can only ever be superseded by an equal-or-larger correct number.
+   * Deliberately never throws — an interim progress write must never fail the ingestion
+   * scope that produced it. Called periodically (not every scope) by
+   * OI_ScanComponentIngestBatchable to bound both DML and platform-event volume on very
+   * large orgs.
+   */
+  public static void recordComponentIngestProgress(
+    Id scanRunId,
+    Id scanTaskId,
+    String metadataTypeApiName,
+    Integer recordsScannedSoFar,
+    Integer totalComponents
+  ) {
+    if (isRunCancelled(scanRunId)) {
+      return;
+    }
+    try {
+      update new OI_Scan_Task__c(
+        Id = scanTaskId,
+        Records_Scanned__c = recordsScannedSoFar
+      );
+    } catch (Exception e) {
+      new OI_LoggerService()
+        .warn(
+          'Could not record incremental progress for task ' +
+            scanTaskId +
+            ': ' +
+            e.getMessage(),
+          'OI_ScanOrchestratorQueueable',
+          String.valueOf(scanTaskId)
+        );
+    }
+    publishProgress(
+      scanRunId,
+      STATUS_RUNNING,
+      metadataTypeApiName,
+      metadataTypeApiName +
+        ': ingested ' +
+        recordsScannedSoFar +
+        ' of ' +
+        totalComponents +
+        ' components...'
+    );
+  }
+
+  /**
+   * Best-effort interim progress signal for a type's relationship-linking phase (the
+   * OI_ScanRelationshipIngestBatchable counterpart to recordComponentIngestProgress above).
+   * Deliberately never writes Records_Scanned__c — that field already holds the correct
+   * node count left by the component phase, and a relationship count is a different unit
+   * entirely; writing it here would show a misleadingly large or small number until
+   * completeTask's final write overwrote it anyway. The progress event alone is enough to
+   * keep this phase observably alive.
+   */
+  public static void recordRelationshipIngestProgress(
+    Id scanRunId,
+    String metadataTypeApiName,
+    Integer relationshipsProcessedSoFar,
+    Integer totalRelationships
+  ) {
+    if (isRunCancelled(scanRunId)) {
+      return;
+    }
+    publishProgress(
+      scanRunId,
+      STATUS_RUNNING,
+      metadataTypeApiName,
+      metadataTypeApiName +
+        ': linked ' +
+        relationshipsProcessedSoFar +
+        ' of ' +
+        totalRelationships +
+        ' relationships...'
+    );
+  }
+
+  /**
    * Never lets a failure to advance escape uncaught (Sprint 9 validation finding):
    * Developer Edition/trial orgs enforce a real, low ceiling on total chained Queueable
    * depth. Production/sandbox orgs (Enterprise/Unlimited/Performance/Professional — what
@@ -772,7 +868,12 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
         anyFailed = true;
         errorCount++;
       }
-      if (completedTask.Records_Scanned__c != null) {
+      // A Failed task may still hold an interim count from recordComponentIngestProgress;
+      // only tasks that did not fail contribute to the run's node count.
+      if (
+        completedTask.Status__c != 'Failed' &&
+        completedTask.Records_Scanned__c != null
+      ) {
         totalScanned += Integer.valueOf(completedTask.Records_Scanned__c);
       }
     }
