@@ -36,6 +36,21 @@
  *              fields, by design, to stay within governor limits on wide objects), so
  *              showing them here would require a second per-record query this panel does
  *              not make — a real, scoped gap, not an oversight.
+ * Sharing Settings section: for an Object node, this platform's first Tooling-API-sourced
+ *              fact — internal/external sharing model (OWD), which Apex Describe has no
+ *              accessor for at all (see OI_ObjectSharingSettingsDTO's own doc comment).
+ *              Lazy-loaded on expand, exactly like Relationships' own explicit-action gate,
+ *              since it is a live, non-cacheable read.
+ * Record mode's Hierarchy/Sharing sections: brought to parity with Object mode's own
+ *              collapsible-section pattern (chevron + identity icon + title, one lazy-load gate
+ *              per section) — Hierarchy behaves like Relationships (data already available from
+ *              the same fragment fetch, open by default, no separate callout), Sharing behaves
+ *              like Sharing Settings (a live, non-cacheable read, collapsed by default, loaded
+ *              the moment the section is expanded). Hierarchy always renders once a record is
+ *              selected, including an explicit "No related records" state, matching this panel's
+ *              own "an empty section that states its own coverage is informative" convention
+ *              (see intelligenceSections' doc comment) rather than disappearing when a record
+ *              genuinely has none.
  * Fields section (Hierarchy Visualizer field-browser sprint): for an Object node, a
  *              dedicated Show All/Standard/Custom field browser — the deliberate answer to
  *              moving field-browsing off the canvas card ("see fields when asked") rather
@@ -52,7 +67,11 @@
 import { LightningElement, api } from "lwc";
 import getNodeDetail from "@salesforce/apex/OI_GraphController.getNodeDetail";
 import getFieldSummaries from "@salesforce/apex/OI_GraphController.getFieldSummaries";
+import getRelationshipFieldDetail from "@salesforce/apex/OI_GraphController.getRelationshipFieldDetail";
+import getRelationshipTargetObjectRecordCounts from "@salesforce/apex/OI_GraphController.getRelationshipTargetObjectRecordCounts";
+import getObjectSharingSettings from "@salesforce/apex/OI_GraphController.getObjectSharingSettings";
 import getRecordFragment from "@salesforce/apex/OI_RecordHierarchyController.getRecordFragment";
+import getRecordSharing from "@salesforce/apex/OI_RecordHierarchyController.getRecordSharing";
 import getImpact from "@salesforce/apex/OI_DependencyController.getImpact";
 import getNodeIntelligence from "@salesforce/apex/OI_GraphController.getNodeIntelligence";
 import { resolveNodeStyle, resolveEdgeStyle } from "c/presentationRegistry";
@@ -76,6 +95,14 @@ const CATEGORY_ICON_NAMES = {
   Security: "utility:lock"
 };
 
+/** Known status values a scanner may attach to a RelatedComponent (currently only Flow/Process Builder) — a plain lookup for badge color, never a per-type branch. An unrecognised status still renders, just with the neutral fallback class. */
+const STATUS_BADGE_CLASS_BY_VALUE = {
+  Active: "oi-node-detail-panel-status-badge is-active",
+  Inactive: "oi-node-detail-panel-status-badge is-inactive",
+  Draft: "oi-node-detail-panel-status-badge is-inactive",
+  Obsolete: "oi-node-detail-panel-status-badge is-obsolete"
+};
+
 /** Attribute keys already surfaced explicitly elsewhere in the template — excluded from the generic "Other Attributes" fallback table so nothing is shown twice. */
 const CURATED_ATTRIBUTE_KEYS = new Set([
   "label",
@@ -86,13 +113,15 @@ const CURATED_ATTRIBUTE_KEYS = new Set([
   "relationshipName"
 ]);
 
-/** Sections collapsed by default on a fresh node selection (product decision, per the reference design) — Overview (always visible, no toggle) and Relationships stay open since they're the two sections a user almost always wants immediately; Fields/Automation/Code/Security/Impact start collapsed to keep the panel scannable, one click away rather than a wall of tables on every click. A pinned panel (isPanelPinned) never re-applies this default — it keeps whatever layout the user already arranged. */
+/** Sections collapsed by default on a fresh node selection (product decision, per the reference design) — Overview (always visible, no toggle) and Relationships stay open since they're the two sections a user almost always wants immediately; Fields/Automation/Code/Security/Impact start collapsed to keep the panel scannable, one click away rather than a wall of tables on every click. Record mode's own analogue: Hierarchy (already available from the same fragment fetch that resolved the record, no extra cost) stays open just like Relationships; Sharing (a separate live, non-cacheable read, same rationale as Object's Sharing Settings) starts collapsed. A pinned panel (isPanelPinned) never re-applies this default — it keeps whatever layout the user already arranged. */
 const DEFAULT_COLLAPSED_SECTIONS = [
   "fields",
+  "sharingSettings",
   "Automation",
   "Code",
   "Security",
-  "impact"
+  "impact",
+  "sharing"
 ];
 
 /**
@@ -139,12 +168,35 @@ export default class OiNodeDetailPanel extends LightningElement {
   intelligenceErrorMessage = null;
   technicalDetailsVisible = false;
   intelligenceRequestId = 0;
+  /** Record mode's Sharing section (record-level counterpart to the Object panel's Sharing Settings section) — lazy-loaded via the section's own expand, exactly like Object's Sharing Settings, since it is a live, non-cacheable read (see OI_RecordSharingDTO's own doc comment on why). */
+  sharingResult = null;
+  isLoadingSharing = false;
+  sharingErrorMessage = null;
+  sharingRequestId = 0;
+  /** Object mode's reworked Relationships section (outgoing side) — per-field Lookup/Master-Detail detail with a live per-target-object record count, replacing the old flat "Outgoing Lookups — N" count. Lazy-loaded the moment the Relationships section is expanded (see handleSectionToggle), since it is a live, non-cacheable read (see OI_RelationshipFieldDetailDTO's own doc comment). */
+  relationshipFieldDetail = null;
+  isLoadingRelationshipFieldDetail = false;
+  relationshipFieldDetailErrorMessage = null;
+  relationshipFieldDetailRequestId = 0;
+  /** On-demand target-object record counts for the Relationships section (see OI_RelationshipFieldDetailService's own doc comment on why counts are a separate, explicit action rather than part of the detail load above — live-org profiling showed computing them inline made wide-fanout objects slow to open). Keyed by object API name; a key's absence means that object's count is not yet loaded or could not be resolved. */
+  targetObjectRecordCounts = null;
+  isLoadingTargetObjectRecordCounts = false;
+  targetObjectRecordCountsErrorMessage = null;
+  targetObjectRecordCountsTruncated = false;
+  targetObjectRecordCountsRequestId = 0;
+  /** Object mode's Sharing Settings section (Org-Wide Default) — this platform's first Tooling-API-sourced fact (see OI_ObjectSharingSettingsDTO's own doc comment on why Apex Describe cannot answer this). Lazy-loaded the moment the section is expanded, mirroring Relationships' own explicit-action gate, since it is a live, non-cacheable read. */
+  objectSharingSettings = null;
+  isLoadingObjectSharingSettings = false;
+  objectSharingSettingsErrorMessage = null;
+  objectSharingSettingsRequestId = 0;
   /** The currently-open drill-down selection, or null. Cleared on every new node selection so a dialog can never outlive the node it describes. */
   drilldown = null;
   /** Collapsible-section UI state (GraphUI.md §42 Intelligence Panel rebuild) — a set of collapsed section keys ('fields'/'relationships'/'Automation'/'Code'/'Security'/'impact'); Technical Details keeps its own pre-existing technicalDetailsVisible toggle (already collapsed-by-default) rather than joining this set. Defaults to DEFAULT_COLLAPSED_SECTIONS on a fresh node selection — see that constant's own comment. */
   collapsedSections = new Set(DEFAULT_COLLAPSED_SECTIONS);
   /** Which categories' "Coverage details" disclosure is open — collapsed (empty set) by default on a fresh node selection. */
   expandedCoverageDetails = new Set();
+  /** Which per-type groups (within an Automation/Code/Security section, keyed "category::subTypeKey") have their component list open — collapsed (empty set) by default, matching every other disclosure in this panel; a type group is a count until a user asks to see the list behind it. */
+  expandedIntelligenceTypeGroups = new Set();
   /** Whole-panel chrome (Intelligence Panel header) — isPanelExpanded collapses the entire body to reclaim canvas space; isPanelPinned, when on, keeps collapsedSections/expandedCoverageDetails as-is across a node change instead of resetting them, so a layout a user has arranged (e.g. "just show me Security") survives browsing between nodes. Neither is node-specific state, so neither is touched by the nodeKey setter's reset logic below. */
   isPanelExpanded = true;
   isPanelPinned = false;
@@ -163,9 +215,13 @@ export default class OiNodeDetailPanel extends LightningElement {
     this.resetFieldBrowser();
     this.resetImpactAnalysis();
     this.resetIntelligence();
+    this.resetRecordSharing();
+    this.resetRelationshipFieldDetail();
+    this.resetObjectSharingSettings();
     if (!this.isPanelPinned) {
       this.collapsedSections = new Set(DEFAULT_COLLAPSED_SECTIONS);
       this.expandedCoverageDetails = new Set();
+      this.expandedIntelligenceTypeGroups = new Set();
     }
     this.loadDetail();
     /**
@@ -176,7 +232,9 @@ export default class OiNodeDetailPanel extends LightningElement {
      * view. Impact Analysis is a multi-hop traversal answering a deliberate question, so it
      * stays opt-in.
      */
-    this.loadIntelligence();
+    if (!parseRecordNodeKey(value)) {
+      this.loadIntelligence();
+    }
   }
 
   resetIntelligence() {
@@ -256,6 +314,7 @@ export default class OiNodeDetailPanel extends LightningElement {
           directionLabel:
             item.direction === "incoming" ? "uses this" : "used by this"
         })),
+        typeGroups: this.buildTypeGroups(category),
         hasItems,
         countLabel: `${(category.items || []).length}`,
         truncated: !!category.truncated,
@@ -276,6 +335,124 @@ export default class OiNodeDetailPanel extends LightningElement {
         isExpanded: !this.collapsedSections.has(category.category)
       };
     });
+  }
+
+  /**
+   * Groups one category's items by component type — "Apex Trigger — 3", "Flow — 5",
+   * "Process Builder — 2" — each a collapsed-by-default row that opens into the list behind it
+   * on click. subTypeKey (currently only set on Flow items, see OI_NodeIntelligenceService)
+   * takes priority over typeKey so Process Builder and Flow group separately even though they
+   * share one underlying typeKey; every other type falls back to grouping by typeKey exactly as
+   * before this rebuild, so a category with only one type still reads as one clean group rather
+   * than a redundant single-row wrapper being a regression from the old flat list.
+   */
+  buildTypeGroups(category) {
+    const groupsByKey = new Map();
+    for (const item of category.items || []) {
+      const key = item.subTypeKey || item.typeKey;
+      if (!groupsByKey.has(key)) {
+        groupsByKey.set(key, {
+          key,
+          typeLabel: item.subTypeLabel || item.typeLabel,
+          items: []
+        });
+      }
+      groupsByKey.get(key).items.push(item);
+    }
+    return Array.from(groupsByKey.values()).map((group) => {
+      const groupKey = `${category.category}::${group.key}`;
+      const drilldownSelector = this.resolveGroupDrilldownSelector(group.items);
+      return {
+        key: groupKey,
+        typeLabel: group.typeLabel,
+        countLabel: `${group.items.length}`,
+        isExpanded: this.expandedIntelligenceTypeGroups.has(groupKey),
+        isDrilldownEligible: !!drilldownSelector,
+        drilldownDirection: drilldownSelector
+          ? drilldownSelector.direction
+          : null,
+        drilldownEdgeTypeKey: drilldownSelector
+          ? drilldownSelector.edgeTypeKey
+          : null,
+        headerTitle: drilldownSelector ? "Show these connections" : null,
+        items: group.items.map((item) => ({
+          ...item,
+          directionLabel:
+            item.direction === "incoming" ? "uses this" : "used by this",
+          hasStatus: !!item.status,
+          statusBadgeClass: item.status
+            ? STATUS_BADGE_CLASS_BY_VALUE[item.status] ||
+              "oi-node-detail-panel-status-badge"
+            : null
+        }))
+      };
+    });
+  }
+
+  /**
+   * A type group can open the exact drill-down that answers its own count only when every item
+   * in it was reached the same way — one direction, one edge type — the same pair
+   * OI_NodeConnectionsService needs to page it. A mixed-provenance group (e.g. Code holding both
+   * a REFERENCES-reached class and an EXECUTES_ON-reached trigger) has no single pair a
+   * drill-down query could describe, so it is left ineligible and keeps today's inline-expand
+   * behavior instead of promising a drill-down that would silently omit some of its own rows.
+   * Deliberately not category-gated: eligibility is a structural fact about the group's own
+   * items, not a per-category allowlist.
+   */
+  resolveGroupDrilldownSelector(items) {
+    if (!items.length) {
+      return null;
+    }
+    const first = items[0];
+    if (!first.direction || !first.edgeTypeKey) {
+      return null;
+    }
+    const isUniform = items.every(
+      (item) =>
+        item.direction === first.direction &&
+        item.edgeTypeKey === first.edgeTypeKey
+    );
+    return isUniform
+      ? { direction: first.direction, edgeTypeKey: first.edgeTypeKey }
+      : null;
+  }
+
+  /** Locates one type group by its groupKey across every category — mirrors handleDrilldownOpen's own row lookup against the getter's current output, the same "recompute rather than cache a second copy" convention already used for relationshipCountRows. */
+  findTypeGroupByKey(groupKey) {
+    for (const section of this.intelligenceSections) {
+      const match = section.typeGroups.find((group) => group.key === groupKey);
+      if (match) {
+        return match;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Opens the drill-down for a type group when every item within it shares one
+   * (direction, edgeTypeKey) pair — the same product promise as the summary rows above (see
+   * handleDrilldownOpen), just reached from a per-type group instead of a per-edge-type summary
+   * row. A mixed-provenance group falls back to today's inline expand/collapse, unchanged.
+   */
+  handleTypeGroupToggle(event) {
+    event.stopPropagation();
+    const groupKey = event.currentTarget.dataset.groupKey;
+    const group = this.findTypeGroupByKey(groupKey);
+    if (group && group.isDrilldownEligible) {
+      this.drilldown = {
+        direction: group.drilldownDirection,
+        edgeTypeKey: group.drilldownEdgeTypeKey,
+        relationshipLabel: group.typeLabel
+      };
+      return;
+    }
+    const updated = new Set(this.expandedIntelligenceTypeGroups);
+    if (updated.has(groupKey)) {
+      updated.delete(groupKey);
+    } else {
+      updated.add(groupKey);
+    }
+    this.expandedIntelligenceTypeGroups = updated;
   }
 
   /** "Coverage details" disclosure (GraphUI.md §42, item 15) — the scanner's own honest "Detected... Not detected..." explanation stays available, just collapsed by default so it never dominates the primary panel the way a permanently-visible paragraph did. Independent of the section's own collapse state (collapsedSections) — collapsing/re-expanding a whole section shouldn't discard whether its coverage note was open. */
@@ -337,16 +514,26 @@ export default class OiNodeDetailPanel extends LightningElement {
     );
   }
 
-  /** Toggles one collapsible section open/closed (Fields, Structural Connections, an intelligence category, Impact) — a plain UI concern, never touching data state. Technical Details keeps its own separate, pre-existing toggle. */
+  /** Toggles one collapsible section open/closed (Fields, Structural Connections, an intelligence category, Impact) — a plain UI concern, never touching data state, with one deliberate exception: opening Relationships on an Object node is the explicit action gate for its live, non-cacheable field-detail/cardinality read (mirrors Fields' own "Show Fields" gate, just triggered by the section's own expand instead of a second nested button, since that read IS this section's entire content now). */
   handleSectionToggle(event) {
     const section = event.currentTarget.dataset.section;
     const updated = new Set(this.collapsedSections);
-    if (updated.has(section)) {
+    const wasCollapsed = updated.has(section);
+    if (wasCollapsed) {
       updated.delete(section);
     } else {
       updated.add(section);
     }
     this.collapsedSections = updated;
+    if (section === "relationships" && wasCollapsed && this.isObject) {
+      this.loadRelationshipFieldDetail();
+    }
+    if (section === "sharingSettings" && wasCollapsed && this.isObject) {
+      this.loadObjectSharingSettings();
+    }
+    if (section === "sharing" && wasCollapsed && this.isRecordDetail) {
+      this.loadRecordSharing();
+    }
   }
 
   // --- Panel chrome (Intelligence Panel header: collapse whole body / pin section layout) ---
@@ -388,6 +575,18 @@ export default class OiNodeDetailPanel extends LightningElement {
 
   get isRelationshipsExpanded() {
     return !this.collapsedSections.has("relationships");
+  }
+
+  get isSharingSettingsExpanded() {
+    return !this.collapsedSections.has("sharingSettings");
+  }
+
+  get isHierarchyExpanded() {
+    return !this.collapsedSections.has("hierarchy");
+  }
+
+  get isSharingExpanded() {
+    return !this.collapsedSections.has("sharing");
   }
 
   get isImpactExpanded() {
@@ -454,6 +653,35 @@ export default class OiNodeDetailPanel extends LightningElement {
     this.fieldsVisible = false;
   }
 
+  /** A fresh node selection is a fresh Sharing section — a previous record's share rows must never bleed into the newly-selected record's panel. */
+  resetRecordSharing() {
+    this.sharingRequestId++;
+    this.sharingResult = null;
+    this.isLoadingSharing = false;
+    this.sharingErrorMessage = null;
+  }
+
+  /** A fresh node selection is a fresh Relationships (outgoing) section — a previous object's field detail/cardinality must never bleed into the newly-selected object's panel. */
+  resetRelationshipFieldDetail() {
+    this.relationshipFieldDetailRequestId++;
+    this.relationshipFieldDetail = null;
+    this.isLoadingRelationshipFieldDetail = false;
+    this.relationshipFieldDetailErrorMessage = null;
+    this.targetObjectRecordCountsRequestId++;
+    this.targetObjectRecordCounts = null;
+    this.isLoadingTargetObjectRecordCounts = false;
+    this.targetObjectRecordCountsErrorMessage = null;
+    this.targetObjectRecordCountsTruncated = false;
+  }
+
+  /** A fresh node selection is a fresh Sharing Settings section — a previous object's OWD must never bleed into the newly-selected object's panel. */
+  resetObjectSharingSettings() {
+    this.objectSharingSettingsRequestId++;
+    this.objectSharingSettings = null;
+    this.isLoadingObjectSharingSettings = false;
+    this.objectSharingSettingsErrorMessage = null;
+  }
+
   async loadDetail() {
     const requestId = ++this.detailRequestId;
     const requestedNodeKey = this._nodeKey;
@@ -486,6 +714,7 @@ export default class OiNodeDetailPanel extends LightningElement {
           ...summary,
           isRecord: true,
           recordRef,
+          recordOverview: fragment.recordOverview || {},
           ...this.deriveRecordHierarchy(fragment, requestedNodeKey),
           attributes: {},
           outgoingRelationshipCounts: {},
@@ -498,6 +727,10 @@ export default class OiNodeDetailPanel extends LightningElement {
           return;
         }
         this.detail = detail;
+        /** Relationships starts expanded by default (DEFAULT_COLLAPSED_SECTIONS), so the explicit-action gate in handleSectionToggle never fires on a fresh selection — this covers that case, the same way Overview's own always-visible content needs no separate gate. A pinned panel that collapsed Relationships correctly waits for the user to re-expand it instead. */
+        if (this.isObject && this.isRelationshipsExpanded) {
+          this.loadRelationshipFieldDetail();
+        }
       }
     } catch (error) {
       if (requestId === this.detailRequestId) {
@@ -527,7 +760,7 @@ export default class OiNodeDetailPanel extends LightningElement {
       (fragment.nodes || []).map((n) => [n.nodeKey, n])
     );
     const parentRows = [];
-    const childCountsByTypeKey = new Map();
+    const childCountsByRelationship = new Map();
     for (const edge of fragment.edges || []) {
       if (edge.sourceNodeKey !== centerNodeKey) {
         continue;
@@ -537,25 +770,33 @@ export default class OiNodeDetailPanel extends LightningElement {
         continue;
       }
       if (edge.typeKey === RECORD_PARENT_EDGE_TYPE_KEY) {
+        if (
+          ["OwnerId", "CreatedById", "LastModifiedById"].includes(
+            edge.viaFieldApiName
+          )
+        ) {
+          continue;
+        }
         parentRows.push({
+          key: `${edge.viaFieldApiName || "parent"}::${target.nodeKey}`,
           nodeKey: target.nodeKey,
           label: target.label,
-          typeLabel: this.recordTypeDisplayLabel(target.typeKey)
+          typeLabel: this.recordTypeDisplayLabel(target.typeKey),
+          relationshipLabel: edge.viaFieldApiName || "Parent relationship"
         });
       } else if (edge.typeKey === RECORD_CHILD_EDGE_TYPE_KEY) {
-        childCountsByTypeKey.set(
-          target.typeKey,
-          (childCountsByTypeKey.get(target.typeKey) || 0) + 1
-        );
+        const relationshipKey = `${target.typeKey}::${edge.viaFieldApiName || "children"}`;
+        const existing = childCountsByRelationship.get(relationshipKey) || {
+          key: relationshipKey,
+          typeLabel: this.recordTypeDisplayLabel(target.typeKey),
+          relationshipLabel: edge.viaFieldApiName || "Child relationship",
+          count: 0
+        };
+        existing.count += 1;
+        childCountsByRelationship.set(relationshipKey, existing);
       }
     }
-    const childRows = Array.from(childCountsByTypeKey.entries()).map(
-      ([typeKey, count]) => ({
-        key: typeKey,
-        typeLabel: this.recordTypeDisplayLabel(typeKey),
-        count
-      })
-    );
+    const childRows = Array.from(childCountsByRelationship.values());
     return { parentRows, childRows, hasMoreRelationships: !!fragment.hasMore };
   }
 
@@ -586,6 +827,24 @@ export default class OiNodeDetailPanel extends LightningElement {
       : "";
   }
 
+  get recordOverview() {
+    return (this.detail && this.detail.recordOverview) || {};
+  }
+
+  get recordOwnerName() {
+    return this.recordOverview.ownerName || null;
+  }
+
+  formatDateTime(value) {
+    if (!value) {
+      return null;
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(value));
+  }
+
   get recordParentRows() {
     return (this.detail && this.detail.parentRows) || [];
   }
@@ -606,8 +865,141 @@ export default class OiNodeDetailPanel extends LightningElement {
     return this.hasRecordParents || this.hasRecordChildren;
   }
 
+  get hasNoRecordHierarchy() {
+    return !this.hasRecordHierarchy;
+  }
+
+  /** Total related records shown in the section header, exactly like Relationships' own relationshipSectionCount — every parent row is one distinct record, every child row is a per-relationship count, already known from the same fragment fetch that resolved this record (no lazy load needed, unlike Sharing). */
+  get hierarchySectionCount() {
+    const childTotal = this.recordChildRows.reduce(
+      (sum, row) => sum + (row.count || 0),
+      0
+    );
+    return this.recordParentRows.length + childTotal;
+  }
+
   get recordHasMoreNote() {
     return !!(this.detail && this.detail.hasMoreRelationships);
+  }
+
+  get isSharingLoaded() {
+    return this.sharingResult !== null;
+  }
+
+  get hasSharingError() {
+    return !!this.sharingErrorMessage;
+  }
+
+  get sharingSupportsSharing() {
+    return !!(this.sharingResult && this.sharingResult.supportsSharing);
+  }
+
+  get sharingCoverageNote() {
+    return (this.sharingResult && this.sharingResult.coverageNote) || null;
+  }
+
+  get sharingRows() {
+    const rows = (this.sharingResult && this.sharingResult.shareRows) || [];
+    return rows.map((row, index) => ({
+      ...row,
+      key: row.userOrGroupId || `row-${index}`
+    }));
+  }
+
+  get hasSharingRows() {
+    return this.sharingRows.length > 0;
+  }
+
+  get sharingTruncated() {
+    return !!(this.sharingResult && this.sharingResult.truncated);
+  }
+
+  get sharingIsLockedByApproval() {
+    return !!(this.sharingResult && this.sharingResult.isLockedByApproval);
+  }
+
+  get sharingPendingApprovalDetail() {
+    return (
+      (this.sharingResult && this.sharingResult.pendingApprovalDetail) || null
+    );
+  }
+
+  /** The object's Org-Wide Default, embedded on the same DTO (see OI_RecordSharingDTO's own doc comment on why) — read alongside the record's own share rows rather than requiring a switch to Object mode. */
+  get sharingOrgWideDefault() {
+    return (this.sharingResult && this.sharingResult.orgWideDefault) || null;
+  }
+
+  get orgWideDefaultSupported() {
+    return !!(
+      this.sharingOrgWideDefault && this.sharingOrgWideDefault.supported
+    );
+  }
+
+  get orgWideDefaultUnavailableReason() {
+    return (
+      (this.sharingOrgWideDefault &&
+        this.sharingOrgWideDefault.unavailableReason) ||
+      null
+    );
+  }
+
+  /** Same (label, value) pair shape as Object mode's objectSharingSettingsRows — deliberately identical wording, since it is the exact same fact. */
+  get orgWideDefaultRows() {
+    if (!this.orgWideDefaultSupported) {
+      return [];
+    }
+    return [
+      {
+        key: "internal",
+        label: "Internal Sharing Model",
+        value: this.sharingOrgWideDefault.internalSharingModel || "—"
+      },
+      {
+        key: "external",
+        label: "External Sharing Model",
+        value: this.sharingOrgWideDefault.externalSharingModel || "Not enabled"
+      }
+    ];
+  }
+
+  async loadRecordSharing() {
+    if (
+      this.isSharingLoaded ||
+      this.isLoadingSharing ||
+      !this.recordObjectApiName ||
+      !this.recordId
+    ) {
+      return;
+    }
+    const requestId = ++this.sharingRequestId;
+    const objectApiName = this.recordObjectApiName;
+    const recordId = this.recordId;
+    this.isLoadingSharing = true;
+    this.sharingErrorMessage = null;
+    try {
+      const result = await getRecordSharing({ objectApiName, recordId });
+      if (requestId !== this.sharingRequestId) {
+        return;
+      }
+      this.sharingResult = result;
+    } catch (error) {
+      if (requestId === this.sharingRequestId) {
+        this.sharingResult = null;
+        this.sharingErrorMessage =
+          (error && error.body && error.body.message) ||
+          "Something went wrong loading sharing.";
+      }
+    } finally {
+      if (requestId === this.sharingRequestId) {
+        this.isLoadingSharing = false;
+      }
+    }
+  }
+
+  /** The error banner's retry affordance re-runs the same explicit-action load, exactly like Object's Sharing Settings own onretry handler (handleObjectSharingSettingsRetry). */
+  handleRecordSharingRetry() {
+    this.sharingResult = null;
+    this.loadRecordSharing();
   }
 
   get hasSelection() {
@@ -628,6 +1020,14 @@ export default class OiNodeDetailPanel extends LightningElement {
 
   get isField() {
     return !!this.detail && this.detail.typeKey === FIELD_TYPE_KEY;
+  }
+
+  get showMetadataIntelligence() {
+    return !this.isRecordDetail;
+  }
+
+  get showMetadataImpact() {
+    return !this.isRecordDetail;
   }
 
   get typeDisplayLabel() {
@@ -755,11 +1155,33 @@ export default class OiNodeDetailPanel extends LightningElement {
       return [];
     }
     if (this.isRecordDetail) {
-      return [
+      const fields = [
         { key: "name", label: "Name", value: this.detail.label },
         { key: "object", label: "Object", value: this.recordObjectApiName },
         { key: "recordId", label: "Record Id", value: this.recordId }
       ];
+      if (this.recordOwnerName) {
+        fields.push({
+          key: "owner",
+          label: "Owner",
+          value: this.recordOwnerName
+        });
+      }
+      const created = this.formatDateTime(this.recordOverview.createdDate);
+      const modified = this.formatDateTime(
+        this.recordOverview.lastModifiedDate
+      );
+      if (created) {
+        fields.push({ key: "created", label: "Created", value: created });
+      }
+      if (modified) {
+        fields.push({
+          key: "modified",
+          label: "Last Modified",
+          value: modified
+        });
+      }
+      return fields;
     }
     const fields = [];
     /** A label that differs from the API name (e.g. a custom field's "Deal Size" vs. Deal_Size__c) is real identity information the API Name row alone can't carry — shown whenever the two actually differ, never as a redundant repeat of the same string. */
@@ -790,25 +1212,6 @@ export default class OiNodeDetailPanel extends LightningElement {
           key: "parentObject",
           label: "Parent Object",
           value: this.parentObjectApiName
-        });
-      }
-      if (this.hasFieldRelationshipType) {
-        fields.push({
-          key: "relationshipType",
-          label: "Relationship Type",
-          value: this.fieldRelationshipTypeLabel
-        });
-      }
-      if (this.hasReferencedObjects) {
-        fields.push({
-          key: "referencedObjects",
-          label: "Referenced Object(s)",
-          value: this.referencedObjectsDisplay
-        });
-        fields.push({
-          key: "relationshipName",
-          label: "Relationship Name",
-          value: this.relationshipName
         });
       }
       return fields;
@@ -869,6 +1272,41 @@ export default class OiNodeDetailPanel extends LightningElement {
     return rows;
   }
 
+  get hasFieldRelationshipSection() {
+    return (
+      this.isField &&
+      (this.hasFieldRelationshipType ||
+        this.hasReferencedObjects ||
+        !!this.relationshipName)
+    );
+  }
+
+  get fieldRelationshipFields() {
+    const rows = [];
+    if (this.hasFieldRelationshipType) {
+      rows.push({
+        key: "type",
+        label: "Relationship Type",
+        value: this.fieldRelationshipTypeLabel
+      });
+    }
+    if (this.hasReferencedObjects) {
+      rows.push({
+        key: "target",
+        label: "Target Object",
+        value: this.referencedObjectsDisplay
+      });
+    }
+    if (this.relationshipName) {
+      rows.push({
+        key: "name",
+        label: "Relationship Name",
+        value: this.relationshipName
+      });
+    }
+    return rows;
+  }
+
   /**
    * Opens the drill-down for one summary row. State lives here rather than in the child so the
    * child stays a pure, parameterised view that can be reused by any other surface later
@@ -910,7 +1348,9 @@ export default class OiNodeDetailPanel extends LightningElement {
 
   get hasRelationshipCounts() {
     return (
-      this.hasCuratedRelationshipRows || this.relationshipCountRows.length > 0
+      !this.isField &&
+      !this.isRecordDetail &&
+      (this.hasCuratedRelationshipRows || this.relationshipCountRows.length > 0)
     );
   }
 
@@ -931,7 +1371,14 @@ export default class OiNodeDetailPanel extends LightningElement {
       return [];
     }
     const incoming = this.detail.incomingRelationshipCounts || {};
-    const outgoing = this.detail.outgoingRelationshipCounts || {};
+    /**
+     * Outgoing Lookups/Outgoing Master-Detail are deliberately NOT rows here any more — this
+     * object's own fields are exactly what relationshipFieldRows now shows as real per-field
+     * detail (type, required, cascade behavior, live cardinality) instead of a flat count that
+     * only re-stated what the canvas already draws. Incoming stays a count: the source field
+     * lives on some OTHER object, and a true per-field breakdown there would mean enumerating
+     * every other object in the org (see OI_RelationshipFieldDetailService's own Limitations).
+     */
     const rows = [
       {
         key: "in-lookup",
@@ -947,22 +1394,6 @@ export default class OiNodeDetailPanel extends LightningElement {
         edgeTypeKey: MASTER_DETAIL_TO_TYPE_KEY,
         label: "Incoming Master-Detail",
         count: incoming[MASTER_DETAIL_TO_TYPE_KEY] || 0,
-        isDrilldownEligible: true
-      },
-      {
-        key: "out-lookup",
-        direction: "outgoing",
-        edgeTypeKey: LOOKUP_TO_TYPE_KEY,
-        label: "Outgoing Lookups",
-        count: outgoing[LOOKUP_TO_TYPE_KEY] || 0,
-        isDrilldownEligible: true
-      },
-      {
-        key: "out-md",
-        direction: "outgoing",
-        edgeTypeKey: MASTER_DETAIL_TO_TYPE_KEY,
-        label: "Outgoing Master-Detail",
-        count: outgoing[MASTER_DETAIL_TO_TYPE_KEY] || 0,
         isDrilldownEligible: true
       }
     ];
@@ -1022,6 +1453,245 @@ export default class OiNodeDetailPanel extends LightningElement {
     return (this.detail && this.detail.directConnectionCount) || 0;
   }
 
+  get isRelationshipFieldDetailLoaded() {
+    return this.relationshipFieldDetail !== null;
+  }
+
+  get hasRelationshipFieldDetailError() {
+    return !!this.relationshipFieldDetailErrorMessage;
+  }
+
+  /** One row per outgoing Lookup/Master-Detail field. Target-object record counts are loaded on demand (see targetObjectRecordCounts) rather than eagerly: before that explicit load, every target reads "(load counts to see)"; a loaded-but-unresolved count reads "(count unavailable)" — never a fabricated zero either way. */
+  get relationshipFieldRows() {
+    const fields =
+      (this.relationshipFieldDetail && this.relationshipFieldDetail.fields) ||
+      [];
+    const counts = this.targetObjectRecordCounts;
+    return fields.map((field) => ({
+      ...field,
+      requiredLabel:
+        field.isRequired === null || field.isRequired === undefined
+          ? "Unknown"
+          : field.isRequired
+            ? "Yes"
+            : "No",
+      cascadeDeleteLabel: field.cascadeDeleteBehavior || "Not available",
+      targetObjectsDisplay: (field.targetObjects || [])
+        .map((target) => {
+          if (!counts) {
+            return target.objectApiName;
+          }
+          const recordCount = counts[target.objectApiName];
+          return recordCount === null || recordCount === undefined
+            ? `${target.objectApiName} (count unavailable)`
+            : `${target.objectApiName} (${recordCount.toLocaleString()} records)`;
+        })
+        .join(", ")
+    }));
+  }
+
+  get hasRelationshipFieldRows() {
+    return this.relationshipFieldRows.length > 0;
+  }
+
+  /** Every distinct target object API name across the currently-loaded relationship fields — the exact request payload for the on-demand record-count load, deduplicated client-side so a shared target (e.g. two fields both pointing at Account) is requested once. */
+  get distinctRelationshipTargetObjectApiNames() {
+    const fields =
+      (this.relationshipFieldDetail && this.relationshipFieldDetail.fields) ||
+      [];
+    const names = new Set();
+    fields.forEach((field) => {
+      (field.targetObjects || []).forEach((target) => {
+        if (target.objectApiName) {
+          names.add(target.objectApiName);
+        }
+      });
+    });
+    return Array.from(names);
+  }
+
+  get isTargetObjectRecordCountsLoaded() {
+    return this.targetObjectRecordCounts !== null;
+  }
+
+  get hasTargetObjectRecordCountsError() {
+    return !!this.targetObjectRecordCountsErrorMessage;
+  }
+
+  /** The "Load record counts" action is only offered once there is something to count for, and hides itself once counts are loaded (or loading) — mirroring every other explicit-action gate in this panel (Impact Analysis, Relationships detail itself). Gated on distinctRelationshipTargetObjectApiNames rather than hasRelationshipFieldRows alone: a field row can exist with no usable target object api name (e.g. a corrupted/blank referenceTo entry), which would otherwise leave the button visible but permanently inert, since loadTargetObjectRecordCounts no-ops on an empty request list. */
+  get canLoadTargetObjectRecordCounts() {
+    return (
+      this.hasRelationshipFieldRows &&
+      this.distinctRelationshipTargetObjectApiNames.length > 0 &&
+      !this.isTargetObjectRecordCountsLoaded &&
+      !this.isLoadingTargetObjectRecordCounts
+    );
+  }
+
+  async loadRelationshipFieldDetail() {
+    if (
+      this.isRelationshipFieldDetailLoaded ||
+      this.isLoadingRelationshipFieldDetail ||
+      !this.detail ||
+      !this.detail.nodeKey
+    ) {
+      return;
+    }
+    const requestId = ++this.relationshipFieldDetailRequestId;
+    const objectNodeKey = this.detail.nodeKey;
+    this.isLoadingRelationshipFieldDetail = true;
+    this.relationshipFieldDetailErrorMessage = null;
+    try {
+      const result = await getRelationshipFieldDetail({ objectNodeKey });
+      if (requestId !== this.relationshipFieldDetailRequestId) {
+        return;
+      }
+      this.relationshipFieldDetail = result;
+    } catch (error) {
+      if (requestId === this.relationshipFieldDetailRequestId) {
+        this.relationshipFieldDetail = null;
+        this.relationshipFieldDetailErrorMessage =
+          (error && error.body && error.body.message) ||
+          "Something went wrong loading relationship detail.";
+      }
+    } finally {
+      if (requestId === this.relationshipFieldDetailRequestId) {
+        this.isLoadingRelationshipFieldDetail = false;
+      }
+    }
+  }
+
+  /** The error banner's retry affordance re-runs the same explicit-action load, exactly like Fields'/Sharing's own onretry handlers. */
+  handleRelationshipFieldDetailRetry() {
+    this.relationshipFieldDetail = null;
+    this.loadRelationshipFieldDetail();
+  }
+
+  /** The explicit "Load record counts" action (see canLoadTargetObjectRecordCounts) — never fired automatically, since this is the exact synchronous-COUNT()-per-target-object cost that made the old inline behavior slow on wide-fanout objects. */
+  async handleLoadTargetObjectRecordCounts() {
+    await this.loadTargetObjectRecordCounts();
+  }
+
+  handleTargetObjectRecordCountsRetry() {
+    this.targetObjectRecordCounts = null;
+    this.targetObjectRecordCountsErrorMessage = null;
+    this.loadTargetObjectRecordCounts();
+  }
+
+  async loadTargetObjectRecordCounts() {
+    const objectApiNames = this.distinctRelationshipTargetObjectApiNames;
+    if (
+      this.isTargetObjectRecordCountsLoaded ||
+      this.isLoadingTargetObjectRecordCounts ||
+      objectApiNames.length === 0
+    ) {
+      return;
+    }
+    const requestId = ++this.targetObjectRecordCountsRequestId;
+    this.isLoadingTargetObjectRecordCounts = true;
+    this.targetObjectRecordCountsErrorMessage = null;
+    try {
+      const result = await getRelationshipTargetObjectRecordCounts({
+        objectApiNames
+      });
+      if (requestId !== this.targetObjectRecordCountsRequestId) {
+        return;
+      }
+      this.targetObjectRecordCounts = result.countsByObjectApiName || {};
+      this.targetObjectRecordCountsTruncated = !!result.truncated;
+    } catch (error) {
+      if (requestId === this.targetObjectRecordCountsRequestId) {
+        this.targetObjectRecordCounts = null;
+        this.targetObjectRecordCountsErrorMessage =
+          (error && error.body && error.body.message) ||
+          "Something went wrong loading record counts.";
+      }
+    } finally {
+      if (requestId === this.targetObjectRecordCountsRequestId) {
+        this.isLoadingTargetObjectRecordCounts = false;
+      }
+    }
+  }
+
+  get isObjectSharingSettingsLoaded() {
+    return this.objectSharingSettings !== null;
+  }
+
+  get hasObjectSharingSettingsError() {
+    return !!this.objectSharingSettingsErrorMessage;
+  }
+
+  get objectSharingSettingsSupported() {
+    return !!(
+      this.objectSharingSettings && this.objectSharingSettings.supported
+    );
+  }
+
+  get objectSharingSettingsUnavailableReason() {
+    return (
+      (this.objectSharingSettings &&
+        this.objectSharingSettings.unavailableReason) ||
+      null
+    );
+  }
+
+  /** A plain (label, value) pair list — same shape as fieldRelationshipFields above — rather than a table, since this section is always exactly two facts. externalSharingModel not being enabled for this org/object is shown as "Not enabled", never a blank or fabricated value. */
+  get objectSharingSettingsRows() {
+    if (!this.objectSharingSettingsSupported) {
+      return [];
+    }
+    return [
+      {
+        key: "internal",
+        label: "Internal Sharing Model",
+        value: this.objectSharingSettings.internalSharingModel || "—"
+      },
+      {
+        key: "external",
+        label: "External Sharing Model",
+        value: this.objectSharingSettings.externalSharingModel || "Not enabled"
+      }
+    ];
+  }
+
+  async loadObjectSharingSettings() {
+    if (
+      this.isObjectSharingSettingsLoaded ||
+      this.isLoadingObjectSharingSettings ||
+      !this.apiName
+    ) {
+      return;
+    }
+    const requestId = ++this.objectSharingSettingsRequestId;
+    const objectApiName = this.apiName;
+    this.isLoadingObjectSharingSettings = true;
+    this.objectSharingSettingsErrorMessage = null;
+    try {
+      const result = await getObjectSharingSettings({ objectApiName });
+      if (requestId !== this.objectSharingSettingsRequestId) {
+        return;
+      }
+      this.objectSharingSettings = result;
+    } catch (error) {
+      if (requestId === this.objectSharingSettingsRequestId) {
+        this.objectSharingSettings = null;
+        this.objectSharingSettingsErrorMessage =
+          (error && error.body && error.body.message) ||
+          "Something went wrong loading sharing settings.";
+      }
+    } finally {
+      if (requestId === this.objectSharingSettingsRequestId) {
+        this.isLoadingObjectSharingSettings = false;
+      }
+    }
+  }
+
+  /** The error banner's retry affordance re-runs the same explicit-action load, exactly like Relationships' own onretry handler. */
+  handleObjectSharingSettingsRetry() {
+    this.objectSharingSettings = null;
+    this.loadObjectSharingSettings();
+  }
+
   get attributeRows() {
     if (!this.detail || !this.detail.attributes) {
       return [];
@@ -1052,6 +1722,38 @@ export default class OiNodeDetailPanel extends LightningElement {
     );
   }
 
+  get fieldMetricRows() {
+    const summaries = this.fieldSummaries || [];
+    const unloadedValue = this.areFieldsLoaded ? 0 : "—";
+    return [
+      { key: "total", label: "Total", value: this.fieldCount },
+      {
+        key: "standard",
+        label: "Standard",
+        value: this.areFieldsLoaded
+          ? summaries.filter((field) => field.isCustom === false).length
+          : unloadedValue
+      },
+      {
+        key: "custom",
+        label: "Custom",
+        value: this.areFieldsLoaded
+          ? summaries.filter((field) => field.isCustom === true).length
+          : unloadedValue
+      },
+      {
+        key: "relationship",
+        label: "Relationship",
+        value: this.areFieldsLoaded
+          ? summaries.filter(
+              (field) =>
+                Array.isArray(field.referenceTo) && field.referenceTo.length
+            ).length
+          : unloadedValue
+      }
+    ];
+  }
+
   get hasFieldsToShow() {
     return this.fieldCount > 0;
   }
@@ -1070,6 +1772,16 @@ export default class OiNodeDetailPanel extends LightningElement {
       this.fieldsVisible = true;
       return;
     }
+    await this.loadFieldSummaries();
+    if (this.areFieldsLoaded) {
+      this.fieldsVisible = true;
+    }
+  }
+
+  async loadFieldSummaries() {
+    if (this.areFieldsLoaded || this.isLoadingFields || !this._nodeKey) {
+      return;
+    }
     const requestId = ++this.fieldRequestId;
     const requestedNodeKey = this._nodeKey;
     this.isLoadingFields = true;
@@ -1082,7 +1794,6 @@ export default class OiNodeDetailPanel extends LightningElement {
         return;
       }
       this.fieldSummaries = summaries;
-      this.fieldsVisible = true;
     } catch (error) {
       if (requestId === this.fieldRequestId) {
         this.fieldSummaries = null;

@@ -37,167 +37,432 @@
  */
 @isTest
 private class OI_ScanOrchestratorQueueableTest {
-    @isTest
-    static void testStartScanCompletesTheRunWithMetadataTypesIncludedRecorded() {
-        OI_ScanOrchestratorQueueable.testScannerOverrides.put('ApexClass', new OI_FakeMetadataScanner(5, true));
+  @isTest
+  static void testStartScanCompletesTheRunWithMetadataTypesIncludedRecorded() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(5, true)
+    );
 
-        Test.startTest();
-        Id runId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-        Test.stopTest();
+    Test.startTest();
+    Id runId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+    Test.stopTest();
 
-        OI_Scan_Run__c run = [SELECT Status__c, Completed_At__c, Metadata_Types_Included__c FROM OI_Scan_Run__c WHERE Id = :runId];
-        System.assertEquals('Completed', run.Status__c);
-        System.assertNotEquals(null, run.Completed_At__c);
-        System.assertEquals('ApexClass', run.Metadata_Types_Included__c);
+    OI_Scan_Run__c run = [
+      SELECT Status__c, Completed_At__c, Metadata_Types_Included__c
+      FROM OI_Scan_Run__c
+      WHERE Id = :runId
+    ];
+    System.assertEquals('Completed', run.Status__c);
+    System.assertNotEquals(null, run.Completed_At__c);
+    System.assertEquals('ApexClass', run.Metadata_Types_Included__c);
 
-        OI_Scan_Task__c task = [SELECT Metadata_Type__c, Status__c FROM OI_Scan_Task__c WHERE Scan_Run__c = :runId LIMIT 1];
-        System.assertEquals('ApexClass', task.Metadata_Type__c);
+    OI_Scan_Task__c task = [
+      SELECT Metadata_Type__c, Status__c
+      FROM OI_Scan_Task__c
+      WHERE Scan_Run__c = :runId
+      LIMIT 1
+    ];
+    System.assertEquals('ApexClass', task.Metadata_Type__c);
+  }
+
+  @isTest
+  static void testMetadataTypeOverrideRestrictsTheScanToOnlyThatType() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(3, true)
+    );
+
+    Test.startTest();
+    Id runId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+    Test.stopTest();
+
+    List<OI_Scan_Task__c> tasks = [
+      SELECT Metadata_Type__c
+      FROM OI_Scan_Task__c
+      WHERE Scan_Run__c = :runId
+    ];
+    System.assertEquals(1, tasks.size());
+    System.assertEquals('ApexClass', tasks[0].Metadata_Type__c);
+  }
+
+  @isTest
+  static void testOverrideMatchingNoEnabledTypeCompletesImmediatelyWithNoTasks() {
+    Id runId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'DoesNotExistType' }
+    );
+
+    OI_Scan_Run__c run = [
+      SELECT Status__c
+      FROM OI_Scan_Run__c
+      WHERE Id = :runId
+    ];
+    System.assertEquals('Completed', run.Status__c);
+    System.assertEquals(
+      0,
+      [SELECT COUNT() FROM OI_Scan_Task__c WHERE Scan_Run__c = :runId]
+    );
+  }
+
+  @isTest
+  static void testSuccessfulTaskRecordsIsFullSnapshotAndRecordsScanned() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(7, true)
+    );
+
+    Test.startTest();
+    Id runId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+    Test.stopTest();
+
+    OI_Scan_Task__c task = [
+      SELECT
+        Status__c,
+        Is_Full_Snapshot__c,
+        Records_Scanned__c,
+        Error_Message__c
+      FROM OI_Scan_Task__c
+      WHERE Scan_Run__c = :runId
+      LIMIT 1
+    ];
+    System.assertEquals(
+      'Succeeded',
+      task.Status__c,
+      'Error_Message__c: ' + task.Error_Message__c
+    );
+    System.assertEquals(true, task.Is_Full_Snapshot__c);
+    System.assertEquals(7, task.Records_Scanned__c);
+  }
+
+  // --- Sprint 9 additions: single-flight guard, cancellation, status/history reads ---
+
+  @isTest
+  static void testStartScanWhileAnotherIsRunningThrowsServiceException() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(3, true)
+    );
+    OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+
+    try {
+      OI_ScanOrchestratorQueueable.startScan(
+        'Full',
+        new List<String>{ 'ApexClass' }
+      );
+      System.assert(
+        false,
+        'Expected the single-flight guard to reject a second concurrent scan.'
+      );
+    } catch (OI_ServiceException e) {
+      System.assert(true);
     }
+  }
 
-    @isTest
-    static void testMetadataTypeOverrideRestrictsTheScanToOnlyThatType() {
-        OI_ScanOrchestratorQueueable.testScannerOverrides.put('ApexClass', new OI_FakeMetadataScanner(3, true));
+  @isTest
+  static void testStartScanSucceedsAfterThePreviousRunHasCompleted() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(3, true)
+    );
+    Test.startTest();
+    Id firstRunId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+    Test.stopTest();
 
-        Test.startTest();
-        Id runId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-        Test.stopTest();
+    Id secondRunId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+    System.assertNotEquals(firstRunId, secondRunId);
+  }
 
-        List<OI_Scan_Task__c> tasks = [SELECT Metadata_Type__c FROM OI_Scan_Task__c WHERE Scan_Run__c = :runId];
-        System.assertEquals(1, tasks.size());
-        System.assertEquals('ApexClass', tasks[0].Metadata_Type__c);
+  /**
+   * Calls execute() directly rather than via System.enqueueJob/Test.stopTest() — safe
+   * here specifically because a Cancelled run's execute() returns immediately without
+   * enqueueing anything further (see OI_ScanOrchestratorQueueable.execute), so this
+   * exercises the real cancellation-check code path with zero chain-depth risk.
+   */
+  @isTest
+  static void testExecuteOnCancelledRunDoesNotStartAnyScanTask() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Cancelled';
+    insert run;
+
+    OI_ScanOrchestratorQueueable orchestrator = new OI_ScanOrchestratorQueueable(
+      run.Id,
+      new List<String>{ 'ApexClass' }
+    );
+    orchestrator.execute(null);
+
+    System.assertEquals(
+      0,
+      [SELECT COUNT() FROM OI_Scan_Task__c WHERE Scan_Run__c = :run.Id],
+      'A cancelled run must not start any new scan task.'
+    );
+  }
+
+  @isTest
+  static void testCancelScanTransitionsRunningRunToCancelled() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(3, true)
+    );
+    Id runId = OI_ScanOrchestratorQueueable.startScan(
+      'Full',
+      new List<String>{ 'ApexClass' }
+    );
+
+    OI_ScanOrchestratorQueueable.cancelScan(runId);
+
+    System.assertEquals(
+      'Cancelled',
+      OI_ScanOrchestratorQueueable.getScanStatus(runId).Status__c
+    );
+  }
+
+  @isTest
+  static void testCancelScanOnNonRunningRunThrowsValidationException() {
+    OI_Scan_Run__c completedRun = OI_TestDataFactory.newScanRun();
+    completedRun.Status__c = 'Completed';
+    insert completedRun;
+
+    try {
+      OI_ScanOrchestratorQueueable.cancelScan(completedRun.Id);
+      System.assert(
+        false,
+        'Expected OI_ValidationException — only a Running scan can be cancelled.'
+      );
+    } catch (OI_ValidationException e) {
+      System.assert(true);
     }
+  }
 
-    @isTest
-    static void testOverrideMatchingNoEnabledTypeCompletesImmediatelyWithNoTasks() {
-        Id runId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'DoesNotExistType' });
+  @isTest
+  static void testGetScanStatusThrowsForUnknownId() {
+    OI_Scan_Run__c placeholder = OI_TestDataFactory.newScanRun();
+    insert placeholder;
+    Id fakeId = placeholder.Id;
+    delete placeholder;
 
-        OI_Scan_Run__c run = [SELECT Status__c FROM OI_Scan_Run__c WHERE Id = :runId];
-        System.assertEquals('Completed', run.Status__c);
-        System.assertEquals(0, [SELECT COUNT() FROM OI_Scan_Task__c WHERE Scan_Run__c = :runId]);
+    try {
+      OI_ScanOrchestratorQueueable.getScanStatus(fakeId);
+      System.assert(
+        false,
+        'Expected OI_ValidationException for a scan run that does not exist.'
+      );
+    } catch (OI_ValidationException e) {
+      System.assert(true);
     }
+  }
 
-    @isTest
-    static void testSuccessfulTaskRecordsIsFullSnapshotAndRecordsScanned() {
-        OI_ScanOrchestratorQueueable.testScannerOverrides.put('ApexClass', new OI_FakeMetadataScanner(7, true));
+  /**
+   * Uses a deliberately-future and deliberately-past cursor rather than chaining off a
+   * just-inserted row's own CreatedDate — records inserted moments apart within the same
+   * test transaction can legitimately share an identical CreatedDate timestamp, which
+   * would make a strict "<" comparison against one row's own timestamp flaky.
+   */
+  @isTest
+  static void testGetScanHistoryFiltersStrictlyOlderThanTheCursor() {
+    insert OI_TestDataFactory.newScanRun();
+    insert OI_TestDataFactory.newScanRun();
 
-        Test.startTest();
-        Id runId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-        Test.stopTest();
+    List<OI_Scan_Run__c> allRows = OI_ScanOrchestratorQueueable.getScanHistory(
+      10,
+      null
+    );
+    System.assertEquals(2, allRows.size());
 
-        OI_Scan_Task__c task = [
-            SELECT Status__c, Is_Full_Snapshot__c, Records_Scanned__c, Error_Message__c
-            FROM OI_Scan_Task__c
-            WHERE Scan_Run__c = :runId
-            LIMIT 1
-        ];
-        System.assertEquals('Succeeded', task.Status__c, 'Error_Message__c: ' + task.Error_Message__c);
-        System.assertEquals(true, task.Is_Full_Snapshot__c);
-        System.assertEquals(7, task.Records_Scanned__c);
+    String futureCursor = String.valueOf(Datetime.now().addDays(1));
+    List<OI_Scan_Run__c> pageBeforeFutureCursor = OI_ScanOrchestratorQueueable.getScanHistory(
+      10,
+      futureCursor
+    );
+    System.assertEquals(
+      2,
+      pageBeforeFutureCursor.size(),
+      'A cursor in the future must include every existing row.'
+    );
+
+    String pastCursor = String.valueOf(
+      Datetime.newInstanceGmt(2000, 1, 1, 0, 0, 0)
+    );
+    List<OI_Scan_Run__c> pageAfterPastCursor = OI_ScanOrchestratorQueueable.getScanHistory(
+      10,
+      pastCursor
+    );
+    System.assertEquals(
+      0,
+      pageAfterPastCursor.size(),
+      'A cursor before every row must exclude everything.'
+    );
+  }
+
+  // --- Sprint 9.1 additions: interim progress reporting during large-type Batch Apex ingestion ---
+
+  @isTest
+  static void testRecordComponentIngestProgressWritesInterimRecordsScanned() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Running';
+    insert run;
+    OI_Scan_Task__c task = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'CustomField',
+      Status__c = 'Running'
+    );
+    insert task;
+
+    Test.startTest();
+    OI_ScanOrchestratorQueueable.recordComponentIngestProgress(
+      run.Id,
+      task.Id,
+      'CustomField',
+      300,
+      25916
+    );
+    Test.stopTest();
+
+    OI_Scan_Task__c interimTask = [
+      SELECT Status__c, Records_Scanned__c
+      FROM OI_Scan_Task__c
+      WHERE Id = :task.Id
+    ];
+    System.assertEquals(
+      300,
+      interimTask.Records_Scanned__c,
+      'An interim progress write must land on the task before the type finishes.'
+    );
+    System.assertEquals(
+      'Running',
+      interimTask.Status__c,
+      'An interim progress write must not change the task status.'
+    );
+  }
+
+  /**
+   * recordComponentIngestProgress is called from inside a Batch Apex execute() scope
+   * (OI_ScanComponentIngestBatchable) — a failure to write interim progress (e.g. the
+   * task was deleted mid-run) must never escape and fail the scope that is doing the
+   * real ingestion work, per this method's own "deliberately never throws" contract.
+   */
+  @isTest
+  static void testRecordComponentIngestProgressForAMissingTaskDoesNotThrow() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    insert run;
+    OI_Scan_Task__c real = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'CustomField',
+      Status__c = 'Running'
+    );
+    insert real;
+    Id missingTaskId = real.Id;
+    delete real;
+
+    Test.startTest();
+    try {
+      OI_ScanOrchestratorQueueable.recordComponentIngestProgress(
+        run.Id,
+        missingTaskId,
+        'CustomField',
+        300,
+        25916
+      );
+    } catch (Exception e) {
+      System.assert(
+        false,
+        'A missing task must not surface as an exception to the caller: ' +
+        e.getMessage()
+      );
     }
+    Test.stopTest();
 
-    // --- Sprint 9 additions: single-flight guard, cancellation, status/history reads ---
+    Test.getEventBus().deliver();
+    System.assert(
+      [
+        SELECT COUNT()
+        FROM OI_Log__c
+        WHERE Level__c = 'WARN' AND Source__c = 'OI_ScanOrchestratorQueueable'
+      ] > 0,
+      'The failed interim write must be logged.'
+    );
+  }
 
-    @isTest
-    static void testStartScanWhileAnotherIsRunningThrowsServiceException() {
-        OI_ScanOrchestratorQueueable.testScannerOverrides.put('ApexClass', new OI_FakeMetadataScanner(3, true));
-        OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
+  /** A batch that keeps running after the user cancels must not write interim progress for the cancelled run. */
+  @isTest
+  static void testRecordComponentIngestProgressIsSkippedForACancelledRun() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Cancelled';
+    insert run;
+    OI_Scan_Task__c task = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'CustomField',
+      Status__c = 'Running'
+    );
+    insert task;
 
-        try {
-            OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-            System.assert(false, 'Expected the single-flight guard to reject a second concurrent scan.');
-        } catch (OI_ServiceException e) {
-            System.assert(true);
-        }
+    Test.startTest();
+    OI_ScanOrchestratorQueueable.recordComponentIngestProgress(
+      run.Id,
+      task.Id,
+      'CustomField',
+      300,
+      25916
+    );
+    Test.stopTest();
+
+    Decimal scanned = [
+      SELECT Records_Scanned__c
+      FROM OI_Scan_Task__c
+      WHERE Id = :task.Id
+    ]
+    .Records_Scanned__c;
+    System.assert(
+      scanned == null || scanned == 0,
+      'A cancelled run must not receive interim progress, got ' + scanned
+    );
+  }
+
+  @isTest
+  static void testRecordRelationshipIngestProgressPublishesWithoutThrowing() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Running';
+    insert run;
+
+    Test.startTest();
+    try {
+      OI_ScanOrchestratorQueueable.recordRelationshipIngestProgress(
+        run.Id,
+        'CustomField',
+        3600,
+        46320
+      );
+    } catch (Exception e) {
+      System.assert(
+        false,
+        'Relationship-phase progress reporting must never throw: ' +
+        e.getMessage()
+      );
     }
+    Test.stopTest();
 
-    @isTest
-    static void testStartScanSucceedsAfterThePreviousRunHasCompleted() {
-        OI_ScanOrchestratorQueueable.testScannerOverrides.put('ApexClass', new OI_FakeMetadataScanner(3, true));
-        Test.startTest();
-        Id firstRunId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-        Test.stopTest();
-
-        Id secondRunId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-        System.assertNotEquals(firstRunId, secondRunId);
-    }
-
-    /**
-     * Calls execute() directly rather than via System.enqueueJob/Test.stopTest() — safe
-     * here specifically because a Cancelled run's execute() returns immediately without
-     * enqueueing anything further (see OI_ScanOrchestratorQueueable.execute), so this
-     * exercises the real cancellation-check code path with zero chain-depth risk.
-     */
-    @isTest
-    static void testExecuteOnCancelledRunDoesNotStartAnyScanTask() {
-        OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
-        run.Status__c = 'Cancelled';
-        insert run;
-
-        OI_ScanOrchestratorQueueable orchestrator = new OI_ScanOrchestratorQueueable(run.Id, new List<String>{ 'ApexClass' });
-        orchestrator.execute(null);
-
-        System.assertEquals(0, [SELECT COUNT() FROM OI_Scan_Task__c WHERE Scan_Run__c = :run.Id], 'A cancelled run must not start any new scan task.');
-    }
-
-    @isTest
-    static void testCancelScanTransitionsRunningRunToCancelled() {
-        OI_ScanOrchestratorQueueable.testScannerOverrides.put('ApexClass', new OI_FakeMetadataScanner(3, true));
-        Id runId = OI_ScanOrchestratorQueueable.startScan('Full', new List<String>{ 'ApexClass' });
-
-        OI_ScanOrchestratorQueueable.cancelScan(runId);
-
-        System.assertEquals('Cancelled', OI_ScanOrchestratorQueueable.getScanStatus(runId).Status__c);
-    }
-
-    @isTest
-    static void testCancelScanOnNonRunningRunThrowsValidationException() {
-        OI_Scan_Run__c completedRun = OI_TestDataFactory.newScanRun();
-        completedRun.Status__c = 'Completed';
-        insert completedRun;
-
-        try {
-            OI_ScanOrchestratorQueueable.cancelScan(completedRun.Id);
-            System.assert(false, 'Expected OI_ValidationException — only a Running scan can be cancelled.');
-        } catch (OI_ValidationException e) {
-            System.assert(true);
-        }
-    }
-
-    @isTest
-    static void testGetScanStatusThrowsForUnknownId() {
-        OI_Scan_Run__c placeholder = OI_TestDataFactory.newScanRun();
-        insert placeholder;
-        Id fakeId = placeholder.Id;
-        delete placeholder;
-
-        try {
-            OI_ScanOrchestratorQueueable.getScanStatus(fakeId);
-            System.assert(false, 'Expected OI_ValidationException for a scan run that does not exist.');
-        } catch (OI_ValidationException e) {
-            System.assert(true);
-        }
-    }
-
-    /**
-     * Uses a deliberately-future and deliberately-past cursor rather than chaining off a
-     * just-inserted row's own CreatedDate — records inserted moments apart within the same
-     * test transaction can legitimately share an identical CreatedDate timestamp, which
-     * would make a strict "<" comparison against one row's own timestamp flaky.
-     */
-    @isTest
-    static void testGetScanHistoryFiltersStrictlyOlderThanTheCursor() {
-        insert OI_TestDataFactory.newScanRun();
-        insert OI_TestDataFactory.newScanRun();
-
-        List<OI_Scan_Run__c> allRows = OI_ScanOrchestratorQueueable.getScanHistory(10, null);
-        System.assertEquals(2, allRows.size());
-
-        String futureCursor = String.valueOf(Datetime.now().addDays(1));
-        List<OI_Scan_Run__c> pageBeforeFutureCursor = OI_ScanOrchestratorQueueable.getScanHistory(10, futureCursor);
-        System.assertEquals(2, pageBeforeFutureCursor.size(), 'A cursor in the future must include every existing row.');
-
-        String pastCursor = String.valueOf(Datetime.newInstanceGmt(2000, 1, 1, 0, 0, 0));
-        List<OI_Scan_Run__c> pageAfterPastCursor = OI_ScanOrchestratorQueueable.getScanHistory(10, pastCursor);
-        System.assertEquals(0, pageAfterPastCursor.size(), 'A cursor before every row must exclude everything.');
-    }
+    System.assertEquals(
+      'Running',
+      [SELECT Status__c FROM OI_Scan_Run__c WHERE Id = :run.Id].Status__c,
+      'A progress signal must not change the run.'
+    );
+  }
 }

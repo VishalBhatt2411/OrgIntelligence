@@ -291,36 +291,43 @@ private class OI_OrgHealthFindingServiceTest {
     );
   }
 
+  /**
+   * Uses a DI fake for OI_OrgHealthFindingHistorySelector (CodingStandards.md's DI-based-fake
+   * convention) rather than a real Status__c update + a real query against
+   * OI_Org_Health_Finding__History. A live-org reproduction proved Salesforce's native Field
+   * History Tracking is not reliably queryable within the SAME transaction that made the
+   * change (confirmed: a Status__c change was invisible to an immediate SELECT against
+   * OI_Org_Health_Finding__History in the same script, but appeared once a second, later
+   * transaction queried it) — an ordinary Apex test method is exactly one transaction, so
+   * asserting on real platform-generated history rows here was asserting on a timing
+   * guarantee the platform does not make, not a bug in getFindingHistory's own label-resolution
+   * logic. That logic is what this test actually verifies, so it fakes the History rows
+   * getFindingHistory receives rather than depending on when/whether the platform has
+   * finished writing them.
+   */
   @isTest
   static void testGetFindingHistoryReturnsHumanReadableFieldLabelsForTrackedChanges() {
-    new OI_OrgHealthFindingService()
-      .sync(
-        'MetadataHealth',
-        new List<OI_OrgHealthFindingCandidate>{ buildCandidate('objHistory') },
-        'run-1'
-      );
-    Id findingId = new OI_OrgHealthFindingService()
-        .getFindingsForSection('MetadataHealth')[0]
-      .id;
+    OI_OrgHealthFindingService service = new OI_OrgHealthFindingService(
+      new OI_OrgHealthFindingRepository(),
+      new FakeOrgHealthFindingHistorySelector(
+        new List<OI_FindingHistoryRowDTO>{
+          new OI_FindingHistoryRowDTO(
+            'Status__c',
+            'Open',
+            'Acknowledged',
+            Datetime.now(),
+            'Test User'
+          )
+        }
+      )
+    );
 
-    new OI_OrgHealthFindingService()
-      .updateStatus(
-        findingId,
-        'Acknowledged',
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      );
-
-    List<OI_FindingHistoryDTO> history = new OI_OrgHealthFindingService()
-      .getFindingHistory(findingId);
+    /** The fake selector below ignores its findingId argument entirely, so no real finding needs to exist for this test — getFindingHistory's own label-resolution logic is the only thing under test here. */
+    List<OI_FindingHistoryDTO> history = service.getFindingHistory(null);
 
     System.assert(
       !history.isEmpty(),
-      'Status__c has trackHistory=true — an explicit status change must produce at least one history row.'
+      'The fake selector supplied one history row, which getFindingHistory must pass through.'
     );
     Boolean foundStatusChange = false;
     for (OI_FindingHistoryDTO entry : history) {
@@ -391,5 +398,22 @@ private class OI_OrgHealthFindingServiceTest {
     candidate.remediation = 'Remediation text.';
     candidate.validationSteps = 'Validation text.';
     return candidate;
+  }
+
+  /** DI seam for tests (CodingStandards.md's DI-based-fake convention) — see testGetFindingHistoryReturnsHumanReadableFieldLabelsForTrackedChanges for why this replaces asserting on real, platform-generated OI_Org_Health_Finding__History rows. */
+  private class FakeOrgHealthFindingHistorySelector extends OI_OrgHealthFindingHistorySelector {
+    private final List<OI_FindingHistoryRowDTO> rows;
+
+    private FakeOrgHealthFindingHistorySelector(
+      List<OI_FindingHistoryRowDTO> rows
+    ) {
+      this.rows = rows;
+    }
+
+    public override List<OI_FindingHistoryRowDTO> selectByFindingId(
+      Id findingId
+    ) {
+      return rows;
+    }
   }
 }

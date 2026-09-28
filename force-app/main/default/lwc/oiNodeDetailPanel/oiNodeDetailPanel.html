@@ -106,6 +106,21 @@
                 >
               </button>
               <template lwc:if={isFieldsExpanded}>
+                <div
+                  class="oi-node-detail-panel-metric-grid"
+                  data-id="field-metrics"
+                >
+                  <template for:each={fieldMetricRows} for:item="metric">
+                    <div key={metric.key} class="oi-node-detail-panel-metric">
+                      <span class="oi-node-detail-panel-metric-value"
+                        >{metric.value}</span
+                      >
+                      <span class="oi-node-detail-panel-metric-label"
+                        >{metric.label}</span
+                      >
+                    </div>
+                  </template>
+                </div>
                 <template lwc:if={fieldsVisible}>
                   <div class="oi-node-detail-panel-fields-toolbar">
                     <input
@@ -229,6 +244,37 @@
             </div>
           </template>
 
+          <template lwc:if={hasFieldRelationshipSection}>
+            <div
+              class="oi-node-detail-panel-section"
+              data-id="field-relationship-section"
+            >
+              <div class="oi-node-detail-panel-section-header-static">
+                <lightning-icon
+                  icon-name="utility:relate"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-icon is-relationships"
+                ></lightning-icon>
+                <h3 class="oi-node-detail-panel-section-title">Relationship</h3>
+              </div>
+              <div class="oi-node-detail-panel-overview-grid">
+                <template for:each={fieldRelationshipFields} for:item="field">
+                  <div
+                    key={field.key}
+                    class="oi-node-detail-panel-overview-cell"
+                  >
+                    <span class="oi-node-detail-panel-overview-label"
+                      >{field.label}</span
+                    >
+                    <span class="oi-node-detail-panel-overview-value"
+                      >{field.value}</span
+                    >
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
           <template lwc:if={hasRelationshipCounts}>
             <div
               class="oi-node-detail-panel-section"
@@ -296,6 +342,101 @@
                       </template>
                     </tbody>
                   </table>
+
+                  <p
+                    class="oi-node-detail-panel-section-note"
+                    data-id="outgoing-relationships-heading"
+                  >
+                    Outgoing relationships
+                  </p>
+                  <template lwc:if={isLoadingRelationshipFieldDetail}>
+                    <c-oi-skeleton
+                      lines="3"
+                      label="Loading relationship detail"
+                    ></c-oi-skeleton>
+                  </template>
+                  <template lwc:elseif={hasRelationshipFieldDetailError}>
+                    <c-oi-state-banner
+                      data-id="relationship-field-detail-error"
+                      state="error"
+                      title="Couldn't load relationship detail"
+                      message={relationshipFieldDetailErrorMessage}
+                      onretry={handleRelationshipFieldDetailRetry}
+                    ></c-oi-state-banner>
+                  </template>
+                  <template lwc:elseif={hasRelationshipFieldRows}>
+                    <table
+                      class="oi-node-detail-panel-table"
+                      data-id="relationship-field-table"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col">Field</th>
+                          <th scope="col">Type</th>
+                          <th scope="col">Required</th>
+                          <th scope="col">Cascade Delete</th>
+                          <th scope="col">Target Object(s)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template
+                          for:each={relationshipFieldRows}
+                          for:item="field"
+                        >
+                          <tr key={field.fieldNodeKey}>
+                            <td title={field.apiName}>{field.label}</td>
+                            <td>{field.relationshipType}</td>
+                            <td>{field.requiredLabel}</td>
+                            <td>{field.cascadeDeleteLabel}</td>
+                            <td>{field.targetObjectsDisplay}</td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <template lwc:if={canLoadTargetObjectRecordCounts}>
+                      <button
+                        type="button"
+                        class="oi-node-detail-panel-show-fields-button"
+                        data-id="load-target-object-record-counts-button"
+                        title="Fetch a live record count for every target object above"
+                        onclick={handleLoadTargetObjectRecordCounts}
+                      >
+                        Load record counts
+                      </button>
+                    </template>
+                    <template lwc:if={isLoadingTargetObjectRecordCounts}>
+                      <c-oi-skeleton
+                        lines="1"
+                        label="Loading record counts"
+                      ></c-oi-skeleton>
+                    </template>
+                    <template lwc:if={hasTargetObjectRecordCountsError}>
+                      <c-oi-state-banner
+                        data-id="target-object-record-counts-error"
+                        state="error"
+                        title="Couldn't load record counts"
+                        message={targetObjectRecordCountsErrorMessage}
+                        onretry={handleTargetObjectRecordCountsRetry}
+                      ></c-oi-state-banner>
+                    </template>
+                    <template lwc:if={targetObjectRecordCountsTruncated}>
+                      <p
+                        class="oi-node-detail-panel-section-note"
+                        data-id="relationship-cardinality-truncated-note"
+                      >
+                        Some target objects were beyond the limit for a live
+                        record count and show no count here.
+                      </p>
+                    </template>
+                  </template>
+                  <template lwc:elseif={isRelationshipFieldDetailLoaded}>
+                    <c-oi-state-banner
+                      data-id="relationship-field-detail-empty"
+                      state="true-zero"
+                      title="No outgoing relationships"
+                      message="This object has no Lookup or Master-Detail fields of its own."
+                    ></c-oi-state-banner>
+                  </template>
                 </template>
                 <template lwc:else>
                   <p class="oi-node-detail-panel-section-note">
@@ -332,315 +473,621 @@
             </div>
           </template>
 
-          <template lwc:if={hasIntelligenceError}>
-            <c-oi-state-banner
-              data-id="intelligence-error"
-              state="error"
-              title="Couldn't load intelligence"
-              message={intelligenceErrorMessage}
-              onretry={handleIntelligenceRetry}
-            ></c-oi-state-banner>
-          </template>
-          <template lwc:if={hasIntelligenceSections}>
-            <template for:each={intelligenceSections} for:item="section">
-              <div
-                key={section.key}
-                class="oi-node-detail-panel-section"
-                data-id="intelligence-section"
-                data-category={section.key}
+          <template lwc:if={isObject}>
+            <div
+              class="oi-node-detail-panel-section"
+              data-id="sharing-settings-section"
+            >
+              <button
+                type="button"
+                class="oi-node-detail-panel-section-header"
+                data-id="sharing-settings-section-toggle"
+                data-section="sharingSettings"
+                aria-expanded={isSharingSettingsExpanded}
+                onclick={handleSectionToggle}
               >
-                <button
-                  type="button"
-                  class="oi-node-detail-panel-section-header"
-                  data-id="intelligence-section-toggle"
-                  data-section={section.key}
-                  aria-expanded={section.isExpanded}
-                  onclick={handleSectionToggle}
+                <lightning-icon
+                  icon-name="utility:chevronright"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-chevron"
+                ></lightning-icon>
+                <lightning-icon
+                  icon-name="utility:lock"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-icon is-security"
+                  title="Org-Wide Default sharing model for this object"
+                ></lightning-icon>
+                <span class="oi-node-detail-panel-section-title"
+                  >Sharing Settings</span
                 >
-                  <lightning-icon
-                    icon-name="utility:chevronright"
-                    size="xx-small"
-                    class="oi-node-detail-panel-section-chevron"
-                  ></lightning-icon>
-                  <template lwc:if={section.isCode}>
-                    <span
-                      class="oi-node-detail-panel-code-icon"
-                      aria-hidden="true"
-                      >&lt;/&gt;</span
+              </button>
+              <template lwc:if={isSharingSettingsExpanded}>
+                <template lwc:if={isLoadingObjectSharingSettings}>
+                  <c-oi-skeleton
+                    lines="2"
+                    label="Loading sharing settings"
+                  ></c-oi-skeleton>
+                </template>
+                <template lwc:elseif={hasObjectSharingSettingsError}>
+                  <c-oi-state-banner
+                    data-id="object-sharing-settings-error"
+                    state="error"
+                    title="Couldn't load sharing settings"
+                    message={objectSharingSettingsErrorMessage}
+                    onretry={handleObjectSharingSettingsRetry}
+                  ></c-oi-state-banner>
+                </template>
+                <template lwc:elseif={objectSharingSettingsSupported}>
+                  <div
+                    class="oi-node-detail-panel-overview-grid"
+                    data-id="sharing-settings-grid"
+                  >
+                    <template
+                      for:each={objectSharingSettingsRows}
+                      for:item="row"
                     >
-                  </template>
-                  <template lwc:else>
+                      <div
+                        key={row.key}
+                        class="oi-node-detail-panel-overview-cell"
+                      >
+                        <span class="oi-node-detail-panel-overview-label"
+                          >{row.label}</span
+                        >
+                        <span class="oi-node-detail-panel-overview-value"
+                          >{row.value}</span
+                        >
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <template lwc:elseif={isObjectSharingSettingsLoaded}>
+                  <c-oi-state-banner
+                    data-id="object-sharing-settings-unsupported"
+                    state="coverage-incomplete"
+                    title="Sharing settings unavailable"
+                    message={objectSharingSettingsUnavailableReason}
+                  ></c-oi-state-banner>
+                </template>
+              </template>
+            </div>
+          </template>
+
+          <template lwc:if={showMetadataIntelligence}>
+            <template lwc:if={hasIntelligenceError}>
+              <c-oi-state-banner
+                data-id="intelligence-error"
+                state="error"
+                title="Couldn't load intelligence"
+                message={intelligenceErrorMessage}
+                onretry={handleIntelligenceRetry}
+              ></c-oi-state-banner>
+            </template>
+            <template lwc:if={hasIntelligenceSections}>
+              <template for:each={intelligenceSections} for:item="section">
+                <div
+                  key={section.key}
+                  class="oi-node-detail-panel-section"
+                  data-id="intelligence-section"
+                  data-category={section.key}
+                >
+                  <button
+                    type="button"
+                    class="oi-node-detail-panel-section-header"
+                    data-id="intelligence-section-toggle"
+                    data-section={section.key}
+                    aria-expanded={section.isExpanded}
+                    onclick={handleSectionToggle}
+                  >
                     <lightning-icon
-                      icon-name={section.iconName}
+                      icon-name="utility:chevronright"
                       size="xx-small"
-                      class={section.iconModifierClass}
+                      class="oi-node-detail-panel-section-chevron"
                     ></lightning-icon>
+                    <template lwc:if={section.isCode}>
+                      <span
+                        class="oi-node-detail-panel-code-icon"
+                        aria-hidden="true"
+                        >&lt;/&gt;</span
+                      >
+                    </template>
+                    <template lwc:else>
+                      <lightning-icon
+                        icon-name={section.iconName}
+                        size="xx-small"
+                        class={section.iconModifierClass}
+                      ></lightning-icon>
+                    </template>
+                    <span class="oi-node-detail-panel-section-title"
+                      >{section.title}</span
+                    >
+                    <span class="oi-node-detail-panel-section-count"
+                      >{section.countLabel}</span
+                    >
+                  </button>
+                  <template lwc:if={section.isExpanded}>
+                    <template lwc:if={section.hasItems}>
+                      <template for:each={section.typeGroups} for:item="group">
+                        <div
+                          key={group.key}
+                          class="oi-node-detail-panel-type-group"
+                          data-id="intelligence-type-group"
+                        >
+                          <button
+                            type="button"
+                            class="oi-node-detail-panel-type-group-header"
+                            data-id="intelligence-type-group-toggle"
+                            data-group-key={group.key}
+                            title={group.headerTitle}
+                            aria-expanded={group.isExpanded}
+                            onclick={handleTypeGroupToggle}
+                          >
+                            <lightning-icon
+                              icon-name="utility:chevronright"
+                              size="xx-small"
+                              class="oi-node-detail-panel-section-chevron"
+                            ></lightning-icon>
+                            <span class="oi-node-detail-panel-type-group-label"
+                              >{group.typeLabel}</span
+                            >
+                            <span
+                              class="oi-node-detail-panel-type-group-count"
+                              data-id="intelligence-type-group-count"
+                              >{group.countLabel}</span
+                            >
+                          </button>
+                          <template lwc:if={group.isExpanded}>
+                            <table
+                              class="oi-node-detail-panel-table oi-node-detail-panel-fields-table"
+                            >
+                              <tbody>
+                                <template
+                                  for:each={group.items}
+                                  for:item="item"
+                                >
+                                  <tr
+                                    key={item.nodeKey}
+                                    class="oi-node-detail-panel-field-row"
+                                    data-id="intelligence-row"
+                                    data-node-key={item.nodeKey}
+                                    onclick={handleIntelligenceRowClick}
+                                  >
+                                    <td title={item.label}>
+                                      {item.label}
+                                      <template lwc:if={item.hasStatus}>
+                                        <span
+                                          class={item.statusBadgeClass}
+                                          data-id="intelligence-status-badge"
+                                          >{item.status}</span
+                                        >
+                                      </template>
+                                    </td>
+                                    <td title={item.typeLabel}>
+                                      {item.typeLabel}
+                                    </td>
+                                    <td title={item.directionLabel}>
+                                      {item.directionLabel}
+                                    </td>
+                                  </tr>
+                                </template>
+                              </tbody>
+                            </table>
+                          </template>
+                        </div>
+                      </template>
+                      <template lwc:if={section.truncated}>
+                        <p
+                          class="oi-node-detail-panel-section-note"
+                          data-id="intelligence-truncated"
+                        >
+                          Showing the first results only — more exist than are
+                          listed here.
+                        </p>
+                      </template>
+                    </template>
+                    <template lwc:else>
+                      <p
+                        class={section.emptyStateBadgeClass}
+                        data-id="intelligence-empty"
+                        data-state={section.emptyState}
+                      >
+                        {section.emptyStateMessage}
+                      </p>
+                    </template>
+                    <button
+                      type="button"
+                      class="oi-node-detail-panel-coverage-toggle"
+                      data-id="coverage-details-toggle"
+                      data-category={section.key}
+                      aria-expanded={section.isCoverageDetailsExpanded}
+                      onclick={handleCoverageDetailsToggle}
+                    >
+                      <lightning-icon
+                        icon-name="utility:info"
+                        size="xx-small"
+                      ></lightning-icon>
+                      Coverage details
+                    </button>
+                    <template lwc:if={section.isCoverageDetailsExpanded}>
+                      <p
+                        class="oi-node-detail-panel-section-note"
+                        data-id="intelligence-coverage"
+                      >
+                        {section.coverageNote}
+                      </p>
+                    </template>
                   </template>
-                  <span class="oi-node-detail-panel-section-title"
-                    >{section.title}</span
+                </div>
+              </template>
+            </template>
+          </template>
+
+          <template lwc:if={showMetadataImpact}>
+            <div
+              class="oi-node-detail-panel-section"
+              data-id="impact-analysis-section"
+            >
+              <button
+                type="button"
+                class="oi-node-detail-panel-section-header"
+                data-id="impact-section-toggle"
+                data-section="impact"
+                aria-expanded={isImpactExpanded}
+                onclick={handleSectionToggle}
+              >
+                <lightning-icon
+                  icon-name="utility:chevronright"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-chevron"
+                ></lightning-icon>
+                <lightning-icon
+                  icon-name="utility:graph"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-icon is-impact"
+                ></lightning-icon>
+                <span class="oi-node-detail-panel-section-title">Impact</span>
+              </button>
+              <template lwc:if={isImpactExpanded}>
+                <div class="oi-node-detail-panel-impact-actions">
+                  <button
+                    type="button"
+                    class="oi-node-detail-panel-impact-button"
+                    data-id="impact-forward-button"
+                    onclick={handleShowForwardImpact}
                   >
-                  <span class="oi-node-detail-panel-section-count"
-                    >{section.countLabel}</span
+                    What does this depend on?
+                  </button>
+                  <button
+                    type="button"
+                    class="oi-node-detail-panel-impact-button"
+                    data-id="impact-reverse-button"
+                    onclick={handleShowReverseImpact}
                   >
-                </button>
-                <template lwc:if={section.isExpanded}>
-                  <template lwc:if={section.hasItems}>
+                    What depends on this?
+                  </button>
+                </div>
+                <template lwc:if={isLoadingImpact}>
+                  <c-oi-skeleton
+                    lines="4"
+                    label="Computing impact"
+                  ></c-oi-skeleton>
+                </template>
+                <template lwc:elseif={hasImpactError}>
+                  <c-oi-state-banner
+                    data-id="impact-error"
+                    state="error"
+                    title="Couldn't compute impact"
+                    message={impactErrorMessage}
+                    onretry={handleImpactRetry}
+                  ></c-oi-state-banner>
+                </template>
+                <template lwc:elseif={hasImpactResult}>
+                  <p
+                    class="oi-node-detail-panel-section-note"
+                    data-id="impact-coverage-caveat"
+                  >
+                    {impactResult.coverageCaveat}
+                  </p>
+                  <template lwc:if={hasImpactAffectedRows}>
+                    <template lwc:if={hasImpactTypeBreakdown}>
+                      <p
+                        class="oi-node-detail-panel-impact-breakdown"
+                        data-id="impact-type-breakdown"
+                      >
+                        <template
+                          for:each={impactTypeBreakdown}
+                          for:item="group"
+                        >
+                          <span
+                            key={group.key}
+                            class="oi-node-detail-panel-impact-breakdown-chip"
+                            >{group.text}</span
+                          >
+                        </template>
+                      </p>
+                    </template>
                     <table
                       class="oi-node-detail-panel-table oi-node-detail-panel-fields-table"
+                      data-id="impact-table"
                     >
+                      <thead>
+                        <tr>
+                          <th scope="col">{impactDirectionLabel}</th>
+                          <th scope="col">Type</th>
+                          <th scope="col">Hops</th>
+                          <th scope="col"></th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        <template for:each={section.items} for:item="item">
+                        <template for:each={impactAffectedRows} for:item="row">
                           <tr
-                            key={item.nodeKey}
+                            key={row.nodeKey}
                             class="oi-node-detail-panel-field-row"
-                            data-id="intelligence-row"
-                            data-node-key={item.nodeKey}
-                            onclick={handleIntelligenceRowClick}
+                            data-id="impact-row"
+                            data-node-key={row.nodeKey}
+                            onclick={handleImpactRowClick}
                           >
-                            <td title={item.label}>{item.label}</td>
-                            <td title={item.typeLabel}>{item.typeLabel}</td>
-                            <td title={item.directionLabel}>
-                              {item.directionLabel}
+                            <td>{row.label}</td>
+                            <td>{row.typeLabel}</td>
+                            <td>{row.hopDistance}</td>
+                            <td>
+                              <template lwc:if={row.cycleBadgeVisible}>
+                                <span
+                                  class="oi-node-detail-panel-field-badge is-custom"
+                                  data-id="impact-cycle-badge"
+                                  >Cycle</span
+                                >
+                              </template>
                             </td>
                           </tr>
                         </template>
                       </tbody>
                     </table>
-                    <template lwc:if={section.truncated}>
-                      <p
-                        class="oi-node-detail-panel-section-note"
-                        data-id="intelligence-truncated"
-                      >
-                        Showing the first results only — more exist than are
-                        listed here.
-                      </p>
-                    </template>
+                    <button
+                      type="button"
+                      class="oi-node-detail-panel-show-fields-button"
+                      data-id="impact-highlight-button"
+                      onclick={handleHighlightOnGraph}
+                    >
+                      Highlight on Graph
+                    </button>
                   </template>
                   <template lwc:else>
-                    <p
-                      class={section.emptyStateBadgeClass}
-                      data-id="intelligence-empty"
-                      data-state={section.emptyState}
-                    >
-                      {section.emptyStateMessage}
-                    </p>
-                  </template>
-                  <button
-                    type="button"
-                    class="oi-node-detail-panel-coverage-toggle"
-                    data-id="coverage-details-toggle"
-                    data-category={section.key}
-                    aria-expanded={section.isCoverageDetailsExpanded}
-                    onclick={handleCoverageDetailsToggle}
-                  >
-                    <lightning-icon
-                      icon-name="utility:info"
-                      size="xx-small"
-                    ></lightning-icon>
-                    Coverage details
-                  </button>
-                  <template lwc:if={section.isCoverageDetailsExpanded}>
-                    <p
-                      class="oi-node-detail-panel-section-note"
-                      data-id="intelligence-coverage"
-                    >
-                      {section.coverageNote}
-                    </p>
+                    <c-oi-state-banner
+                      data-id="impact-empty"
+                      state="true-zero"
+                      title="No dependencies"
+                      message="No dependencies found in the currently-scanned data."
+                    ></c-oi-state-banner>
                   </template>
                 </template>
-              </div>
-            </template>
+              </template>
+            </div>
           </template>
 
-          <div
-            class="oi-node-detail-panel-section"
-            data-id="impact-analysis-section"
-          >
-            <button
-              type="button"
-              class="oi-node-detail-panel-section-header"
-              data-id="impact-section-toggle"
-              data-section="impact"
-              aria-expanded={isImpactExpanded}
-              onclick={handleSectionToggle}
+          <template lwc:if={isRecordDetail}>
+            <div
+              class="oi-node-detail-panel-section"
+              data-id="record-hierarchy-section"
             >
-              <lightning-icon
-                icon-name="utility:chevronright"
-                size="xx-small"
-                class="oi-node-detail-panel-section-chevron"
-              ></lightning-icon>
-              <lightning-icon
-                icon-name="utility:graph"
-                size="xx-small"
-                class="oi-node-detail-panel-section-icon is-impact"
-              ></lightning-icon>
-              <span class="oi-node-detail-panel-section-title">Impact</span>
-            </button>
-            <template lwc:if={isImpactExpanded}>
-              <div class="oi-node-detail-panel-impact-actions">
-                <button
-                  type="button"
-                  class="oi-node-detail-panel-impact-button"
-                  data-id="impact-forward-button"
-                  onclick={handleShowForwardImpact}
+              <button
+                type="button"
+                class="oi-node-detail-panel-section-header"
+                data-id="hierarchy-section-toggle"
+                data-section="hierarchy"
+                aria-expanded={isHierarchyExpanded}
+                onclick={handleSectionToggle}
+              >
+                <lightning-icon
+                  icon-name="utility:chevronright"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-chevron"
+                ></lightning-icon>
+                <lightning-icon
+                  icon-name="utility:hierarchy"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-icon is-relationships"
+                  title="Parent and child records directly connected to this record"
+                ></lightning-icon>
+                <span class="oi-node-detail-panel-section-title"
+                  >Hierarchy</span
                 >
-                  What does this depend on?
-                </button>
-                <button
-                  type="button"
-                  class="oi-node-detail-panel-impact-button"
-                  data-id="impact-reverse-button"
-                  onclick={handleShowReverseImpact}
+                <span class="oi-node-detail-panel-section-count"
+                  >{hierarchySectionCount}</span
                 >
-                  What depends on this?
-                </button>
-              </div>
-              <template lwc:if={isLoadingImpact}>
-                <c-oi-skeleton
-                  lines="4"
-                  label="Computing impact"
-                ></c-oi-skeleton>
-              </template>
-              <template lwc:elseif={hasImpactError}>
-                <c-oi-state-banner
-                  data-id="impact-error"
-                  state="error"
-                  title="Couldn't compute impact"
-                  message={impactErrorMessage}
-                  onretry={handleImpactRetry}
-                ></c-oi-state-banner>
-              </template>
-              <template lwc:elseif={hasImpactResult}>
-                <p
-                  class="oi-node-detail-panel-section-note"
-                  data-id="impact-coverage-caveat"
-                >
-                  {impactResult.coverageCaveat}
-                </p>
-                <template lwc:if={hasImpactAffectedRows}>
-                  <template lwc:if={hasImpactTypeBreakdown}>
-                    <p
-                      class="oi-node-detail-panel-impact-breakdown"
-                      data-id="impact-type-breakdown"
-                    >
-                      <template for:each={impactTypeBreakdown} for:item="group">
-                        <span
-                          key={group.key}
-                          class="oi-node-detail-panel-impact-breakdown-chip"
-                          >{group.text}</span
-                        >
-                      </template>
-                    </p>
-                  </template>
-                  <table
-                    class="oi-node-detail-panel-table oi-node-detail-panel-fields-table"
-                    data-id="impact-table"
+              </button>
+              <template lwc:if={isHierarchyExpanded}>
+                <template lwc:if={hasRecordParents}>
+                  <p
+                    class="oi-node-detail-panel-section-note"
+                    data-id="record-parents-label"
                   >
-                    <thead>
-                      <tr>
-                        <th scope="col">{impactDirectionLabel}</th>
-                        <th scope="col">Type</th>
-                        <th scope="col">Hops</th>
-                        <th scope="col"></th>
-                      </tr>
-                    </thead>
+                    Parent records
+                  </p>
+                  <table class="oi-node-detail-panel-table">
                     <tbody>
-                      <template for:each={impactAffectedRows} for:item="row">
-                        <tr
-                          key={row.nodeKey}
-                          class="oi-node-detail-panel-field-row"
-                          data-id="impact-row"
-                          data-node-key={row.nodeKey}
-                          onclick={handleImpactRowClick}
-                        >
-                          <td>{row.label}</td>
-                          <td>{row.typeLabel}</td>
-                          <td>{row.hopDistance}</td>
-                          <td>
-                            <template lwc:if={row.cycleBadgeVisible}>
-                              <span
-                                class="oi-node-detail-panel-field-badge is-custom"
-                                data-id="impact-cycle-badge"
-                                >Cycle</span
-                              >
-                            </template>
-                          </td>
+                      <template for:each={recordParentRows} for:item="row">
+                        <tr key={row.key}>
+                          <th scope="row">{row.relationshipLabel}</th>
+                          <td>{row.typeLabel} · {row.label}</td>
                         </tr>
                       </template>
                     </tbody>
                   </table>
-                  <button
-                    type="button"
-                    class="oi-node-detail-panel-show-fields-button"
-                    data-id="impact-highlight-button"
-                    onclick={handleHighlightOnGraph}
-                  >
-                    Highlight on Graph
-                  </button>
                 </template>
-                <template lwc:else>
+                <template lwc:if={hasRecordChildren}>
+                  <p
+                    class="oi-node-detail-panel-section-note"
+                    data-id="record-children-label"
+                  >
+                    Child records (by relationship)
+                  </p>
+                  <table class="oi-node-detail-panel-table">
+                    <tbody>
+                      <template for:each={recordChildRows} for:item="row">
+                        <tr key={row.key}>
+                          <th scope="row">{row.relationshipLabel}</th>
+                          <td>{row.typeLabel} · {row.count} shown</td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </template>
+                <template lwc:if={recordHasMoreNote}>
+                  <p
+                    class="oi-node-detail-panel-section-note"
+                    data-id="record-has-more-note"
+                  >
+                    Additional parent lookups, relationship types, or child
+                    records exist beyond what's shown here — bounded to keep
+                    this within governor limits.
+                  </p>
+                </template>
+                <template lwc:if={hasNoRecordHierarchy}>
                   <c-oi-state-banner
-                    data-id="impact-empty"
+                    data-id="record-hierarchy-empty"
                     state="true-zero"
-                    title="No dependencies"
-                    message="No dependencies found in the currently-scanned data."
+                    title="No related records"
+                    message="No parent lookups or child records were found for this record."
                   ></c-oi-state-banner>
                 </template>
               </template>
-            </template>
-          </div>
+            </div>
+          </template>
 
-          <template lwc:if={hasRecordHierarchy}>
-            <div
-              class="oi-node-detail-panel-section"
-              data-id="record-hierarchy"
-            >
-              <h3 class="oi-node-detail-panel-section-title">Hierarchy</h3>
-              <template lwc:if={hasRecordParents}>
-                <p
-                  class="oi-node-detail-panel-section-note"
-                  data-id="record-parents-label"
-                >
-                  Parent records
-                </p>
-                <table class="oi-node-detail-panel-table">
-                  <tbody>
-                    <template for:each={recordParentRows} for:item="row">
-                      <tr key={row.nodeKey}>
-                        <th scope="row">{row.typeLabel}</th>
-                        <td>{row.label}</td>
-                      </tr>
+          <template lwc:if={isRecordDetail}>
+            <div class="oi-node-detail-panel-section" data-id="sharing-section">
+              <button
+                type="button"
+                class="oi-node-detail-panel-section-header"
+                data-id="sharing-section-toggle"
+                data-section="sharing"
+                aria-expanded={isSharingExpanded}
+                onclick={handleSectionToggle}
+              >
+                <lightning-icon
+                  icon-name="utility:chevronright"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-chevron"
+                ></lightning-icon>
+                <lightning-icon
+                  icon-name="utility:lock"
+                  size="xx-small"
+                  class="oi-node-detail-panel-section-icon is-security"
+                  title="Who has access to this specific record, and why"
+                ></lightning-icon>
+                <span class="oi-node-detail-panel-section-title">Sharing</span>
+              </button>
+              <template lwc:if={isSharingExpanded}>
+                <template lwc:if={isSharingLoaded}>
+                  <span
+                    class="oi-node-detail-panel-overview-label"
+                    data-id="sharing-org-wide-default-label"
+                    >Org-Wide Default</span
+                  >
+                  <template lwc:if={orgWideDefaultSupported}>
+                    <div
+                      class="oi-node-detail-panel-overview-grid"
+                      data-id="sharing-org-wide-default-grid"
+                    >
+                      <template for:each={orgWideDefaultRows} for:item="row">
+                        <div
+                          key={row.key}
+                          class="oi-node-detail-panel-overview-cell"
+                        >
+                          <span class="oi-node-detail-panel-overview-label"
+                            >{row.label}</span
+                          >
+                          <span class="oi-node-detail-panel-overview-value"
+                            >{row.value}</span
+                          >
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                  <template lwc:else>
+                    <p
+                      class="oi-node-detail-panel-section-note"
+                      data-id="sharing-org-wide-default-unavailable"
+                    >
+                      {orgWideDefaultUnavailableReason}
+                    </p>
+                  </template>
+                </template>
+                <template lwc:if={sharingIsLockedByApproval}>
+                  <c-oi-state-banner
+                    data-id="sharing-approval-lock"
+                    state="error"
+                    title="Locked by an approval process"
+                    message={sharingPendingApprovalDetail}
+                  ></c-oi-state-banner>
+                </template>
+                <template lwc:if={isLoadingSharing}>
+                  <c-oi-skeleton
+                    lines="3"
+                    label="Loading sharing"
+                  ></c-oi-skeleton>
+                </template>
+                <template lwc:elseif={hasSharingError}>
+                  <c-oi-state-banner
+                    data-id="sharing-error"
+                    state="error"
+                    title="Couldn't load sharing"
+                    message={sharingErrorMessage}
+                    onretry={handleRecordSharingRetry}
+                  ></c-oi-state-banner>
+                </template>
+                <template lwc:elseif={isSharingLoaded}>
+                  <template lwc:if={sharingSupportsSharing}>
+                    <template lwc:if={hasSharingRows}>
+                      <table
+                        class="oi-node-detail-panel-table"
+                        data-id="sharing-table"
+                      >
+                        <thead>
+                          <tr>
+                            <th scope="col">Shared With</th>
+                            <th scope="col">Access</th>
+                            <th scope="col">Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <template for:each={sharingRows} for:item="row">
+                            <tr key={row.key}>
+                              <td>{row.userOrGroupLabel}</td>
+                              <td>{row.accessLevel}</td>
+                              <td>{row.rowCause}</td>
+                            </tr>
+                          </template>
+                        </tbody>
+                      </table>
+                      <template lwc:if={sharingTruncated}>
+                        <p
+                          class="oi-node-detail-panel-section-note"
+                          data-id="sharing-truncated-note"
+                        >
+                          Additional share rows exist beyond what's shown here —
+                          bounded to keep this within governor limits.
+                        </p>
+                      </template>
                     </template>
-                  </tbody>
-                </table>
-              </template>
-              <template lwc:if={hasRecordChildren}>
-                <p
-                  class="oi-node-detail-panel-section-note"
-                  data-id="record-children-label"
-                >
-                  Child records (by relationship)
-                </p>
-                <table class="oi-node-detail-panel-table">
-                  <tbody>
-                    <template for:each={recordChildRows} for:item="row">
-                      <tr key={row.key}>
-                        <th scope="row">{row.typeLabel}</th>
-                        <td>{row.count}</td>
-                      </tr>
+                    <template lwc:else>
+                      <c-oi-state-banner
+                        data-id="sharing-empty"
+                        state="true-zero"
+                        title="No share rows"
+                        message={sharingCoverageNote}
+                      ></c-oi-state-banner>
                     </template>
-                  </tbody>
-                </table>
-              </template>
-              <template lwc:if={recordHasMoreNote}>
-                <p
-                  class="oi-node-detail-panel-section-note"
-                  data-id="record-has-more-note"
-                >
-                  Additional parent lookups, relationship types, or child
-                  records exist beyond what's shown here — bounded to keep this
-                  within governor limits.
-                </p>
+                  </template>
+                  <template lwc:else>
+                    <c-oi-state-banner
+                      data-id="sharing-unsupported"
+                      state="coverage-incomplete"
+                      title="Not applicable"
+                      message={sharingCoverageNote}
+                    ></c-oi-state-banner>
+                  </template>
+                </template>
               </template>
             </div>
           </template>

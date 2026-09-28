@@ -57,7 +57,7 @@ private class OI_PermissionSetSelectorTest {
   }
 
   @IsTest
-  static void testSelectBroadObjectGrantsOnlyReturnsViewAllOrModifyAllRows() {
+  static void testCountBroadObjectGrantsByPermissionSetIdsOnlyCountsViewAllOrModifyAllRows() {
     PermissionSet permissionSet = new PermissionSet(
       Name = 'OI_Test_Sel_Broad',
       Label = 'OI Test Sel Broad'
@@ -78,14 +78,77 @@ private class OI_PermissionSetSelectorTest {
       )
     };
 
-    List<ObjectPermissions> grants = new OI_PermissionSetSelector()
-      .selectBroadObjectGrants(new Set<Id>{ permissionSet.Id });
+    Map<Id, Integer> counts = new OI_PermissionSetSelector()
+      .countBroadObjectGrantsByPermissionSetIds(
+        new Set<Id>{ permissionSet.Id }
+      );
 
     System.assertEquals(
       1,
-      grants.size(),
+      counts.get(permissionSet.Id),
       'Only the View All Records grant on Account is broad; the Contact row (read/edit only) must be excluded.'
     );
-    System.assertEquals('Account', grants[0].SobjectType);
+  }
+
+  @IsTest
+  static void testCountBroadObjectGrantsByPermissionSetIdsHandlesEmptySetWithoutQuerying() {
+    Map<Id, Integer> counts = new OI_PermissionSetSelector()
+      .countBroadObjectGrantsByPermissionSetIds(new Set<Id>());
+    System.assertEquals(0, counts.size());
+  }
+
+  @IsTest
+  static void testSelectSensitiveObjectGrantPermissionSetIdsOnlyMatchesNamedSensitiveObjects() {
+    PermissionSet permissionSet = new PermissionSet(
+      Name = 'OI_Test_Sel_Sensitive',
+      Label = 'OI Test Sel Sensitive'
+    );
+    insert permissionSet;
+    insert new List<ObjectPermissions>{
+      new ObjectPermissions(
+        ParentId = permissionSet.Id,
+        SobjectType = 'Account',
+        PermissionsRead = true,
+        PermissionsViewAllRecords = true
+      ),
+      new ObjectPermissions(
+        ParentId = permissionSet.Id,
+        SobjectType = 'Opportunity',
+        PermissionsRead = true,
+        PermissionsCreate = true,
+        PermissionsEdit = true,
+        PermissionsDelete = true,
+        PermissionsViewAllRecords = true,
+        PermissionsModifyAllRecords = true
+      )
+    };
+
+    Set<Id> matches = new OI_PermissionSetSelector()
+      .selectSensitiveObjectGrantPermissionSetIds(
+        new Set<Id>{ permissionSet.Id },
+        new Set<String>{ 'Account', 'Contact' }
+      );
+
+    System.assert(
+      matches.contains(permissionSet.Id),
+      'The broad Account grant must match — Account is in the sensitive object set.'
+    );
+  }
+
+  @IsTest
+  static void testSelectSensitiveObjectGrantPermissionSetIdsHandlesEmptyInputsWithoutQuerying() {
+    Set<Id> matches = new OI_PermissionSetSelector()
+      .selectSensitiveObjectGrantPermissionSetIds(
+        new Set<Id>(),
+        new Set<String>{ 'Account' }
+      );
+    System.assertEquals(0, matches.size());
+
+    Set<Id> matchesNoSensitiveNames = new OI_PermissionSetSelector()
+      .selectSensitiveObjectGrantPermissionSetIds(
+        new Set<Id>{ UserInfo.getUserId() },
+        new Set<String>()
+      );
+    System.assertEquals(0, matchesNoSensitiveNames.size());
   }
 }

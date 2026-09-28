@@ -10,6 +10,8 @@
         value={queryTerm}
         onchange={handleInputChange}
         onkeydown={handleInputKeyDown}
+        onfocus={handleFocus}
+        onblur={handleBlur}
       ></lightning-input>
       <button
         type="button"
@@ -53,8 +55,21 @@
               class="oi-combobox-option"
               onclick={handleResultClick}
             >
-              <span class="oi-combobox-option-label">{result.label}</span>
-              <span class="oi-combobox-option-type">{result.typeLabel}</span>
+              <span class="oi-combobox-option-glyph" aria-hidden="true"
+                >{result.initials}</span
+              >
+              <span class="oi-combobox-option-copy">
+                <strong class="oi-combobox-option-label">{result.label}</strong>
+                <span class="oi-combobox-option-secondary"
+                  >{result.secondaryLabel}</span
+                >
+              </span>
+              <span class="oi-combobox-option-meta">
+                <span class="oi-combobox-option-type">{result.typeLabel}</span>
+                <span class="oi-combobox-option-arrow" aria-hidden="true"
+                  >→</span
+                >
+              </span>
             </button>
           </li>
         </template>

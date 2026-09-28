@@ -131,6 +131,33 @@
   width: 12rem;
 }
 
+/** Same severity color tokens and Active/Inactive/Obsolete vocabulary as oiNodeDetailPanel's own status badge (never a raw green/amber/red, never a one-off palette for this single badge). */
+.oi-drilldown-status-badge {
+  display: inline-block;
+  padding: var(--oi-space-1) var(--oi-space-2);
+  border-radius: var(--oi-radius-pill);
+  font-size: var(--oi-font-size-micro);
+  font-weight: var(--oi-font-weight-bold);
+  white-space: nowrap;
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+
+.oi-drilldown-status-badge.is-active {
+  background: var(--oi-color-severity-good-wash);
+  color: var(--oi-color-severity-good);
+}
+
+.oi-drilldown-status-badge.is-inactive {
+  background: var(--oi-color-severity-none-wash);
+  color: var(--oi-color-severity-none);
+}
+
+.oi-drilldown-status-badge.is-obsolete {
+  background: var(--oi-color-severity-critical-wash);
+  color: var(--oi-color-severity-critical);
+}
+
 .oi-drilldown-more {
   margin-top: var(--oi-space-3);
 }

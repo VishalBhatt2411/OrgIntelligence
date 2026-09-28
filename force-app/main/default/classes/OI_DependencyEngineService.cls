@@ -11,8 +11,11 @@
  *                    miss, calls OI_GraphEngine.getImpactSubgraph, runs a BFS hop-distance
  *                    pass and a DFS white/gray/black cycle-detection pass over the
  *                    already-small, already-bounded result (cheap, since the set is bounded
- *                    by construction), builds the flat affected-components list, caches the
- *                    computed result, and returns it. invalidateForScanDelta(...) is DE-7's
+ *                    by construction), builds the flat affected-components list, opportunistically
+ *                    caches the computed result (a cache-write failure, e.g. a high-fanout
+ *                    subgraph too large for Manual_Test_Json1__c, is caught and logged —
+ *                    never allowed to fail a successfully computed request), and returns it.
+ *                    invalidateForScanDelta(...) is DE-7's
  *                    mechanism — callable today, not yet wired into the live scan pipeline
  *                    (see Limitations).
  * Dependencies: OI_GraphEngine, OI_ImpactCacheRepository, OI_SettingsService (all
@@ -172,18 +175,55 @@ public with sharing class OI_DependencyEngineService {
       COVERAGE_CAVEAT
     );
 
-    Datetime now = Datetime.now();
-    cacheRepository.put(
-      cacheKey,
-      nodeKey,
-      capitalizeDirection(effectiveDirection),
-      effectiveDepth,
-      JSON.serialize(result),
-      now,
-      now.addMinutes(ttlMinutes())
-    );
+    cacheResult(cacheKey, nodeKey, effectiveDirection, effectiveDepth, result);
 
     return result;
+  }
+
+  /**
+   * Caching is opportunistic, never load-bearing: the result has already been fully computed
+   * above, so a failure here (most notably STRING_TOO_LONG on Manual_Test_Json1__c for a
+   * high-fanout root — a well-connected standard object with dozens of permission-set grants
+   * serializes past even the raised cap) must never surface as an Impact Analysis failure to
+   * the caller. Logged so the missed cache write is observable rather than silently repeated
+   * on every request for this root, per OI_ScanOrchestratorQueueable.recordCoverage's own
+   * established "diagnostic write failure must not fail the real operation" precedent.
+   */
+  private void cacheResult(
+    String cacheKey,
+    String nodeKey,
+    String direction,
+    Integer depth,
+    OI_ImpactResult result
+  ) {
+    Datetime now = Datetime.now();
+    try {
+      cacheRepository.put(
+        cacheKey,
+        nodeKey,
+        capitalizeDirection(direction),
+        depth,
+        JSON.serialize(result),
+        now,
+        now.addMinutes(ttlMinutes())
+      );
+    } catch (Exception e) {
+      new OI_LoggerService()
+        .warn(
+          'Could not cache impact analysis result for node ' +
+            nodeKey +
+            ' (' +
+            direction +
+            '): ' +
+            // A STRING_TOO_LONG message can echo the rejected payload; keep the log under
+            // OI_Log_Event__e.Message__c's 4096 limit or the event itself is rejected.
+            e.getMessage().abbreviate(1000),
+          'OI_DependencyEngineService',
+          // Node keys are 64-char hashes and Correlation_Id__c is Text(36); the key is
+          // already in the message, so no correlation id is passed.
+          null
+        );
+    }
   }
 
   /**

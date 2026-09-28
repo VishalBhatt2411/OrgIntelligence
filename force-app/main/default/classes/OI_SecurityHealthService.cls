@@ -136,21 +136,13 @@ public with sharing class OI_SecurityHealthService {
     Map<Id, Integer> assigneeCountsByPsId = permissionSetSelector.countAssigneesByPermissionSetIds(
       permissionSetIds
     );
-    Map<Id, Integer> broadGrantCountByPsId = new Map<Id, Integer>();
-    Set<Id> sensitiveGrantPsIds = new Set<Id>();
-    for (
-      ObjectPermissions grant : permissionSetSelector.selectBroadObjectGrants(
-        permissionSetIds
-      )
-    ) {
-      Integer count = broadGrantCountByPsId.containsKey(grant.ParentId)
-        ? broadGrantCountByPsId.get(grant.ParentId)
-        : 0;
-      broadGrantCountByPsId.put(grant.ParentId, count + 1);
-      if (SENSITIVE_OBJECT_API_NAMES.contains(grant.SobjectType)) {
-        sensitiveGrantPsIds.add(grant.ParentId);
-      }
-    }
+    Map<Id, Integer> broadGrantCountByPsId = permissionSetSelector.countBroadObjectGrantsByPermissionSetIds(
+      permissionSetIds
+    );
+    Set<Id> sensitiveGrantPsIds = permissionSetSelector.selectSensitiveObjectGrantPermissionSetIds(
+      permissionSetIds,
+      SENSITIVE_OBJECT_API_NAMES
+    );
 
     return buildSignals(
       permissionSets,

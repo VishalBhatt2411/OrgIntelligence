@@ -167,6 +167,11 @@ public class OI_FieldScanner implements OI_IMetadataScanner {
         }
         attributes.put('referenceTo', referencedObjectNames);
         attributes.put('relationshipName', fieldDescribe.getRelationshipName());
+        /** Same non-null-getRelationshipOrder() mechanism this scanner already uses to choose MASTER_DETAIL_TO vs LOOKUP_TO below — stored on the field's own attributes too, so a consumer (Intelligence Panel's Relationships section) can tell the two apart without a second query against the graph's edge rows. */
+        attributes.put(
+          'masterDetail',
+          fieldDescribe.getRelationshipOrder() != null
+        );
       }
 
       components.add(

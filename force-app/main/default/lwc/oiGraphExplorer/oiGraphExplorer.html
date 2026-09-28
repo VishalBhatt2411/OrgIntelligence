@@ -1,49 +1,59 @@
 <template>
   <div class="oi-graph-explorer">
     <div class="oi-graph-explorer-header">
-      <div class="oi-analyze-mode-group" role="tablist" aria-label="Analyze">
-        <button
-          type="button"
-          data-id="analyze-mode-object"
-          data-mode="Object"
-          class={objectModeButtonClass}
-          role="tab"
-          aria-selected={isObjectMode}
-          onclick={handleAnalyzeModeChange}
-        >
-          Object
-        </button>
-        <button
-          type="button"
-          data-id="analyze-mode-field"
-          data-mode="Field"
-          class={fieldModeButtonClass}
-          role="tab"
-          aria-selected={isFieldMode}
-          onclick={handleAnalyzeModeChange}
-        >
-          Field
-        </button>
-        <button
-          type="button"
-          data-id="analyze-mode-record"
-          data-mode="Record"
-          class={recordModeButtonClass}
-          role="tab"
-          aria-selected={isRecordMode}
-          onclick={handleAnalyzeModeChange}
-        >
-          Record
-        </button>
+      <div class="oi-analysis-launchpad-heading">
+        <div>
+          <span class="oi-analysis-launchpad-eyebrow">Analysis workspace</span>
+          <strong>Choose a lens, then anchor the graph</strong>
+        </div>
+        <div class="oi-analyze-mode-group" role="tablist" aria-label="Analyze">
+          <button
+            type="button"
+            data-id="analyze-mode-object"
+            data-mode="Object"
+            class={objectModeButtonClass}
+            role="tab"
+            aria-selected={isObjectMode}
+            onclick={handleAnalyzeModeChange}
+          >
+            Object
+          </button>
+          <button
+            type="button"
+            data-id="analyze-mode-field"
+            data-mode="Field"
+            class={fieldModeButtonClass}
+            role="tab"
+            aria-selected={isFieldMode}
+            onclick={handleAnalyzeModeChange}
+          >
+            Field
+          </button>
+          <button
+            type="button"
+            data-id="analyze-mode-record"
+            data-mode="Record"
+            class={recordModeButtonClass}
+            role="tab"
+            aria-selected={isRecordMode}
+            onclick={handleAnalyzeModeChange}
+          >
+            Record
+          </button>
+        </div>
       </div>
       <template lwc:if={isFieldMode}>
         <template lwc:if={hasFieldModeObject}>
           <div class="oi-field-mode-picker">
             <div
-              class="oi-field-mode-object-banner"
+              class="oi-context-ribbon oi-field-mode-object-banner"
               data-id="field-mode-object-banner"
             >
-              Object: <strong>{fieldModeObjectLabel}</strong>
+              <span class="oi-context-ribbon-step">1</span>
+              <span class="oi-context-ribbon-copy">
+                <small>Object selected</small>
+                <strong>{fieldModeObjectLabel}</strong>
+              </span>
               <button
                 type="button"
                 class="oi-field-mode-change-object"
@@ -57,14 +67,11 @@
               <c-oi-skeleton lines="1" label="Loading fields"></c-oi-skeleton>
             </template>
             <template lwc:elseif={hasFieldModeOptions}>
-              <lightning-combobox
+              <c-oi-field-picker
                 data-id="field-mode-field-picker"
-                label="Field"
-                variant="label-hidden"
-                placeholder="Select a field..."
                 options={fieldModeFieldOptions}
                 onchange={handleFieldPicked}
-              ></lightning-combobox>
+              ></c-oi-field-picker>
             </template>
             <template lwc:else>
               <div
@@ -89,10 +96,14 @@
         <template lwc:if={hasRecordModeObject}>
           <div class="oi-record-mode-picker">
             <div
-              class="oi-record-mode-object-banner"
+              class="oi-context-ribbon oi-record-mode-object-banner"
               data-id="record-mode-object-banner"
             >
-              Object: <strong>{recordModeObjectLabel}</strong>
+              <span class="oi-context-ribbon-step">1</span>
+              <span class="oi-context-ribbon-copy">
+                <small>Searching records in</small>
+                <strong>{recordModeObjectLabel}</strong>
+              </span>
               <button
                 type="button"
                 class="oi-record-mode-change-object"
@@ -131,8 +142,15 @@
           ></c-oi-search-bar>
         </template>
         <template lwc:elseif={centerObjectSummary}>
-          <div class="oi-object-mode-banner" data-id="object-mode-banner">
-            Object: <strong>{centerObjectSummary.label}</strong>
+          <div
+            class="oi-context-ribbon oi-object-mode-banner"
+            data-id="object-mode-banner"
+          >
+            <span class="oi-context-ribbon-step">✓</span>
+            <span class="oi-context-ribbon-copy">
+              <small>Graph anchored on</small>
+              <strong>{centerObjectSummary.label}</strong>
+            </span>
             <button
               type="button"
               class="oi-object-mode-change"
@@ -212,8 +230,15 @@
             class="oi-graph-explorer-placeholder"
             data-id="explorer-placeholder"
           >
-            Search for an object, field, or record above to start exploring its
-            hierarchy.
+            <div class="oi-placeholder-orbit" aria-hidden="true">
+              <span></span><span></span><span></span><b></b>
+            </div>
+            <span class="oi-placeholder-eyebrow">Ready to map</span>
+            <strong>Start with a Salesforce entity</strong>
+            <p>
+              Search above to reveal relationships, dependencies and impact in
+              one connected view.
+            </p>
           </div>
         </template>
       </div>

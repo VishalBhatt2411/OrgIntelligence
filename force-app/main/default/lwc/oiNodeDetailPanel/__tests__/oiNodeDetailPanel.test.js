@@ -2,7 +2,11 @@ import { createElement } from "lwc";
 import OiNodeDetailPanel from "c/oiNodeDetailPanel";
 import getNodeDetail from "@salesforce/apex/OI_GraphController.getNodeDetail";
 import getFieldSummaries from "@salesforce/apex/OI_GraphController.getFieldSummaries";
+import getRelationshipFieldDetail from "@salesforce/apex/OI_GraphController.getRelationshipFieldDetail";
+import getRelationshipTargetObjectRecordCounts from "@salesforce/apex/OI_GraphController.getRelationshipTargetObjectRecordCounts";
+import getObjectSharingSettings from "@salesforce/apex/OI_GraphController.getObjectSharingSettings";
 import getRecordFragment from "@salesforce/apex/OI_RecordHierarchyController.getRecordFragment";
+import getRecordSharing from "@salesforce/apex/OI_RecordHierarchyController.getRecordSharing";
 import getImpact from "@salesforce/apex/OI_DependencyController.getImpact";
 import getNodeIntelligence from "@salesforce/apex/OI_GraphController.getNodeIntelligence";
 
@@ -17,7 +21,27 @@ jest.mock(
   { virtual: true }
 );
 jest.mock(
+  "@salesforce/apex/OI_GraphController.getRelationshipFieldDetail",
+  () => ({ default: jest.fn() }),
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/OI_GraphController.getRelationshipTargetObjectRecordCounts",
+  () => ({ default: jest.fn() }),
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/OI_GraphController.getObjectSharingSettings",
+  () => ({ default: jest.fn() }),
+  { virtual: true }
+);
+jest.mock(
   "@salesforce/apex/OI_RecordHierarchyController.getRecordFragment",
+  () => ({ default: jest.fn() }),
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/OI_RecordHierarchyController.getRecordSharing",
   () => ({ default: jest.fn() }),
   { virtual: true }
 );
@@ -44,6 +68,21 @@ function flushPromises() {
  */
 async function expandSection(element, section) {
   element.shadowRoot.querySelector(`[data-section="${section}"]`).click();
+  await flushPromises();
+}
+
+/**
+ * Every Automation/Code/Security item now sits behind two disclosures: the section itself, then
+ * the per-type group ("Apex Trigger — 3") within it — a type group is a count until this click
+ * opens the list behind it (the feature this rebuild adds). Opens the first type-group header
+ * found inside the given category's section, which is sufficient for fixtures with exactly one
+ * type in that category; tests with more than one type group open each by index instead.
+ */
+async function expandFirstTypeGroup(element, category) {
+  const section = element.shadowRoot.querySelector(
+    `[data-category="${category}"]`
+  );
+  section.querySelector('[data-id="intelligence-type-group-toggle"]').click();
   await flushPromises();
 }
 
@@ -79,6 +118,10 @@ describe("c-oi-node-detail-panel", () => {
     getNodeDetail.mockReset();
     getFieldSummaries.mockReset();
     getRecordFragment.mockReset();
+    getRecordSharing.mockReset();
+    getRelationshipFieldDetail.mockReset();
+    getRelationshipTargetObjectRecordCounts.mockReset();
+    getObjectSharingSettings.mockReset();
     getImpact.mockReset();
     getNodeIntelligence.mockReset();
   });
@@ -125,7 +168,8 @@ describe("c-oi-node-detail-panel", () => {
               "Detected: object-level grants. Not detected: field-level grants."
           }
         ],
-        lastScannedAt: "2026-08-19T12:22:11.000Z",
+        /** Relative to Date.now() rather than a fixed past date so this fixture never crosses STALE_THRESHOLD_MS as real-world time passes — a hardcoded past ISO string here previously bit-rotted into a false "stale" result once more than 30 days had elapsed since it was written. */
+        lastScannedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         hasCoverageLimitations: false,
         ...overrides
       };
@@ -142,6 +186,8 @@ describe("c-oi-node-detail-panel", () => {
       await flushPromises();
       await expandSection(element, "Automation");
       await expandSection(element, "Security");
+      await expandFirstTypeGroup(element, "Automation");
+      await expandFirstTypeGroup(element, "Security");
 
       const sections = element.shadowRoot.querySelectorAll(
         '[data-id="intelligence-section"]'
@@ -227,6 +273,7 @@ describe("c-oi-node-detail-panel", () => {
       element.nodeKey = "account";
       await flushPromises();
       await expandSection(element, "Security");
+      await expandFirstTypeGroup(element, "Security");
 
       const securitySection = element.shadowRoot.querySelector(
         '[data-category="Security"]'
@@ -251,6 +298,8 @@ describe("c-oi-node-detail-panel", () => {
       await expandSection(element, "Automation");
       await expandSection(element, "Code");
       await expandSection(element, "Security");
+      await expandFirstTypeGroup(element, "Automation");
+      await expandFirstTypeGroup(element, "Security");
 
       const sectionText = [
         ...element.shadowRoot.querySelectorAll(
@@ -465,8 +514,9 @@ describe("c-oi-node-detail-panel", () => {
 
       toggle.click();
       await flushPromises();
-      expect(automationSection.textContent).toContain("AccountTrigger");
       expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      await expandFirstTypeGroup(element, "Automation");
+      expect(automationSection.textContent).toContain("AccountTrigger");
 
       toggle.click();
       await flushPromises();
@@ -484,6 +534,7 @@ describe("c-oi-node-detail-panel", () => {
       element.nodeKey = "account";
       await flushPromises();
       await expandSection(element, "Automation");
+      await expandFirstTypeGroup(element, "Automation");
       const handler = jest.fn();
       element.addEventListener("select", handler);
 
@@ -491,6 +542,386 @@ describe("c-oi-node-detail-panel", () => {
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler.mock.calls[0][0].detail.nodeKey).toBe("trg1");
+    });
+
+    describe("Type groups (component type — count, opened on click) and Flow status badges", () => {
+      function automationWithFlows() {
+        return intelligence({
+          categories: [
+            {
+              category: "Automation",
+              items: [
+                {
+                  nodeKey: "trg1",
+                  label: "AccountTrigger",
+                  typeKey: "SalesforceMetadata.ApexTrigger",
+                  typeLabel: "Apex Trigger",
+                  direction: "incoming"
+                },
+                {
+                  nodeKey: "flow1",
+                  label: "Account_After_Save",
+                  typeKey: "SalesforceMetadata.Flow",
+                  typeLabel: "Flow",
+                  direction: "incoming",
+                  status: "Active",
+                  subTypeKey: "SalesforceMetadata.Flow",
+                  subTypeLabel: "Flow"
+                },
+                {
+                  nodeKey: "flow2",
+                  label: "Old_Discount_Process",
+                  typeKey: "SalesforceMetadata.Flow",
+                  typeLabel: "Flow",
+                  direction: "incoming",
+                  status: "Inactive",
+                  subTypeKey: "ProcessBuilder",
+                  subTypeLabel: "Process Builder"
+                }
+              ],
+              truncated: false,
+              coverageNote: "n/a"
+            },
+            {
+              category: "Code",
+              items: [],
+              truncated: false,
+              coverageNote: "n/a"
+            },
+            {
+              category: "Security",
+              items: [],
+              truncated: false,
+              coverageNote: "n/a"
+            }
+          ]
+        });
+      }
+
+      it("groups Automation items by type — Apex Trigger, Flow, and Process Builder each their own count — collapsed until clicked", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(automationWithFlows());
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Automation");
+
+        const automationSection = element.shadowRoot.querySelector(
+          '[data-category="Automation"]'
+        );
+        const groups = automationSection.querySelectorAll(
+          '[data-id="intelligence-type-group"]'
+        );
+        expect(groups).toHaveLength(3);
+        /** Collapsed by default — the whole point of "a number until you click it." */
+        expect(automationSection.textContent).not.toContain("AccountTrigger");
+        expect(automationSection.textContent).not.toContain(
+          "Account_After_Save"
+        );
+
+        const counts = [
+          ...automationSection.querySelectorAll(
+            '[data-id="intelligence-type-group-count"]'
+          )
+        ].map((el) => el.textContent);
+        expect(counts).toEqual(["1", "1", "1"]);
+
+        const flowToggle = [...groups]
+          .find((group) => group.textContent.includes("Process Builder"))
+          .querySelector('[data-id="intelligence-type-group-toggle"]');
+        flowToggle.click();
+        await flushPromises();
+        expect(automationSection.textContent).toContain("Old_Discount_Process");
+        expect(automationSection.textContent).not.toContain(
+          "Account_After_Save"
+        );
+      });
+
+      it("shows an Active/Inactive status badge on a Flow item, colored differently per status", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(automationWithFlows());
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Automation");
+
+        const automationSection = element.shadowRoot.querySelector(
+          '[data-category="Automation"]'
+        );
+        const flowGroupToggle = [
+          ...automationSection.querySelectorAll(
+            '[data-id="intelligence-type-group-toggle"]'
+          )
+        ].find(
+          (toggle) =>
+            toggle.textContent.includes("Flow") &&
+            !toggle.textContent.includes("Process")
+        );
+        flowGroupToggle.click();
+        await flushPromises();
+
+        const badge = automationSection.querySelector(
+          '[data-id="intelligence-status-badge"]'
+        );
+        expect(badge).not.toBeNull();
+        expect(badge.textContent).toBe("Active");
+        expect(badge.className).toContain("is-active");
+      });
+
+      it("never shows a status badge for a component type with no status concept (Apex Trigger)", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(automationWithFlows());
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Automation");
+
+        const automationSection = element.shadowRoot.querySelector(
+          '[data-category="Automation"]'
+        );
+        const triggerGroupToggle = [
+          ...automationSection.querySelectorAll(
+            '[data-id="intelligence-type-group-toggle"]'
+          )
+        ].find((toggle) => toggle.textContent.includes("Apex Trigger"));
+        triggerGroupToggle.click();
+        await flushPromises();
+
+        expect(
+          automationSection.querySelector(
+            '[data-id="intelligence-status-badge"]'
+          )
+        ).toBeNull();
+      });
+
+      it("opens the drill-down for a type group whose items all share one direction and edge type", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(
+          intelligence({
+            categories: [
+              {
+                category: "Automation",
+                items: [
+                  {
+                    nodeKey: "flow1",
+                    label: "Account_After_Save",
+                    typeKey: "SalesforceMetadata.Flow",
+                    typeLabel: "Flow",
+                    direction: "incoming",
+                    edgeTypeKey: "SalesforceMetadata.EXECUTES_ON",
+                    status: "Active",
+                    subTypeKey: "SalesforceMetadata.Flow",
+                    subTypeLabel: "Flow"
+                  },
+                  {
+                    nodeKey: "flow2",
+                    label: "Old_Discount_Process",
+                    typeKey: "SalesforceMetadata.Flow",
+                    typeLabel: "Flow",
+                    direction: "incoming",
+                    edgeTypeKey: "SalesforceMetadata.EXECUTES_ON",
+                    status: "Inactive",
+                    subTypeKey: "SalesforceMetadata.Flow",
+                    subTypeLabel: "Flow"
+                  }
+                ],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Code",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Security",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              }
+            ]
+          })
+        );
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Automation");
+
+        expect(
+          element.shadowRoot.querySelector('[data-id="drilldown-host"]')
+        ).toBeNull();
+
+        const automationSection = element.shadowRoot.querySelector(
+          '[data-category="Automation"]'
+        );
+        automationSection
+          .querySelector('[data-id="intelligence-type-group-toggle"]')
+          .click();
+        await flushPromises();
+
+        const host = element.shadowRoot.querySelector(
+          '[data-id="drilldown-host"]'
+        );
+        expect(host).not.toBeNull();
+        expect(host.direction).toBe("incoming");
+        expect(host.edgeTypeKey).toBe("SalesforceMetadata.EXECUTES_ON");
+        expect(host.relationshipLabel).toBe("Flow");
+        /** A drill-down-eligible group opens the modal instead of the inline expand fallback — its items never render inline underneath the collapsed header. */
+        expect(automationSection.textContent).not.toContain(
+          "Account_After_Save"
+        );
+      });
+
+      it("falls back to the inline expand/collapse when a type group's items were reached through different directions or edge types", async () => {
+        getNodeDetail.mockResolvedValue(objectDetail());
+        getNodeIntelligence.mockResolvedValue(
+          intelligence({
+            categories: [
+              {
+                category: "Automation",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Code",
+                items: [
+                  {
+                    nodeKey: "cls1",
+                    label: "AccountService",
+                    typeKey: "SalesforceMetadata.ApexClass",
+                    typeLabel: "Apex Class",
+                    direction: "incoming",
+                    edgeTypeKey: "SalesforceMetadata.REFERENCES",
+                    subTypeKey: "SalesforceMetadata.ApexClass",
+                    subTypeLabel: "Apex Class"
+                  },
+                  {
+                    nodeKey: "cls2",
+                    label: "AccountHelper",
+                    typeKey: "SalesforceMetadata.ApexClass",
+                    typeLabel: "Apex Class",
+                    direction: "outgoing",
+                    edgeTypeKey: "SalesforceMetadata.EXECUTES_ON",
+                    subTypeKey: "SalesforceMetadata.ApexClass",
+                    subTypeLabel: "Apex Class"
+                  }
+                ],
+                truncated: false,
+                coverageNote: "n/a"
+              },
+              {
+                category: "Security",
+                items: [],
+                truncated: false,
+                coverageNote: "n/a"
+              }
+            ]
+          })
+        );
+        const element = createElement("c-oi-node-detail-panel", {
+          is: OiNodeDetailPanel
+        });
+        document.body.appendChild(element);
+        element.nodeKey = "account";
+        await flushPromises();
+        await expandSection(element, "Code");
+
+        const codeSection = element.shadowRoot.querySelector(
+          '[data-category="Code"]'
+        );
+        const toggle = codeSection.querySelector(
+          '[data-id="intelligence-type-group-toggle"]'
+        );
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+        expect(codeSection.textContent).not.toContain("AccountService");
+
+        toggle.click();
+        await flushPromises();
+
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+        expect(codeSection.textContent).toContain("AccountService");
+        expect(codeSection.textContent).toContain("AccountHelper");
+        expect(
+          element.shadowRoot.querySelector('[data-id="drilldown-host"]')
+        ).toBeNull();
+      });
+    });
+
+    it("lists an Apex Trigger under both Automation and Code when the registry registers it for both (dual-category)", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      getNodeIntelligence.mockResolvedValue(
+        intelligence({
+          categories: [
+            {
+              category: "Automation",
+              items: [
+                {
+                  nodeKey: "trg1",
+                  label: "AccountTrigger",
+                  typeKey: "SalesforceMetadata.ApexTrigger",
+                  typeLabel: "Apex Trigger",
+                  direction: "incoming"
+                }
+              ],
+              truncated: false,
+              coverageNote: "n/a"
+            },
+            {
+              category: "Code",
+              items: [
+                {
+                  nodeKey: "trg1",
+                  label: "AccountTrigger",
+                  typeKey: "SalesforceMetadata.ApexTrigger",
+                  typeLabel: "Apex Trigger",
+                  direction: "incoming"
+                }
+              ],
+              truncated: false,
+              coverageNote: "n/a"
+            },
+            {
+              category: "Security",
+              items: [],
+              truncated: false,
+              coverageNote: "n/a"
+            }
+          ]
+        })
+      );
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "Automation");
+      await expandSection(element, "Code");
+      await expandFirstTypeGroup(element, "Automation");
+      await expandFirstTypeGroup(element, "Code");
+
+      const automationSection = element.shadowRoot.querySelector(
+        '[data-category="Automation"]'
+      );
+      const codeSection = element.shadowRoot.querySelector(
+        '[data-category="Code"]'
+      );
+      expect(automationSection.textContent).toContain("AccountTrigger");
+      expect(codeSection.textContent).toContain("AccountTrigger");
     });
 
     it("renders a sanitized error when intelligence fails, without breaking the rest of the panel", async () => {
@@ -630,7 +1061,12 @@ describe("c-oi-node-detail-panel", () => {
         }
       ],
       edges: [],
-      hasMore: false
+      hasMore: false,
+      recordOverview: {
+        ownerName: "Jane Admin",
+        createdDate: "2026-08-10T08:15:00.000Z",
+        lastModifiedDate: "2026-09-12T14:30:00.000Z"
+      }
     });
     const element = createElement("c-oi-node-detail-panel", {
       is: OiNodeDetailPanel
@@ -652,7 +1088,14 @@ describe("c-oi-node-detail-panel", () => {
     expect(content.textContent).toContain("Acme Corp");
     expect(content.textContent).toContain("Account");
     expect(content.textContent).toContain("001x1");
+    expect(content.textContent).toContain("Jane Admin");
+    expect(content.textContent).toContain("Created");
+    expect(content.textContent).toContain("Last Modified");
     expect(content.textContent).not.toContain("API Name");
+    expect(getNodeIntelligence).not.toHaveBeenCalled();
+    expect(
+      element.shadowRoot.querySelector('[data-id="impact-analysis-section"]')
+    ).toBeNull();
   });
 
   it("derives a real Record Hierarchy section — parent lookups and child records grouped by object — directly from the SAME fragment's own edges, never a second query or fabricated data", async () => {
@@ -700,25 +1143,29 @@ describe("c-oi-node-detail-panel", () => {
           edgeKey: "e1",
           typeKey: "SalesforceRecord.LOOKUP_TO",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::User::005x1"
+          targetNodeKey: "Record::User::005x1",
+          viaFieldApiName: "Manager__c"
         },
         {
           edgeKey: "e2",
           typeKey: "SalesforceRecord.CHILD_OF",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::Contact::003x1"
+          targetNodeKey: "Record::Contact::003x1",
+          viaFieldApiName: "AccountId"
         },
         {
           edgeKey: "e3",
           typeKey: "SalesforceRecord.CHILD_OF",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::Contact::003x2"
+          targetNodeKey: "Record::Contact::003x2",
+          viaFieldApiName: "AccountId"
         },
         {
           edgeKey: "e4",
           typeKey: "SalesforceRecord.CHILD_OF",
           sourceNodeKey: "Record::Account::001x1",
-          targetNodeKey: "Record::Opportunity::006x1"
+          targetNodeKey: "Record::Opportunity::006x1",
+          viaFieldApiName: "AccountId"
         }
       ],
       hasMore: true
@@ -732,11 +1179,12 @@ describe("c-oi-node-detail-panel", () => {
     await flushPromises();
 
     const hierarchy = element.shadowRoot.querySelector(
-      '[data-id="record-hierarchy"]'
+      '[data-id="record-hierarchy-section"]'
     );
     expect(hierarchy).not.toBeNull();
     expect(hierarchy.textContent).toContain("User");
     expect(hierarchy.textContent).toContain("Jane Admin");
+    expect(hierarchy.textContent).toContain("Manager__c");
     expect(hierarchy.textContent).toContain("Contact");
     expect(hierarchy.textContent).toContain("Opportunity");
     // Two Contact children collapse into one grouped row with count 2 — not two flat rows.
@@ -750,9 +1198,15 @@ describe("c-oi-node-detail-panel", () => {
     expect(
       element.shadowRoot.querySelector('[data-id="record-has-more-note"]')
     ).not.toBeNull();
+    // Header count and default-expanded state mirror Relationships' own convention for Object mode — 1 parent + 2 grouped Contact children + 1 Opportunity child = 4, expanded without any click needed.
+    const hierarchyToggle = element.shadowRoot.querySelector(
+      '[data-id="hierarchy-section-toggle"]'
+    );
+    expect(hierarchyToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(hierarchyToggle.textContent).toContain("4");
   });
 
-  it("does not render a Hierarchy section for a record with no parent lookups or children (an isolated/root record)", async () => {
+  it("Sharing starts collapsed by default, exactly like Object mode's Sharing Settings, while Hierarchy starts expanded like Relationships", async () => {
     getRecordFragment.mockResolvedValue({
       centerNodeKey: "Record::Account::001x1",
       nodes: [
@@ -776,8 +1230,48 @@ describe("c-oi-node-detail-panel", () => {
     await flushPromises();
 
     expect(
-      element.shadowRoot.querySelector('[data-id="record-hierarchy"]')
-    ).toBeNull();
+      element.shadowRoot
+        .querySelector('[data-id="hierarchy-section-toggle"]')
+        .getAttribute("aria-expanded")
+    ).toBe("true");
+    expect(
+      element.shadowRoot
+        .querySelector('[data-id="sharing-section-toggle"]')
+        .getAttribute("aria-expanded")
+    ).toBe("false");
+  });
+
+  it("still renders the Hierarchy section with an honest empty state for a record with no parent lookups or children (an isolated/root record) — never hides the section entirely", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x1",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x1",
+          typeKey: "SalesforceRecord.Account",
+          label: "Acme Corp",
+          secondaryKey: "Account 001x1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::Account::001x1";
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector('[data-id="record-hierarchy-section"]')
+    ).not.toBeNull();
+    const emptyState = element.shadowRoot.querySelector(
+      '[data-id="record-hierarchy-empty"]'
+    );
+    expect(emptyState).not.toBeNull();
+    expect(emptyState.title).toBe("No related records");
   });
 
   it("a Record Analysis node no longer present in its own fragment renders an honest error, not a crash", async () => {
@@ -803,6 +1297,333 @@ describe("c-oi-node-detail-panel", () => {
     expect(errorEl.message).toContain("No record found");
   });
 
+  it("does not call getRecordSharing until the Sharing section is explicitly expanded — a live, non-cacheable read stays opt-in like Fields, never automatic on selection", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x1",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x1",
+          typeKey: "SalesforceRecord.Account",
+          label: "Acme Corp",
+          secondaryKey: "Account 001x1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::Account::001x1";
+    await flushPromises();
+
+    expect(getRecordSharing).not.toHaveBeenCalled();
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-section-toggle"]')
+    ).not.toBeNull();
+  });
+
+  it("loads and renders share rows once Show Sharing is clicked, keyed to the selected record", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x1",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x1",
+          typeKey: "SalesforceRecord.Account",
+          label: "Acme Corp",
+          secondaryKey: "Account 001x1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    getRecordSharing.mockResolvedValue({
+      supportsSharing: true,
+      coverageNote: null,
+      shareRows: [
+        {
+          userOrGroupId: "005000000000001",
+          userOrGroupLabel: "Jane Admin",
+          accessLevel: "Owner",
+          rowCause: "Owner"
+        }
+      ],
+      truncated: false,
+      isLockedByApproval: false,
+      pendingApprovalDetail: null,
+      orgWideDefault: {
+        supported: true,
+        unavailableReason: null,
+        internalSharingModel: "ReadWrite",
+        externalSharingModel: "Private"
+      }
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::Account::001x1";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="sharing-section-toggle"]')
+      .click();
+    await flushPromises();
+
+    expect(getRecordSharing).toHaveBeenCalledWith({
+      objectApiName: "Account",
+      recordId: "001x1"
+    });
+    const table = element.shadowRoot.querySelector('[data-id="sharing-table"]');
+    expect(table).not.toBeNull();
+    expect(table.textContent).toContain("Jane Admin");
+    expect(table.textContent).toContain("Owner");
+
+    const owdGrid = element.shadowRoot.querySelector(
+      '[data-id="sharing-org-wide-default-grid"]'
+    );
+    expect(owdGrid).not.toBeNull();
+    expect(owdGrid.textContent).toContain("ReadWrite");
+    expect(owdGrid.textContent).toContain("Private");
+  });
+
+  it("reports the Org-Wide Default as unavailable, distinct from the record's own share rows, when the Tooling API cannot resolve it", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x1",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x1",
+          typeKey: "SalesforceRecord.Account",
+          label: "Acme Corp",
+          secondaryKey: "Account 001x1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    getRecordSharing.mockResolvedValue({
+      supportsSharing: true,
+      coverageNote: null,
+      shareRows: [
+        {
+          userOrGroupId: "005000000000001",
+          userOrGroupLabel: "Jane Admin",
+          accessLevel: "Owner",
+          rowCause: "Owner"
+        }
+      ],
+      truncated: false,
+      isLockedByApproval: false,
+      pendingApprovalDetail: null,
+      orgWideDefault: {
+        supported: false,
+        unavailableReason:
+          "Sharing settings could not be retrieved for this object.",
+        internalSharingModel: null,
+        externalSharingModel: null
+      }
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::Account::001x1";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="sharing-section-toggle"]')
+      .click();
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="sharing-org-wide-default-grid"]'
+      )
+    ).toBeNull();
+    const unavailable = element.shadowRoot.querySelector(
+      '[data-id="sharing-org-wide-default-unavailable"]'
+    );
+    expect(unavailable).not.toBeNull();
+    expect(unavailable.textContent).toContain("could not be retrieved");
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-table"]')
+    ).not.toBeNull();
+  });
+
+  it("renders a Not Applicable state, never an empty table, when the object has no share table", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::CampaignMember::00v1",
+      nodes: [
+        {
+          nodeKey: "Record::CampaignMember::00v1",
+          typeKey: "SalesforceRecord.CampaignMember",
+          label: "CampaignMember 00v1",
+          secondaryKey: "CampaignMember 00v1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    getRecordSharing.mockResolvedValue({
+      supportsSharing: false,
+      coverageNote:
+        "This object has no independent sharing table — its access is controlled entirely by its parent record or by the object's org-wide default.",
+      shareRows: [],
+      truncated: false,
+      isLockedByApproval: false,
+      pendingApprovalDetail: null
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::CampaignMember::00v1";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="sharing-section-toggle"]')
+      .click();
+    await flushPromises();
+
+    const unsupported = element.shadowRoot.querySelector(
+      '[data-id="sharing-unsupported"]'
+    );
+    expect(unsupported).not.toBeNull();
+    expect(unsupported.message).toContain("no independent sharing table");
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-table"]')
+    ).toBeNull();
+  });
+
+  it("surfaces an approval lock banner above the share rows without hiding them", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x1",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x1",
+          typeKey: "SalesforceRecord.Account",
+          label: "Acme Corp",
+          secondaryKey: "Account 001x1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    getRecordSharing.mockResolvedValue({
+      supportsSharing: true,
+      coverageNote: null,
+      shareRows: [
+        {
+          userOrGroupId: "005000000000001",
+          userOrGroupLabel: "Jane Admin",
+          accessLevel: "Owner",
+          rowCause: "Owner"
+        }
+      ],
+      truncated: false,
+      isLockedByApproval: true,
+      pendingApprovalDetail:
+        "Submitted by Jane Admin, awaiting the next approver."
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::Account::001x1";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="sharing-section-toggle"]')
+      .click();
+    await flushPromises();
+
+    const lockBanner = element.shadowRoot.querySelector(
+      '[data-id="sharing-approval-lock"]'
+    );
+    expect(lockBanner).not.toBeNull();
+    expect(lockBanner.message).toContain("Submitted by Jane Admin");
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-table"]')
+    ).not.toBeNull();
+  });
+
+  it("clears sharing state when the selected record changes, so a previous record's share rows never bleed into the newly-selected one", async () => {
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x1",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x1",
+          typeKey: "SalesforceRecord.Account",
+          label: "Acme Corp",
+          secondaryKey: "Account 001x1",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    getRecordSharing.mockResolvedValue({
+      supportsSharing: true,
+      coverageNote: null,
+      shareRows: [
+        {
+          userOrGroupId: "005000000000001",
+          userOrGroupLabel: "Jane Admin",
+          accessLevel: "Owner",
+          rowCause: "Owner"
+        }
+      ],
+      truncated: false,
+      isLockedByApproval: false,
+      pendingApprovalDetail: null
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "Record::Account::001x1";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="sharing-section-toggle"]')
+      .click();
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-table"]')
+    ).not.toBeNull();
+
+    getRecordFragment.mockResolvedValue({
+      centerNodeKey: "Record::Account::001x2",
+      nodes: [
+        {
+          nodeKey: "Record::Account::001x2",
+          typeKey: "SalesforceRecord.Account",
+          label: "Beta Corp",
+          secondaryKey: "Account 001x2",
+          state: "Active"
+        }
+      ],
+      edges: [],
+      hasMore: false
+    });
+    element.nodeKey = "Record::Account::001x2";
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-table"]')
+    ).toBeNull();
+    expect(
+      element.shadowRoot.querySelector('[data-id="sharing-section-toggle"]')
+    ).not.toBeNull();
+  });
+
   it("renders curated Object fields — Namespace, Custom/Standard — and keeps the structural-connections summary scoped to schema relationships only (G6/G7)", async () => {
     getNodeDetail.mockResolvedValue({
       nodeKey: "acct",
@@ -818,6 +1639,23 @@ describe("c-oi-node-detail-panel", () => {
       outgoingRelationshipCounts: { "SalesforceMetadata.HAS_FIELD": 5 },
       incomingRelationshipCounts: { "SalesforceMetadata.LOOKUP_TO": 2 },
       directConnectionCount: 7
+    });
+    getRelationshipFieldDetail.mockResolvedValue({
+      fields: [
+        {
+          fieldNodeKey: "acctField.OwnerId",
+          label: "Owner",
+          apiName: "Account.OwnerId",
+          relationshipType: "Lookup",
+          isRequired: false,
+          cascadeDeleteBehavior: null,
+          targetObjects: [{ objectApiName: "User", recordCount: null }]
+        }
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockResolvedValue({
+      countsByObjectApiName: { User: 42 },
+      truncated: false
     });
     const element = createElement("c-oi-node-detail-panel", {
       is: OiNodeDetailPanel
@@ -847,9 +1685,10 @@ describe("c-oi-node-detail-panel", () => {
      * Object mode gets the curated relationship breakdown (GraphUI.md §42, item 14): HAS_FIELD
      * is schema-membership information, not an object-to-object relationship, so it must never
      * appear here — it already powers the Fields section's own count instead. Only genuine
-     * Lookup/Master-Detail metrics show, labeled plainly (Incoming Lookups/Incoming Master-
-     * Detail/Outgoing Lookups/Outgoing Master-Detail), each a real count from the same
-     * getNodeDetail response, never fabricated.
+     * Incoming Lookup/Incoming Master-Detail counts remain as counts (a real number from the
+     * same getNodeDetail response, never fabricated); the outgoing side was reworked to show the
+     * actual fields behind it instead of a flat count (see the relationship-field-table
+     * assertions below).
      */
     const structural = element.shadowRoot.querySelector(
       '[data-id="structural-connections"]'
@@ -862,7 +1701,30 @@ describe("c-oi-node-detail-panel", () => {
       '[data-row-key="in-lookup"]'
     );
     expect(incomingLookupsCount.textContent).toBe("2");
-    expect(structural.textContent).toContain("Outgoing Master-Detail");
+    expect(structural.textContent).not.toContain("Outgoing Master-Detail");
+    expect(getRelationshipFieldDetail).toHaveBeenCalledWith({
+      objectNodeKey: "acct"
+    });
+    const relationshipFieldTable = structural.querySelector(
+      '[data-id="relationship-field-table"]'
+    );
+    expect(relationshipFieldTable).not.toBeNull();
+    expect(relationshipFieldTable.textContent).toContain("Owner");
+    expect(relationshipFieldTable.textContent).toContain("Lookup");
+    /** Record counts are on-demand (see the "Load record counts" tests below) — before that explicit action, the target object appears without any count at all, never a stale/fabricated one. */
+    expect(relationshipFieldTable.textContent).toContain("User");
+    expect(relationshipFieldTable.textContent).not.toContain("records)");
+    expect(getRelationshipTargetObjectRecordCounts).not.toHaveBeenCalled();
+
+    structural
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+
+    expect(getRelationshipTargetObjectRecordCounts).toHaveBeenCalledWith({
+      objectApiNames: ["User"]
+    });
+    expect(relationshipFieldTable.textContent).toContain("User (42 records)");
 
     /** Raw attributes now live behind Technical Details, collapsed by default — the data is preserved, only its prominence changed. */
     const technicalDetails = element.shadowRoot.querySelector(
@@ -883,6 +1745,296 @@ describe("c-oi-node-detail-panel", () => {
     );
     expect(revealed.textContent).toContain("pluralLabel");
     expect(revealed.textContent).not.toContain("custom");
+  });
+
+  it("shows a loading skeleton for the outgoing relationships table while getRelationshipFieldDetail is in flight", async () => {
+    getNodeDetail.mockResolvedValue({
+      nodeKey: "acct",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Account",
+      secondaryKey: "Account",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    let resolveDetail;
+    getRelationshipFieldDetail.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDetail = resolve;
+      })
+    );
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "acct";
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="structural-connections"] c-oi-skeleton'
+      )
+    ).not.toBeNull();
+
+    resolveDetail({ fields: [] });
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="structural-connections"] c-oi-skeleton'
+      )
+    ).toBeNull();
+  });
+
+  it("renders a retryable error banner when getRelationshipFieldDetail fails, without breaking the rest of the Relationships section", async () => {
+    getNodeDetail.mockResolvedValue({
+      nodeKey: "acct",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Account",
+      secondaryKey: "Account",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: { "SalesforceMetadata.LOOKUP_TO": 1 },
+      directConnectionCount: 1
+    });
+    getRelationshipFieldDetail.mockRejectedValue({
+      body: { message: "Something went wrong retrieving the graph." }
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "acct";
+    await flushPromises();
+
+    const errorBanner = element.shadowRoot.querySelector(
+      '[data-id="relationship-field-detail-error"]'
+    );
+    expect(errorBanner).not.toBeNull();
+    expect(errorBanner.message).toBe(
+      "Something went wrong retrieving the graph."
+    );
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="curated-relationships-table"]'
+      )
+    ).not.toBeNull();
+
+    getRelationshipFieldDetail.mockResolvedValue({
+      fields: []
+    });
+    errorBanner.dispatchEvent(new CustomEvent("retry"));
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="relationship-field-detail-error"]'
+      )
+    ).toBeNull();
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="relationship-field-detail-empty"]'
+      )
+    ).not.toBeNull();
+  });
+
+  it("shows a truncated note when the on-demand record-count load reports truncated, and an honest 'count unavailable' for a target that did not resolve", async () => {
+    getNodeDetail.mockResolvedValue({
+      nodeKey: "taskObj",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Task",
+      secondaryKey: "Task",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    getRelationshipFieldDetail.mockResolvedValue({
+      fields: [
+        {
+          fieldNodeKey: "taskObj.WhatId",
+          label: "What Id",
+          apiName: "Task.WhatId",
+          relationshipType: "Lookup",
+          isRequired: false,
+          cascadeDeleteBehavior: null,
+          targetObjects: [
+            { objectApiName: "Account", recordCount: null },
+            { objectApiName: "Opportunity", recordCount: null }
+          ]
+        }
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockResolvedValue({
+      countsByObjectApiName: { Account: 10 },
+      truncated: true
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "taskObj";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="relationship-cardinality-truncated-note"]'
+      )
+    ).not.toBeNull();
+    const table = element.shadowRoot.querySelector(
+      '[data-id="relationship-field-table"]'
+    );
+    expect(table.textContent).toContain("Account (10 records)");
+    expect(table.textContent).toContain("Opportunity (count unavailable)");
+  });
+
+  it("renders a retryable error banner when getRelationshipTargetObjectRecordCounts fails, without discarding the already-loaded field rows", async () => {
+    getNodeDetail.mockResolvedValue({
+      nodeKey: "acct",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Account",
+      secondaryKey: "Account",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    getRelationshipFieldDetail.mockResolvedValue({
+      fields: [
+        {
+          fieldNodeKey: "acctField.OwnerId",
+          label: "Owner",
+          apiName: "Account.OwnerId",
+          relationshipType: "Lookup",
+          isRequired: false,
+          cascadeDeleteBehavior: null,
+          targetObjects: [{ objectApiName: "User", recordCount: null }]
+        }
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockRejectedValue({
+      body: { message: "Something went wrong loading record counts." }
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "acct";
+    await flushPromises();
+    element.shadowRoot
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+
+    const errorBanner = element.shadowRoot.querySelector(
+      '[data-id="target-object-record-counts-error"]'
+    );
+    expect(errorBanner).not.toBeNull();
+    expect(errorBanner.message).toBe(
+      "Something went wrong loading record counts."
+    );
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("Owner");
+
+    getRelationshipTargetObjectRecordCounts.mockResolvedValue({
+      countsByObjectApiName: { User: 7 },
+      truncated: false
+    });
+    errorBanner.dispatchEvent(new CustomEvent("retry"));
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector(
+        '[data-id="target-object-record-counts-error"]'
+      )
+    ).toBeNull();
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("User (7 records)");
+  });
+
+  it("clears relationship field detail when the selected object changes, so a previous object's fields never bleed into the newly-selected one", async () => {
+    getNodeDetail.mockResolvedValueOnce({
+      nodeKey: "objA",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Object A",
+      secondaryKey: "ObjA",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    getRelationshipFieldDetail.mockResolvedValueOnce({
+      fields: [
+        {
+          fieldNodeKey: "objA.Ref",
+          label: "Ref",
+          apiName: "ObjA.Ref__c",
+          relationshipType: "Lookup",
+          isRequired: false,
+          cascadeDeleteBehavior: null,
+          targetObjects: [{ objectApiName: "Account", recordCount: null }]
+        }
+      ]
+    });
+    getRelationshipTargetObjectRecordCounts.mockResolvedValueOnce({
+      countsByObjectApiName: { Account: 5 },
+      truncated: false
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "objA";
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("Ref");
+    element.shadowRoot
+      .querySelector('[data-id="load-target-object-record-counts-button"]')
+      .click();
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+        .textContent
+    ).toContain("Account (5 records)");
+
+    getNodeDetail.mockResolvedValueOnce({
+      nodeKey: "objB",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Object B",
+      secondaryKey: "ObjB",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    getRelationshipFieldDetail.mockResolvedValueOnce({
+      fields: []
+    });
+    element.nodeKey = "objB";
+    await flushPromises();
+
+    expect(
+      element.shadowRoot.querySelector('[data-id="relationship-field-table"]')
+    ).toBeNull();
+    expect(getRelationshipFieldDetail).toHaveBeenCalledWith({
+      objectNodeKey: "objB"
+    });
   });
 
   it("renders Self Relationships/Referenced Objects/Referencing Objects only when objectRelationshipSummary is supplied (Object mode, from oiGraphExplorer), as plain non-drilldown counts", async () => {
@@ -1003,6 +2155,12 @@ describe("c-oi-node-detail-panel", () => {
     expect(content.textContent).toContain("Lookup To");
     expect(content.textContent).toContain("User");
     expect(content.textContent).toContain("Owner");
+    expect(
+      element.shadowRoot.querySelector('[data-id="field-relationship-section"]')
+    ).not.toBeNull();
+    expect(
+      element.shadowRoot.querySelector('[data-id="structural-connections"]')
+    ).toBeNull();
   });
 
   it("renders a sanitized error state when the Apex call fails", async () => {
@@ -1079,6 +2237,10 @@ describe("c-oi-node-detail-panel", () => {
         element.shadowRoot.querySelector('[data-id="show-fields-button"]')
       ).not.toBeNull();
       expect(getFieldSummaries).not.toHaveBeenCalled();
+      expect(
+        element.shadowRoot.querySelector('[data-id="field-metrics"]')
+          .textContent
+      ).toContain("—");
     });
 
     it("collapsing the Fields section header hides the Show Fields trigger, and re-expanding restores it", async () => {
@@ -1335,15 +2497,13 @@ describe("c-oi-node-detail-panel", () => {
     });
 
     it("selecting a new node resets the field browser back to its unloaded, unfiltered state", async () => {
-      getNodeDetail
-        .mockResolvedValueOnce(objectDetail())
-        .mockResolvedValueOnce(
-          objectDetail({
-            nodeKey: "contact",
-            label: "Contact",
-            secondaryKey: "Contact"
-          })
-        );
+      getNodeDetail.mockResolvedValueOnce(objectDetail()).mockResolvedValueOnce(
+        objectDetail({
+          nodeKey: "contact",
+          label: "Contact",
+          secondaryKey: "Contact"
+        })
+      );
       getFieldSummaries.mockResolvedValue([
         fieldSummary({ nodeKey: "f1", label: "Account Name" })
       ]);
@@ -1807,15 +2967,13 @@ describe("c-oi-node-detail-panel", () => {
     });
 
     it("selecting a new node resets the Impact Analysis section back to its unloaded state", async () => {
-      getNodeDetail
-        .mockResolvedValueOnce(objectDetail())
-        .mockResolvedValueOnce(
-          objectDetail({
-            nodeKey: "contact",
-            label: "Contact",
-            secondaryKey: "Contact"
-          })
-        );
+      getNodeDetail.mockResolvedValueOnce(objectDetail()).mockResolvedValueOnce(
+        objectDetail({
+          nodeKey: "contact",
+          label: "Contact",
+          secondaryKey: "Contact"
+        })
+      );
       getImpact.mockResolvedValue(impactResult());
       const element = createElement("c-oi-node-detail-panel", {
         is: OiNodeDetailPanel
@@ -1837,6 +2995,165 @@ describe("c-oi-node-detail-panel", () => {
 
       expect(
         element.shadowRoot.querySelector('[data-id="impact-coverage-caveat"]')
+      ).toBeNull();
+    });
+  });
+
+  describe("Sharing Settings section (Object mode, Tooling-API-sourced OWD)", () => {
+    it("does not call getObjectSharingSettings on selection — it is collapsed by default and loads only when explicitly expanded", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+
+      expect(getObjectSharingSettings).not.toHaveBeenCalled();
+      expect(
+        element.shadowRoot.querySelector('[data-id="sharing-settings-grid"]')
+      ).toBeNull();
+    });
+
+    it("renders the internal and external sharing model once the section is expanded", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      getObjectSharingSettings.mockResolvedValue({
+        supported: true,
+        unavailableReason: null,
+        internalSharingModel: "ReadWrite",
+        externalSharingModel: null
+      });
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+
+      await expandSection(element, "sharingSettings");
+
+      expect(getObjectSharingSettings).toHaveBeenCalledWith({
+        objectApiName: "Account"
+      });
+      const grid = element.shadowRoot.querySelector(
+        '[data-id="sharing-settings-grid"]'
+      );
+      expect(grid.textContent).toContain("ReadWrite");
+      expect(grid.textContent).toContain("Not enabled");
+    });
+
+    it("shows a loading skeleton while getObjectSharingSettings is in flight", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      getObjectSharingSettings.mockReturnValue(new Promise(() => {}));
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+
+      element.shadowRoot
+        .querySelector('[data-section="sharingSettings"]')
+        .click();
+      await flushPromises();
+
+      expect(
+        element.shadowRoot.querySelector(
+          '[data-id="sharing-settings-section"] c-oi-skeleton'
+        )
+      ).not.toBeNull();
+    });
+
+    it("renders a retryable error banner when getObjectSharingSettings fails", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      getObjectSharingSettings.mockRejectedValue({
+        body: { message: "Something went wrong loading sharing settings." }
+      });
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "sharingSettings");
+
+      const banner = element.shadowRoot.querySelector(
+        '[data-id="object-sharing-settings-error"]'
+      );
+      expect(banner).not.toBeNull();
+
+      getObjectSharingSettings.mockResolvedValue({
+        supported: true,
+        unavailableReason: null,
+        internalSharingModel: "Private",
+        externalSharingModel: "Private"
+      });
+      banner.dispatchEvent(new CustomEvent("retry"));
+      await flushPromises();
+
+      expect(
+        element.shadowRoot.querySelector('[data-id="sharing-settings-grid"]')
+          .textContent
+      ).toContain("Private");
+    });
+
+    it("renders an honest unsupported state when the Tooling API could not resolve a sharing model", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      getObjectSharingSettings.mockResolvedValue({
+        supported: false,
+        unavailableReason:
+          "No sharing model information was found for this object.",
+        internalSharingModel: null,
+        externalSharingModel: null
+      });
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "sharingSettings");
+
+      expect(
+        element.shadowRoot.querySelector('[data-id="sharing-settings-grid"]')
+      ).toBeNull();
+      expect(
+        element.shadowRoot.querySelector(
+          '[data-id="object-sharing-settings-unsupported"]'
+        ).message
+      ).toBe("No sharing model information was found for this object.");
+    });
+
+    it("clears sharing settings when the selected object changes, so a previous object's OWD never bleeds into the newly-selected one", async () => {
+      getNodeDetail.mockResolvedValueOnce(objectDetail()).mockResolvedValueOnce(
+        objectDetail({
+          nodeKey: "contact",
+          label: "Contact",
+          secondaryKey: "Contact"
+        })
+      );
+      getObjectSharingSettings.mockResolvedValueOnce({
+        supported: true,
+        unavailableReason: null,
+        internalSharingModel: "ReadWrite",
+        externalSharingModel: null
+      });
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "sharingSettings");
+      expect(
+        element.shadowRoot.querySelector('[data-id="sharing-settings-grid"]')
+      ).not.toBeNull();
+
+      element.nodeKey = "contact";
+      await flushPromises();
+
+      expect(
+        element.shadowRoot.querySelector('[data-id="sharing-settings-grid"]')
       ).toBeNull();
     });
   });

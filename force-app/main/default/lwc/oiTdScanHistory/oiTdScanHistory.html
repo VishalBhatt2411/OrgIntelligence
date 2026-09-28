@@ -1,0 +1,36 @@
+<template>
+  <template lwc:if={loading}>
+    <p class="body1 p4">Loading...</p>
+  </template>
+  <div lwc:else class="page">
+    <div class="paper p3">
+      <p class="subtitle1 gutter">Scan History</p>
+      <template lwc:if={isEmpty}>
+        <p class="body1 muted empty">No scans yet.</p>
+      </template>
+      <template lwc:else>
+        <template for:each={rows} for:item="r">
+          <div
+            key={r.id}
+            class={r.cls}
+            data-id={r.id}
+            onclick={handleView}
+            role="button"
+            tabindex="0"
+          >
+            <div class="grow">
+              <p class="body2 semibold">{r.started}</p>
+              <span class="caption muted">{r.finished}</span>
+            </div>
+            <template lwc:if={r.hasScore}>
+              <span class="body2 bold score" style={r.scoreStyle}
+                >{r.score}</span
+              >
+            </template>
+            <span class={r.chipClass}>{r.status}</span>
+          </div>
+        </template>
+      </template>
+    </div>
+  </div>
+</template>

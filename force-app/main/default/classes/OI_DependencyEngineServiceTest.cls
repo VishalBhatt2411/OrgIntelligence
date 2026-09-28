@@ -248,6 +248,99 @@ private class OI_DependencyEngineServiceTest {
     );
   }
 
+  /**
+   * DE-14 regression guard, reproducing the real production incident (Account reverse
+   * impact, ~50 Permission Set grants): a genuinely oversized subgraph — no mock, no stub —
+   * whose serialized JSON exceeds even the raised 131,072-char cap on Manual_Test_Json1__c
+   * must still return the fully computed result to the caller. Before this fix,
+   * OI_ImpactCacheRepository.put's STRING_TOO_LONG DmlException propagated all the way up
+   * through getImpact, discarding an already-successful computation and surfacing as a
+   * generic "something went wrong" to the user for exactly the well-connected nodes where
+   * Impact Analysis matters most.
+   */
+  @isTest
+  static void testGetImpactReturnsTheFullResultWhenTheCacheWriteFailsOnAnOversizedSubgraph() {
+    Integer fanOut = 149;
+    String longLabel = 'X'.repeat(255);
+    // Real node keys are 64-char SHA-256 hex, longer than the log's Text(36) correlation id.
+    String rootKey = 'a'.repeat(64);
+
+    List<OI_Graph_Node__c> nodes = new List<OI_Graph_Node__c>();
+    nodes.add(
+      new OI_Graph_Node__c(
+        Node_Key__c = rootKey,
+        Node_Version_Key__c = rootKey + '::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'SalesforceMetadata.CustomObject',
+        Label__c = 'Root Object',
+        Secondary_Key__c = 'Root Object',
+        Checksum__c = 'root-checksum',
+        State__c = 'Active',
+        Is_Current__c = true
+      )
+    );
+    for (Integer i = 0; i < fanOut; i++) {
+      String key = 'grantee' + i;
+      nodes.add(
+        new OI_Graph_Node__c(
+          Node_Key__c = key,
+          Node_Version_Key__c = key + '::v1',
+          Version_Number__c = 1,
+          Node_Type__c = 'SalesforceMetadata.PermissionSet',
+          Label__c = longLabel,
+          Secondary_Key__c = longLabel,
+          Checksum__c = key + '-checksum',
+          State__c = 'Active',
+          Is_Current__c = true
+        )
+      );
+    }
+    insert nodes;
+
+    List<OI_Graph_Edge__c> edges = new List<OI_Graph_Edge__c>();
+    for (Integer i = 0; i < fanOut; i++) {
+      String key = 'grantee' + i;
+      edges.add(
+        new OI_Graph_Edge__c(
+          Edge_Key__c = key + '->' + rootKey,
+          Edge_Version_Key__c = key + '->' + rootKey + '::v1',
+          Version_Number__c = 1,
+          Edge_Type__c = 'SalesforceMetadata.GRANTS_ACCESS_TO',
+          Source_Node_Key__c = key,
+          Target_Node_Key__c = rootKey,
+          State__c = 'Active',
+          Is_Current__c = true
+        )
+      );
+    }
+    insert edges;
+
+    OI_ImpactResult result = new OI_DependencyEngineService()
+      .getImpact(rootKey, 'reverse', 3);
+
+    System.assertEquals(
+      fanOut,
+      result.affectedComponents.size(),
+      'Every one of the 149 grantees must still come back to the caller — a cache-write failure must never truncate or discard an already-computed result.'
+    );
+    System.assertEquals(
+      0,
+      [SELECT COUNT() FROM OI_Impact_Cache__c],
+      'Precondition that proves this test actually exercises the failure path: the serialized payload must genuinely exceed Manual_Test_Json1__c\'s cap, so the upsert must have failed and left no row behind.'
+    );
+
+    Test.getEventBus().deliver();
+    System.assertEquals(
+      1,
+      [
+        SELECT COUNT()
+        FROM OI_Log__c
+        WHERE Level__c = 'WARN' AND Source__c = 'OI_DependencyEngineService'
+      ],
+      'The missed cache write must be logged, even for a full-length node key.'
+    );
+  }
+
   private static void insertClassNode(String nodeKey, String label) {
     insert new OI_Graph_Node__c(
       Node_Key__c = nodeKey,

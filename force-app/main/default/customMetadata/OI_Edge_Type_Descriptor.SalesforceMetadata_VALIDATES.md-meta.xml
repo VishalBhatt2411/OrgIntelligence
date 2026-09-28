@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomMetadata
+  xmlns="http://soap.sforce.com/2006/04/metadata"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+>
+    <label>SalesforceMetadata.VALIDATES</label>
+    <protected>false</protected>
+    <values>
+        <field>Type_Key__c</field>
+        <value xsi:type="xsd:string">SalesforceMetadata.VALIDATES</value>
+    </values>
+    <values>
+        <field>Display_Label__c</field>
+        <value xsi:type="xsd:string">Validates</value>
+    </values>
+    <values>
+        <field>Line_Style__c</field>
+        <value xsi:type="xsd:string">solid</value>
+    </values>
+    <values>
+        <field>Source_Role_Label__c</field>
+        <value xsi:type="xsd:string">Validates</value>
+    </values>
+    <values>
+        <field>Target_Role_Label__c</field>
+        <value xsi:type="xsd:string">Validated By</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value
+      xsi:type="xsd:string"
+    >A Validation Rule that runs against records of this object on save.</value>
+    </values>
+</CustomMetadata>

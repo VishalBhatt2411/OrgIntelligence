@@ -61,79 +61,110 @@
     </div>
 
     <div class="oi-hierarchy-manager-detail">
-      <h3 class="oi-hierarchy-manager-section-title">{definitionFormTitle}</h3>
-      <template lwc:if={hasDefinitionFormError}>
-        <c-oi-state-banner
-          data-id="definition-form-error"
-          state="error"
-          title="Couldn't save this hierarchy"
-          message={definitionFormError}
-          onretry={handleSaveDefinition}
-        ></c-oi-state-banner>
-      </template>
-      <div class="oi-hierarchy-manager-form" data-id="definition-form">
-        <lightning-input
-          label="Name"
-          data-field="name"
-          data-id="definition-name-input"
-          value={definitionDraft.name}
-          onchange={handleDefinitionFieldChange}
-        ></lightning-input>
-        <lightning-textarea
-          label="Description"
-          data-field="description"
-          value={definitionDraft.description}
-          onchange={handleDefinitionFieldChange}
-        ></lightning-textarea>
-        <lightning-input
-          label="Object API Name"
-          data-field="objectApiName"
-          data-id="definition-object-input"
-          value={definitionDraft.objectApiName}
-          onchange={handleDefinitionFieldChange}
-        ></lightning-input>
-        <lightning-combobox
-          label="Status"
-          data-field="status"
-          value={definitionDraft.status}
-          options={statusOptions}
-          onchange={handleDefinitionFieldChange}
-        ></lightning-combobox>
-        <lightning-input
-          type="number"
-          label="Max Levels"
-          data-field="maxLevels"
-          value={definitionDraft.maxLevels}
-          onchange={handleDefinitionFieldChange}
-        ></lightning-input>
-        <lightning-input
-          label="Relationship Type"
-          data-field="relationshipType"
-          value={definitionDraft.relationshipType}
-          onchange={handleDefinitionFieldChange}
-        ></lightning-input>
-        <lightning-input
-          type="checkbox"
-          label="Allow Multiple Parents"
-          checked={definitionDraft.allowMultipleParents}
-          onchange={handleAllowMultipleParentsChange}
-        ></lightning-input>
-        <lightning-input
-          type="checkbox"
-          label="Allow Multiple Hierarchies"
-          checked={definitionDraft.allowMultipleHierarchies}
-          onchange={handleAllowMultipleHierarchiesChange}
-        ></lightning-input>
-        <button
-          type="button"
-          class="oi-btn oi-btn_primary"
-          data-id="save-definition-button"
-          disabled={isSavingDefinition}
-          onclick={handleSaveDefinition}
+      <header class="oi-hierarchy-manager-workspace-header">
+        <div>
+          <span class="oi-hierarchy-manager-eyebrow">Hierarchy studio</span>
+          <h2 class="oi-hierarchy-manager-workspace-title">
+            Model business structures without losing context
+          </h2>
+          <p class="oi-hierarchy-manager-workspace-subtitle">
+            Define the hierarchy, shape its levels, then assign records in one
+            connected workspace.
+          </p>
+        </div>
+        <div
+          class="oi-hierarchy-manager-step-rail"
+          aria-label="Hierarchy setup flow"
         >
-          Save Hierarchy
-        </button>
-      </div>
+          <span class="oi-hierarchy-manager-step is-active"
+            ><b>1</b> Definition</span
+          >
+          <span class="oi-hierarchy-manager-step"><b>2</b> Levels</span>
+          <span class="oi-hierarchy-manager-step"><b>3</b> Relationships</span>
+        </div>
+      </header>
+
+      <section class="oi-hierarchy-manager-definition-card">
+        <h3 class="oi-hierarchy-manager-section-title">
+          {definitionFormTitle}
+        </h3>
+        <p class="oi-hierarchy-manager-section-intro">
+          Start with the identity and operating rules. Advanced hierarchy
+          content becomes available after the definition is saved.
+        </p>
+        <template lwc:if={hasDefinitionFormError}>
+          <c-oi-state-banner
+            data-id="definition-form-error"
+            state="error"
+            title="Couldn't save this hierarchy"
+            message={definitionFormError}
+            onretry={handleSaveDefinition}
+          ></c-oi-state-banner>
+        </template>
+        <div class="oi-hierarchy-manager-form" data-id="definition-form">
+          <lightning-input
+            label="Name"
+            data-field="name"
+            data-id="definition-name-input"
+            value={definitionDraft.name}
+            onchange={handleDefinitionFieldChange}
+          ></lightning-input>
+          <lightning-textarea
+            label="Description"
+            data-field="description"
+            value={definitionDraft.description}
+            onchange={handleDefinitionFieldChange}
+          ></lightning-textarea>
+          <lightning-input
+            label="Object API Name"
+            data-field="objectApiName"
+            data-id="definition-object-input"
+            value={definitionDraft.objectApiName}
+            onchange={handleDefinitionFieldChange}
+          ></lightning-input>
+          <lightning-combobox
+            label="Status"
+            data-field="status"
+            value={definitionDraft.status}
+            options={statusOptions}
+            onchange={handleDefinitionFieldChange}
+          ></lightning-combobox>
+          <lightning-input
+            type="number"
+            label="Max Levels"
+            data-field="maxLevels"
+            value={definitionDraft.maxLevels}
+            onchange={handleDefinitionFieldChange}
+          ></lightning-input>
+          <lightning-input
+            label="Relationship Type"
+            data-field="relationshipType"
+            value={definitionDraft.relationshipType}
+            onchange={handleDefinitionFieldChange}
+          ></lightning-input>
+          <lightning-input
+            type="checkbox"
+            label="Allow Multiple Parents"
+            checked={definitionDraft.allowMultipleParents}
+            onchange={handleAllowMultipleParentsChange}
+          ></lightning-input>
+          <lightning-input
+            type="checkbox"
+            label="Allow Multiple Hierarchies"
+            checked={definitionDraft.allowMultipleHierarchies}
+            onchange={handleAllowMultipleHierarchiesChange}
+          ></lightning-input>
+          <button
+            type="button"
+            class="oi-btn oi-btn_primary"
+            data-id="save-definition-button"
+            disabled={isSavingDefinition}
+            onclick={handleSaveDefinition}
+          >
+            Save Hierarchy
+          </button>
+        </div>
+      </section>
 
       <template lwc:if={showLevelsSection}>
         <div class="oi-hierarchy-manager-levels">

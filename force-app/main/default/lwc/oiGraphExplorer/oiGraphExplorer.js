@@ -931,6 +931,12 @@ export default class OiGraphExplorer extends NavigationMixin(LightningElement) {
 
   handleConnectorDetailClose() {
     this.closeConnectorDetail();
+    const relationshipCanvas = this.template.querySelector(
+      "c-oi-relationship-canvas"
+    );
+    if (relationshipCanvas) {
+      relationshipCanvas.clearConnectorSelection();
+    }
   }
 
   closeConnectorDetail() {

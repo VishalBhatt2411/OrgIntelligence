@@ -32,6 +32,13 @@ import { navigateToTarget } from "c/metadataNavigation";
 const PAGE_SIZE = 100;
 /** Debounce for the search box — long enough to avoid a round-trip per keystroke, short enough to feel immediate. */
 const SEARCH_DEBOUNCE_MS = 300;
+/** Same status vocabulary and severity-token badge mapping as oiNodeDetailPanel's own STATUS_BADGE_CLASS_BY_VALUE (row.status is read there and here from the identical OI_ComponentStatusUtil-normalized value) — kept as a separate, component-scoped constant rather than a shared import, matching this codebase's existing per-component lookup-table convention (e.g. CATEGORY_ICON_NAMES). An unrecognised status still renders, just with the neutral fallback class. */
+const STATUS_BADGE_CLASS_BY_VALUE = {
+  Active: "oi-drilldown-status-badge is-active",
+  Inactive: "oi-drilldown-status-badge is-inactive",
+  Draft: "oi-drilldown-status-badge is-inactive",
+  Obsolete: "oi-drilldown-status-badge is-obsolete"
+};
 
 export default class OiIntelligenceDrilldown extends NavigationMixin(
   LightningElement
@@ -132,7 +139,11 @@ export default class OiIntelligenceDrilldown extends NavigationMixin(
     const incoming = (page.rows || []).map((row, index) => ({
       ...row,
       /** A stable per-row key for the template. Edge keys are not returned (they are internal), and labels can repeat, so position within the accumulated list is the reliable identity. */
-      rowKey: `${append ? this.rows.length + index : index}-${row.nodeKey}`
+      rowKey: `${append ? this.rows.length + index : index}-${row.nodeKey}`,
+      hasStatus: !!row.status,
+      statusBadgeClass: row.status
+        ? STATUS_BADGE_CLASS_BY_VALUE[row.status] || "oi-drilldown-status-badge"
+        : null
     }));
     this.rows = append ? [...this.rows, ...incoming] : incoming;
     this.totalCount = page.totalCount;
@@ -265,6 +276,10 @@ export default class OiIntelligenceDrilldown extends NavigationMixin(
 
   get showReferencedObjectColumn() {
     return this.rows.some((row) => !!row.referencedObject);
+  }
+
+  get showStatusColumn() {
+    return this.rows.some((row) => !!row.status);
   }
 
   async handleRowOpen(event) {

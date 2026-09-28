@@ -293,6 +293,78 @@ private class OI_NodeSelectorTest {
   }
 
   @isTest
+  static void testSelectCurrentBrowseOrdersAlphabeticallyAndScopesByTypeAndCurrency() {
+    insert new List<OI_Graph_Node__c>{
+      new OI_Graph_Node__c(
+        Node_Key__c = 'brw1',
+        Node_Version_Key__c = 'brw1::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'Browse.Type',
+        Label__c = 'Zebra',
+        State__c = 'Active',
+        Is_Current__c = true
+      ),
+      new OI_Graph_Node__c(
+        Node_Key__c = 'brw2',
+        Node_Version_Key__c = 'brw2::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'Browse.Type',
+        Label__c = 'Account',
+        State__c = 'Active',
+        Is_Current__c = true
+      ),
+      new OI_Graph_Node__c(
+        Node_Key__c = 'brw3',
+        Node_Version_Key__c = 'brw3::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'Browse.OtherType',
+        Label__c = 'Aardvark',
+        State__c = 'Active',
+        Is_Current__c = true
+      ),
+      new OI_Graph_Node__c(
+        Node_Key__c = 'brw4',
+        Node_Version_Key__c = 'brw4::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'Browse.Type',
+        Label__c = 'Stale',
+        State__c = 'Active',
+        Is_Current__c = false
+      )
+    };
+
+    List<OI_Graph_Node__c> scoped = new OI_NodeSelector()
+      .selectCurrentBrowse('Browse.Type', 20);
+    System.assertEquals(
+      2,
+      scoped.size(),
+      'Only current rows of the requested type must be returned.'
+    );
+    System.assertEquals(
+      'Account',
+      scoped[0].Label__c,
+      'Results must be ordered alphabetically by label.'
+    );
+    System.assertEquals('Zebra', scoped[1].Label__c);
+
+    List<OI_Graph_Node__c> capped = new OI_NodeSelector()
+      .selectCurrentBrowse('Browse.Type', 1);
+    System.assertEquals(
+      1,
+      capped.size(),
+      'The ceiling must bound the result even when more current rows exist.'
+    );
+
+    List<OI_Graph_Node__c> unscoped = new OI_NodeSelector()
+      .selectCurrentBrowse(null, 20);
+    System.assertEquals(
+      3,
+      unscoped.size(),
+      'A blank typeKey must browse across every type, current rows only.'
+    );
+  }
+
+  @isTest
   static void testSelectSecondaryKeysByKeysReturnsCurrentRowsOnlyKeyedByNodeKey() {
     insert new List<OI_Graph_Node__c>{
       new OI_Graph_Node__c(

@@ -9,6 +9,6 @@
     <navType>Standard</navType>
     <tabs>OI_Graph_Explorer</tabs>
     <tabs>OI_Hierarchy_Manager</tabs>
-    <tabs>OI_Org_Health</tabs>
+    <tabs>OI_Tech_Debt</tabs>
     <uiType>Lightning</uiType>
 </CustomApplication>

@@ -10,19 +10,38 @@
  *              "more of this type exists" signal (hasMore), not a resumable cursor.
  */
 public class OI_RecordFragmentDTO {
-    @AuraEnabled
-    public String centerNodeKey;
-    @AuraEnabled
-    public List<OI_NodeSummaryDTO> nodes;
-    @AuraEnabled
-    public List<OI_EdgeSummaryDTO> edges;
-    @AuraEnabled
-    public Boolean hasMore;
+  @AuraEnabled
+  public String centerNodeKey;
+  @AuraEnabled
+  public List<OI_NodeSummaryDTO> nodes;
+  @AuraEnabled
+  public List<OI_EdgeSummaryDTO> edges;
+  @AuraEnabled
+  public Boolean hasMore;
+  /** Live, FLS-trimmed center-record facts for the Intelligence Panel. */
+  @AuraEnabled
+  public OI_RecordOverviewDTO recordOverview;
 
-    public OI_RecordFragmentDTO(String centerNodeKey, List<OI_NodeSummaryDTO> nodes, List<OI_EdgeSummaryDTO> edges, Boolean hasMore) {
-        this.centerNodeKey = centerNodeKey;
-        this.nodes = nodes;
-        this.edges = edges;
-        this.hasMore = hasMore;
-    }
+  public OI_RecordFragmentDTO(
+    String centerNodeKey,
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges,
+    Boolean hasMore
+  ) {
+    this(centerNodeKey, nodes, edges, hasMore, null);
+  }
+
+  public OI_RecordFragmentDTO(
+    String centerNodeKey,
+    List<OI_NodeSummaryDTO> nodes,
+    List<OI_EdgeSummaryDTO> edges,
+    Boolean hasMore,
+    OI_RecordOverviewDTO recordOverview
+  ) {
+    this.centerNodeKey = centerNodeKey;
+    this.nodes = nodes;
+    this.edges = edges;
+    this.hasMore = hasMore;
+    this.recordOverview = recordOverview;
+  }
 }

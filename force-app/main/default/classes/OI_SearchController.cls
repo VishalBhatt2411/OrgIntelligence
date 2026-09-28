@@ -2,7 +2,9 @@
  * Purpose: The @AuraEnabled boundary for finding a starting node to graph (Sprint 10) —
  *          backs oiSearchBar.
  * Responsibilities: Permission check -> OI_NodeSelector prefix lookup -> map to DTOs ->
- *                    return, or translate to a sanitized AuraHandledException.
+ *                    return, or translate to a sanitized AuraHandledException. Also exposes
+ *                    `browse`, the bounded alphabetical enumeration oiSearchBar shows the
+ *                    moment its input gets focus, before any query term exists.
  * Dependencies: OI_NodeSelector, OI_SecurityService, OI_SettingsService,
  *               OI_NodeSummaryDTO.
  * Limitations: This is a deliberately minimal substitute for the full, unbuilt
@@ -13,40 +15,81 @@
  *              replaced, not extended, when Search is actually built.
  */
 public with sharing class OI_SearchController {
-    @AuraEnabled(cacheable=true)
-    public static List<OI_NodeSummaryDTO> search(String queryTerm) {
-        try {
-            OI_SecurityService.assertPermission('OI_View_Graph');
-            Integer minLength = safeInt(new OI_SettingsService().getSettings().Min_Search_Query_Length__c, 2);
-            if (String.isBlank(queryTerm) || queryTerm.trim().length() < minLength) {
-                return new List<OI_NodeSummaryDTO>();
-            }
-            Integer maxResults = safeInt(new OI_SettingsService().getSettings().Max_Search_Results__c, 20);
-            List<OI_NodeSummaryDTO> results = new List<OI_NodeSummaryDTO>();
-            for (OI_Graph_Node__c node : new OI_NodeSelector().selectCurrentByLabelOrSecondaryKeyPrefix(queryTerm.trim(), maxResults)) {
-                results.add(new OI_NodeSummaryDTO(node));
-            }
-            return results;
-        } catch (Exception e) {
-            throw translate(e);
-        }
+  @AuraEnabled(cacheable=true)
+  public static List<OI_NodeSummaryDTO> search(String queryTerm) {
+    try {
+      OI_SecurityService.assertPermission('OI_View_Graph');
+      Integer minLength = safeInt(
+        new OI_SettingsService().getSettings().Min_Search_Query_Length__c,
+        2
+      );
+      if (String.isBlank(queryTerm) || queryTerm.trim().length() < minLength) {
+        return new List<OI_NodeSummaryDTO>();
+      }
+      Integer maxResults = safeInt(
+        new OI_SettingsService().getSettings().Max_Search_Results__c,
+        20
+      );
+      List<OI_NodeSummaryDTO> results = new List<OI_NodeSummaryDTO>();
+      for (
+        OI_Graph_Node__c node : new OI_NodeSelector()
+          .selectCurrentByLabelOrSecondaryKeyPrefix(
+            queryTerm.trim(),
+            maxResults
+          )
+      ) {
+        results.add(new OI_NodeSummaryDTO(node));
+      }
+      return results;
+    } catch (Exception e) {
+      throw translate(e);
     }
+  }
 
-    private static Integer safeInt(Decimal value, Integer fallback) {
-        return value == null ? fallback : Integer.valueOf(value);
+  /**
+   * Bounded, alphabetical node list for the click-to-browse panel — no minimum length gate
+   * (unlike search) since there is no typed term to be too short. Optionally scoped to a
+   * single type (oiSearchBar's typeKeyFilter, the current Analyze mode) so a Field-mode
+   * search box only ever browses fields, never objects.
+   */
+  @AuraEnabled(cacheable=true)
+  public static List<OI_NodeSummaryDTO> browse(String typeKey) {
+    try {
+      OI_SecurityService.assertPermission('OI_View_Graph');
+      Integer maxResults = safeInt(
+        new OI_SettingsService().getSettings().Max_Search_Results__c,
+        20
+      );
+      List<OI_NodeSummaryDTO> results = new List<OI_NodeSummaryDTO>();
+      for (
+        OI_Graph_Node__c node : new OI_NodeSelector()
+          .selectCurrentBrowse(typeKey, maxResults)
+      ) {
+        results.add(new OI_NodeSummaryDTO(node));
+      }
+      return results;
+    } catch (Exception e) {
+      throw translate(e);
     }
+  }
 
-    private static AuraHandledException translate(Exception e) {
-        String message;
-        if (e instanceof OI_SecurityException) {
-            message = 'You don\'t have permission to search org graph data.';
-        } else if (e instanceof OI_ValidationException || e instanceof OI_ServiceException) {
-            message = e.getMessage();
-        } else {
-            message = 'Something went wrong searching. Please try again.';
-        }
-        AuraHandledException handled = new AuraHandledException(message);
-        handled.setMessage(message);
-        return handled;
+  private static Integer safeInt(Decimal value, Integer fallback) {
+    return value == null ? fallback : Integer.valueOf(value);
+  }
+
+  private static AuraHandledException translate(Exception e) {
+    String message;
+    if (e instanceof OI_SecurityException) {
+      message = 'You don\'t have permission to search org graph data.';
+    } else if (
+      e instanceof OI_ValidationException || e instanceof OI_ServiceException
+    ) {
+      message = e.getMessage();
+    } else {
+      message = 'Something went wrong searching. Please try again.';
     }
+    AuraHandledException handled = new AuraHandledException(message);
+    handled.setMessage(message);
+    return handled;
+  }
 }

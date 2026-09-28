@@ -1,0 +1,100 @@
+<template>
+  <div class="page">
+    <p class="body1 muted count">{countLabel}</p>
+
+    <div class="filters">
+      <input
+        class="input f-search"
+        type="text"
+        placeholder="Search findings…"
+        value={search}
+        oninput={handleSearch}
+      />
+      <select class="select f-category" onchange={handleCategory}>
+        <template for:each={categoryOptions} for:item="o">
+          <option key={o.value} value={o.value} selected={o.selected}>
+            {o.label}
+          </option>
+        </template>
+      </select>
+      <select class="select f-other" onchange={handleSeverity}>
+        <template for:each={severityOptions} for:item="o">
+          <option key={o.value} value={o.value} selected={o.selected}>
+            {o.label}
+          </option>
+        </template>
+      </select>
+      <select class="select f-other" onchange={handleStatus}>
+        <template for:each={statusOptions} for:item="o">
+          <option key={o.value} value={o.value} selected={o.selected}>
+            {o.label}
+          </option>
+        </template>
+      </select>
+    </div>
+
+    <template lwc:if={loading}>
+      <p class="body1 muted">Loading…</p>
+    </template>
+    <template lwc:elseif={isEmpty}>
+      <div class="paper p4 center">
+        <p class="body1 muted">{emptyText}</p>
+      </div>
+    </template>
+    <template lwc:else>
+      <template for:each={paged} for:item="f">
+        <c-oi-td-finding-row
+          key={f.id}
+          finding={f}
+          scan-id={scanId}
+          can-manage={canManage}
+        ></c-oi-td-finding-row>
+      </template>
+      <template lwc:if={showPagination}>
+        <nav class="pagination" aria-label="pagination navigation">
+          <button
+            class="page-btn page-nav"
+            disabled={prevDisabled}
+            onclick={handlePrev}
+            aria-label="Go to previous page"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"
+              ></path>
+            </svg>
+          </button>
+          <template for:each={pageItems} for:item="p">
+            <template lwc:if={p.isPage}>
+              <button
+                key={p.key}
+                class={p.cls}
+                data-page={p.page}
+                onclick={handlePage}
+              >
+                {p.page}
+              </button>
+            </template>
+            <template lwc:else>
+              <span key={p.key} class="page-ellipsis">…</span>
+            </template>
+          </template>
+          <button
+            class="page-btn page-nav"
+            disabled={nextDisabled}
+            onclick={handleNext}
+            aria-label="Go to next page"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"
+              ></path>
+            </svg>
+          </button>
+        </nav>
+      </template>
+    </template>
+  </div>
+</template>

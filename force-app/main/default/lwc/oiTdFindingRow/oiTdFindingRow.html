@@ -1,0 +1,68 @@
+<template>
+  <div class="paper-outlined finding" style={paperStyle}>
+    <div class="head">
+      <span class={chipClass}>{finding.severity}</span>
+      <div class="title-box">
+        <p class="body1 semibold nowrap">{finding.title}</p>
+        <span class="caption muted"
+          >{finding.componentType} ·
+          <span class="mono">{finding.componentName}</span></span
+        >
+      </div>
+      <select
+        class="select status-select"
+        disabled={statusDisabled}
+        onchange={handleStatusChange}
+        onclick={stop}
+      >
+        <template for:each={statusOptions} for:item="o">
+          <option key={o.value} value={o.value} selected={o.selected}>
+            {o.label}
+          </option>
+        </template>
+      </select>
+      <input
+        class="input assignee"
+        type="text"
+        placeholder="Assign to…"
+        value={assignee}
+        disabled={assigneeDisabled}
+        oninput={handleAssigneeInput}
+        onblur={handleAssigneeBlur}
+        onclick={stop}
+      />
+      <c-oi-td-open-in-salesforce
+        scan-id={scanId}
+        type={finding.componentType}
+        name={finding.componentName}
+      ></c-oi-td-open-in-salesforce>
+      <button class="btn btn-small" onclick={toggle}>{toggleLabel}</button>
+    </div>
+    <template lwc:if={expanded}>
+      <hr class="divider expand-divider" />
+      <div>
+        <p class="body2 muted">{finding.detail}</p>
+        <template lwc:if={hasRecommendation}>
+          <div class="rec">
+            <p class="subtitle2">AI Explanation</p>
+            <p class="body2 rec-gap">{finding.aiExplanation}</p>
+            <p class="subtitle2">Recommendation</p>
+            <p class="body2">{finding.aiRecommendation}</p>
+          </div>
+        </template>
+        <template lwc:else>
+          <button
+            class="btn btn-small btn-outlined explain"
+            disabled={explainDisabled}
+            onclick={handleExplain}
+          >
+            <template lwc:if={explaining}
+              ><span class="spinner spinner-16"></span
+            ></template>
+            <template lwc:else>Explain with AI</template>
+          </button>
+        </template>
+      </div>
+    </template>
+  </div>
+</template>

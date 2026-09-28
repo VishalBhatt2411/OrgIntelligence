@@ -74,16 +74,43 @@ const CARD_HEIGHT = 80;
 /** CENTER_WIDTH stays wider than the reference's ~160px: real object labels ("Opportunity"), the type caption, and the "Analyzing" status pill routinely need more room than that at real org data volumes — VisualDesignSpecification.md §9's own tolerance ("card/control dimensions within 4px unless dynamic text requires more width") anticipates exactly this. CENTER_HEIGHT is matched exactly (185 -> 196). */
 const CENTER_WIDTH = 210;
 const CENTER_HEIGHT = 196;
-const ROW_GAP = 26;
+/** The contextual "Explore From Here" affordance renders in the gap below whichever card is
+ * selected (see EXPLORE_ACTION_GAP/EXPLORE_ACTION_HEIGHT below); ROW_GAP must always be able to
+ * fit it regardless of which row is active, otherwise it paints over the top border of the row
+ * beneath it (confirmed live: selecting a card whose clearance need — GAP + HEIGHT = 30px —
+ * exceeded the old ROW_GAP of 26px caused the button to visually cut across the next card).
+ * Row spacing is fixed for every row (not just the selected one) per this file's own
+ * deterministic-layout rule — nothing may reflow when selection changes — so the clearance is
+ * reserved unconditionally, plus a few px of breathing room so the two never touch. */
+const EXPLORE_ACTION_GAP = 6;
+const EXPLORE_ACTION_HEIGHT = 24;
+const EXPLORE_ACTION_MARGIN = 8;
+const ROW_GAP =
+  EXPLORE_ACTION_GAP + EXPLORE_ACTION_HEIGHT + EXPLORE_ACTION_MARGIN;
 const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 const MARGIN_X = 24;
 const TOP_MARGIN = 30;
+/**
+ * Connector labels live inside SVG foreignObject viewports. Their caption line, vertical
+ * padding, and two border edges need 28px at Salesforce's resolved design-token values; the
+ * previous 24px viewport clipped the bottom border when hover/selection made it visible.
+ */
+const LABEL_SLOT_HEIGHT = 28;
 const SELF_CARD_WIDTH = 190;
 const SELF_CARD_HEIGHT = 62;
-const SELF_CAPTION_HEIGHT = 42;
+const SELF_CAPTION_TOP_GAP = 4;
+const SELF_CAPTION_HEIGHT = 40;
+const SELF_CAPTION_CARD_GAP = 10;
+const SELF_CARD_LABEL_GAP = 10;
 const SELF_ENTRY_GAP = 22;
 const SELF_ENTRY_HEIGHT =
-  SELF_CAPTION_HEIGHT + SELF_CARD_HEIGHT + SELF_ENTRY_GAP;
+  SELF_CAPTION_TOP_GAP +
+  SELF_CAPTION_HEIGHT +
+  SELF_CAPTION_CARD_GAP +
+  SELF_CARD_HEIGHT +
+  SELF_CARD_LABEL_GAP +
+  LABEL_SLOT_HEIGHT +
+  SELF_ENTRY_GAP;
 
 /**
  * The card-to-trunk segment (where a connector's own label sits) used to be a fixed 150/2=75px
@@ -822,9 +849,9 @@ export default class OiRelationshipCanvas extends LightningElement {
     const exploreAction = activeCard
       ? {
           x: activeCard.x,
-          y: activeCard.y + activeCard.height + 6,
+          y: activeCard.y + activeCard.height + EXPLORE_ACTION_GAP,
           width: activeCard.width,
-          height: 24,
+          height: EXPLORE_ACTION_HEIGHT,
           nodeKey: activeCard.counterpartObject.nodeKey
         }
       : null;
@@ -890,7 +917,7 @@ export default class OiRelationshipCanvas extends LightningElement {
       rowY,
       branchPath,
       labelX: cardX + CARD_WIDTH + 8,
-      labelY: rowY - 9
+      labelY: rowY - LABEL_SLOT_HEIGHT / 2
     };
   }
 
@@ -921,7 +948,7 @@ export default class OiRelationshipCanvas extends LightningElement {
       rowY,
       branchPath,
       labelX: trunkX + 8,
-      labelY: rowY - 9
+      labelY: rowY - LABEL_SLOT_HEIGHT / 2
     };
   }
 
@@ -934,8 +961,8 @@ export default class OiRelationshipCanvas extends LightningElement {
   buildSelfEntry(connector, index, centerX, centerBottomY, diagramHeight) {
     const decorated = this.decorateConnector(connector, "self", index);
     const entryTop = diagramHeight + index * SELF_ENTRY_HEIGHT;
-    const captionY = entryTop + 4;
-    const cardTopY = entryTop + SELF_CAPTION_HEIGHT;
+    const captionY = entryTop + SELF_CAPTION_TOP_GAP;
+    const cardTopY = captionY + SELF_CAPTION_HEIGHT + SELF_CAPTION_CARD_GAP;
     const cardX = centerX + (CENTER_WIDTH - SELF_CARD_WIDTH) / 2;
     const leftX = centerX + CENTER_WIDTH * 0.32;
     const rightX = centerX + CENTER_WIDTH * 0.68;
@@ -945,7 +972,6 @@ export default class OiRelationshipCanvas extends LightningElement {
     const downPath = `M ${leftX} ${centerBottomY} Q ${leftX} ${midY} ${cardLeftX} ${cardTopY}`;
     const upPath = `M ${cardRightX} ${cardTopY} Q ${rightX} ${midY} ${rightX} ${centerBottomY}`;
     const captionBoxWidth = 260;
-    const labelBoxWidth = 240;
     return {
       ...decorated,
       downPathKey: `self-down-${index}-${connector.connectorKey}`,
@@ -959,9 +985,9 @@ export default class OiRelationshipCanvas extends LightningElement {
       cardHeight: SELF_CARD_HEIGHT,
       downPath,
       upPath,
-      labelX: centerX + CENTER_WIDTH / 2 - labelBoxWidth / 2,
-      labelY: cardTopY + SELF_CARD_HEIGHT + 12,
-      labelWidth: labelBoxWidth
+      labelX: cardX,
+      labelY: cardTopY + SELF_CARD_HEIGHT + SELF_CARD_LABEL_GAP,
+      labelWidth: SELF_CARD_WIDTH
     };
   }
 
@@ -969,6 +995,18 @@ export default class OiRelationshipCanvas extends LightningElement {
 
   get activeConnectorKey() {
     return this.selectedConnectorKey || this.hoveredConnectorKey;
+  }
+
+  /**
+   * Returns connector emphasis to its neutral state when the owning explorer closes the
+   * relationship-detail panel. Selection lives locally because hover/click rendering belongs to
+   * this canvas, so the parent needs one explicit lifecycle hook rather than reaching into that
+   * internal state.
+   */
+  @api
+  clearConnectorSelection() {
+    this.selectedConnectorKey = null;
+    this.hoveredConnectorKey = null;
   }
 
   /**

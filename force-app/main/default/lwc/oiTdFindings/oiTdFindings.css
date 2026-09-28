@@ -1,0 +1,73 @@
+@import "c/oiTdStyles";
+
+.count {
+  margin-bottom: 24px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.f-search {
+  min-width: 220px;
+  width: 220px;
+}
+
+.f-category {
+  min-width: 160px;
+  width: auto;
+}
+
+.f-other {
+  min-width: 150px;
+  width: auto;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--td-text);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-btn:hover {
+  background: var(--td-hover);
+}
+
+.page-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+  background: transparent;
+}
+
+.page-btn-active,
+.page-btn-active:hover {
+  background: var(--td-primary);
+  color: #fff;
+}
+
+.page-ellipsis {
+  min-width: 32px;
+  text-align: center;
+  color: var(--td-text);
+}

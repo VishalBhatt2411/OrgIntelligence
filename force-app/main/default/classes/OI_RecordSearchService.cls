@@ -12,36 +12,87 @@
  *              one (rare) returns no results rather than guessing a display field.
  */
 public with sharing class OI_RecordSearchService {
-    private static final Integer MAX_RESULTS = 20;
-    private static final Integer MIN_QUERY_LENGTH = 2;
+  private static final Integer MAX_RESULTS = 20;
+  private static final Integer MIN_QUERY_LENGTH = 2;
 
-    public List<OI_RecordSummaryDTO> search(String objectApiName, String queryTerm) {
-        Schema.DescribeSObjectResult describe = OI_RecordSchemaUtil.describeAccessibleObject(objectApiName);
-        if (String.isBlank(queryTerm) || queryTerm.trim().length() < MIN_QUERY_LENGTH) {
-            return new List<OI_RecordSummaryDTO>();
-        }
-        String nameField = OI_RecordSchemaUtil.resolveNameField(describe);
-        if (nameField == null) {
-            return new List<OI_RecordSummaryDTO>();
-        }
-
-        String likeTerm = '%' + String.escapeSingleQuotes(queryTerm.trim()) + '%';
-        Integer maxResults = MAX_RESULTS;
-        String soql =
-            'SELECT Id, ' +
-            nameField +
-            ' FROM ' +
-            describe.getName() +
-            ' WHERE ' +
-            nameField +
-            ' LIKE :likeTerm ORDER BY ' +
-            nameField +
-            ' ASC LIMIT :maxResults';
-
-        List<OI_RecordSummaryDTO> results = new List<OI_RecordSummaryDTO>();
-        for (SObject record : Database.query(soql, AccessLevel.USER_MODE)) {
-            results.add(new OI_RecordSummaryDTO((String) record.get('Id'), OI_RecordSchemaUtil.labelFor(record, nameField), describe.getName()));
-        }
-        return results;
+  public List<OI_RecordSummaryDTO> search(
+    String objectApiName,
+    String queryTerm
+  ) {
+    Schema.DescribeSObjectResult describe = OI_RecordSchemaUtil.describeAccessibleObject(
+      objectApiName
+    );
+    if (
+      String.isBlank(queryTerm) || queryTerm.trim().length() < MIN_QUERY_LENGTH
+    ) {
+      return new List<OI_RecordSummaryDTO>();
     }
+    String nameField = OI_RecordSchemaUtil.resolveNameField(describe);
+    if (nameField == null) {
+      return new List<OI_RecordSummaryDTO>();
+    }
+
+    String likeTerm = '%' + String.escapeSingleQuotes(queryTerm.trim()) + '%';
+    Integer maxResults = MAX_RESULTS;
+    String soql =
+      'SELECT Id, ' +
+      nameField +
+      ' FROM ' +
+      describe.getName() +
+      ' WHERE ' +
+      nameField +
+      ' LIKE :likeTerm ORDER BY ' +
+      nameField +
+      ' ASC LIMIT :maxResults';
+
+    List<OI_RecordSummaryDTO> results = new List<OI_RecordSummaryDTO>();
+    for (SObject record : Database.query(soql, AccessLevel.USER_MODE)) {
+      results.add(
+        new OI_RecordSummaryDTO(
+          (String) record.get('Id'),
+          OI_RecordSchemaUtil.labelFor(record, nameField),
+          describe.getName()
+        )
+      );
+    }
+    return results;
+  }
+
+  /**
+   * Bounded, alphabetical enumeration of an object's own records — the click-to-browse
+   * panel oiRecordPicker shows the moment its input gets focus, before any query term
+   * exists. No minimum length gate applies here since there is no typed term to be too
+   * short; bounded by the same MAX_RESULTS ceiling as a typed search.
+   */
+  public List<OI_RecordSummaryDTO> browse(String objectApiName) {
+    Schema.DescribeSObjectResult describe = OI_RecordSchemaUtil.describeAccessibleObject(
+      objectApiName
+    );
+    String nameField = OI_RecordSchemaUtil.resolveNameField(describe);
+    if (nameField == null) {
+      return new List<OI_RecordSummaryDTO>();
+    }
+
+    Integer maxResults = MAX_RESULTS;
+    String soql =
+      'SELECT Id, ' +
+      nameField +
+      ' FROM ' +
+      describe.getName() +
+      ' ORDER BY ' +
+      nameField +
+      ' ASC LIMIT :maxResults';
+
+    List<OI_RecordSummaryDTO> results = new List<OI_RecordSummaryDTO>();
+    for (SObject record : Database.query(soql, AccessLevel.USER_MODE)) {
+      results.add(
+        new OI_RecordSummaryDTO(
+          (String) record.get('Id'),
+          OI_RecordSchemaUtil.labelFor(record, nameField),
+          describe.getName()
+        )
+      );
+    }
+    return results;
+  }
 }
