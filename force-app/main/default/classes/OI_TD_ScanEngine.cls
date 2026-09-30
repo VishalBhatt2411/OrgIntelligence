@@ -371,6 +371,10 @@ public with sharing class OI_TD_ScanEngine {
       if (name == null || NOISE_OBJECT_SUFFIX_RE.matcher(name).find()) {
         continue;
       }
+      // The app never reports on itself (ADR-0031).
+      if (OI_ObjectScopeFilter.isAppApiName(name)) {
+        continue;
+      }
       if (isTrue(o.get('layoutable')) || isTrue(o.get('custom'))) {
         st.targets.add(name);
       }
@@ -533,11 +537,14 @@ public with sharing class OI_TD_ScanEngine {
   private Boolean stepClasses() {
     if (st.phase == 0) {
       for (ApexClass c : [
-        SELECT Id, LengthWithoutComments
+        SELECT Id, Name, NamespacePrefix, LengthWithoutComments
         FROM ApexClass
         ORDER BY Name
         LIMIT :maxListRows
       ]) {
+        if (OI_ObjectScopeFilter.isAppComponent(c.NamespacePrefix, c.Name)) {
+          continue;
+        }
         st.work.add(c.Id);
         st.workLens.add(
           c.LengthWithoutComments == null ? 0 : c.LengthWithoutComments
@@ -583,11 +590,14 @@ public with sharing class OI_TD_ScanEngine {
   private Boolean stepTriggers() {
     if (st.phase == 0) {
       for (ApexTrigger t : [
-        SELECT Id, LengthWithoutComments
+        SELECT Id, Name, NamespacePrefix, LengthWithoutComments
         FROM ApexTrigger
         ORDER BY Name
         LIMIT :maxListRows
       ]) {
+        if (OI_ObjectScopeFilter.isAppComponent(t.NamespacePrefix, t.Name)) {
+          continue;
+        }
         st.work.add(t.Id);
         st.workLens.add(
           t.LengthWithoutComments == null ? 0 : t.LengthWithoutComments
@@ -659,6 +669,9 @@ public with sharing class OI_TD_ScanEngine {
         FROM FlowDefinitionView
         LIMIT :maxListRows
       ]) {
+        if (OI_ObjectScopeFilter.isAppComponent(f.NamespacePrefix, f.ApiName)) {
+          continue;
+        }
         st.work.add(
           String.isBlank(f.NamespacePrefix)
             ? f.ApiName
@@ -764,7 +777,7 @@ public with sharing class OI_TD_ScanEngine {
       }
       for (
         Map<String, Object> r : nextToolingPage(
-          'SELECT Id, LightningComponentBundleId, LightningComponentBundle.DeveloperName FROM LightningComponentResource ORDER BY LightningComponentBundleId'
+          'SELECT Id, LightningComponentBundleId, LightningComponentBundle.NamespacePrefix, LightningComponentBundle.DeveloperName FROM LightningComponentResource ORDER BY LightningComponentBundleId'
         )
       ) {
         Map<String, Object> bundle = r.get(
@@ -773,7 +786,13 @@ public with sharing class OI_TD_ScanEngine {
           ? (Map<String, Object>) r.get('LightningComponentBundle')
           : null;
         String name = bundle == null ? null : str(bundle.get('DeveloperName'));
-        if (name == null) {
+        if (
+          name == null ||
+          OI_ObjectScopeFilter.isAppLightningComponent(
+            str(bundle.get('NamespacePrefix')),
+            name
+          )
+        ) {
           continue;
         }
         st.work.add(str(r.get('Id')));
@@ -843,11 +862,14 @@ public with sharing class OI_TD_ScanEngine {
 
   private Boolean stepVfPages() {
     for (ApexPage p : [
-      SELECT Id, Name
+      SELECT Id, Name, NamespacePrefix
       FROM ApexPage
       ORDER BY Name
       LIMIT :maxListRows
     ]) {
+      if (OI_ObjectScopeFilter.isAppComponent(p.NamespacePrefix, p.Name)) {
+        continue;
+      }
       st.vfps.add(vfRec(p.Name, p.Id));
     }
     st.sectionCount = st.vfps.size();
@@ -856,11 +878,14 @@ public with sharing class OI_TD_ScanEngine {
 
   private Boolean stepVfComponents() {
     for (ApexComponent c : [
-      SELECT Id, Name
+      SELECT Id, Name, NamespacePrefix
       FROM ApexComponent
       ORDER BY Name
       LIMIT :maxListRows
     ]) {
+      if (OI_ObjectScopeFilter.isAppComponent(c.NamespacePrefix, c.Name)) {
+        continue;
+      }
       st.vfcs.add(vfRec(c.Name, c.Id));
     }
     st.sectionCount = st.vfcs.size();
@@ -920,6 +945,7 @@ public with sharing class OI_TD_ScanEngine {
         SELECT
           Id,
           Name,
+          NamespacePrefix,
           IsOwnedByProfile,
           ProfileId,
           Profile.Name,
@@ -932,8 +958,14 @@ public with sharing class OI_TD_ScanEngine {
         ORDER BY IsOwnedByProfile DESC, Name
         LIMIT :maxListRows
       ]) {
-        OI_TD_Rules.AccessHolder h = new OI_TD_Rules.AccessHolder();
         Boolean isProfile = ps.IsOwnedByProfile;
+        if (
+          !isProfile &&
+          OI_ObjectScopeFilter.isAppComponent(ps.NamespacePrefix, ps.Name)
+        ) {
+          continue;
+        }
+        OI_TD_Rules.AccessHolder h = new OI_TD_Rules.AccessHolder();
         h.type = isProfile ? 'Profile' : 'PermissionSet';
         h.name = isProfile && ps.Profile != null ? ps.Profile.Name : ps.Name;
         Map<String, Boolean> granted = new Map<String, Boolean>{

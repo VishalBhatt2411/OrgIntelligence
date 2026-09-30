@@ -247,6 +247,70 @@ private class OI_ObjectScopeFilterTest {
     );
   }
 
+  /** The ownership-only checks the Tech Debt engine uses: other packages are not the app's. */
+  @isTest
+  static void testAppOwnershipChecksIgnoreOtherPackages() {
+    OI_ObjectScopeFilter.ScopePolicy policy = useEmptyPolicy();
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isAppComponent(null, 'OI_GraphEngine'),
+      'With no app identity nothing is the app own.'
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isAppLightningComponent(null, 'oiGraphExplorer')
+    );
+
+    policy.appNamePrefix = 'oi_';
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isAppComponent(null, 'OI_GraphEngine')
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isAppComponent('FSL', 'OI_Helper'),
+      'Another package is not the app, whatever the name.'
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isAppLightningComponent(null, 'oiGraphExplorer')
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isAppLightningComponent(null, 'oilPriceTicker'),
+      'The prefix must be followed by an upper-case letter.'
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isAppLightningComponent(null, 'oi')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isAppApiName('OI_Scan_Run__c')
+    );
+    System.assertEquals(false, OI_ObjectScopeFilter.isAppApiName('Account'));
+    System.assertEquals(false, OI_ObjectScopeFilter.isAppApiName(null));
+
+    policy.appNamePrefix = '';
+    policy.appNamespace = 'orgintel';
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isAppComponent('OrgIntel', 'GraphEngine')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isAppLightningComponent('orgintel', 'graphViewState')
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isAppComponent(null, 'OI_CustomerClass')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isAppApiName('orgintel__Scan_Run__c')
+    );
+  }
+
   /** The shipped policy with self-exclusion on (as in production) leaves out this app's own object and class. */
   @isTest
   static void testShippedPolicyExcludesTheAppsOwnComponents() {

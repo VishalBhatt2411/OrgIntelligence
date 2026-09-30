@@ -45,6 +45,8 @@ Apex-class grant edges target only in-scope classes, so no edge dangles. In the 
 
 "Local" namespace means the org's own namespace (`Organization.NamespacePrefix`, one query per transaction). It is not the package's namespace. In a subscriber org the two differ, and only the org's own components belong to the customer. An earlier version of this ADR derived the local namespace from the class name, which would have treated the app's packaged namespace as the customer's.
 
+The Tech Debt engine (`OI_TD_ScanEngine`) applies the same self-exclusion but keeps its own managed-package rules, so it calls the ownership-only checks `isAppComponent`, `isAppLightningComponent` and `isAppApiName` when it collects objects, classes, triggers, flows, Lightning bundles, Visualforce pages and components, and non-profile permission sets. Un-namespaced, a Lightning bundle is recognised as the app's when its name is `oi` followed by an upper-case letter; seven app bundles without that prefix (for example `graphViewState`) are still scanned until they are renamed or the app is packaged.
+
 Decisions are memoised per transaction, so every scanner in a hop gets the same answer.
 
 If the settings record is missing, the scan falls back to the defaults and logs a warning; it does not fail.

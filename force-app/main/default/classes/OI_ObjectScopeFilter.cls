@@ -124,23 +124,57 @@ public inherited sharing class OI_ObjectScopeFilter {
     String namespacePrefix,
     String componentName
   ) {
-    ScopePolicy policy = getPolicy();
-    if (
-      String.isNotBlank(policy.appNamespace) &&
-      String.isNotBlank(namespacePrefix) &&
-      namespacePrefix.toLowerCase() == policy.appNamespace
-    ) {
-      return false;
-    }
-    if (
-      String.isBlank(namespacePrefix) &&
-      String.isNotBlank(policy.appNamePrefix) &&
-      String.isNotBlank(componentName) &&
-      componentName.toLowerCase().startsWith(policy.appNamePrefix)
-    ) {
+    if (isAppComponent(namespacePrefix, componentName)) {
       return false;
     }
     return isNamespaceInScope(namespacePrefix);
+  }
+
+  /**
+   * Whether a code or security component with this NamespacePrefix and API name is this app's
+   * own (see the class comment). Unlike isComponentInScope it says nothing about other
+   * packages, so a caller with its own managed-package rules (the Tech Debt engine) can
+   * leave only the app out.
+   */
+  public static Boolean isAppComponent(
+    String namespacePrefix,
+    String componentName
+  ) {
+    ScopePolicy policy = getPolicy();
+    if (String.isNotBlank(namespacePrefix)) {
+      return namespacePrefix.toLowerCase() == policy.appNamespace;
+    }
+    return String.isNotBlank(policy.appNamePrefix) &&
+      String.isNotBlank(componentName) &&
+      componentName.toLowerCase().startsWith(policy.appNamePrefix);
+  }
+
+  /**
+   * isAppComponent for Lightning component bundles, whose names are camelCase: the app's
+   * un-namespaced bundles start with "oi" followed by an upper-case letter (oiGraphExplorer).
+   * Bundles the app ships without that prefix are not recognised.
+   */
+  public static Boolean isAppLightningComponent(
+    String namespacePrefix,
+    String bundleName
+  ) {
+    ScopePolicy policy = getPolicy();
+    if (String.isNotBlank(namespacePrefix)) {
+      return namespacePrefix.toLowerCase() == policy.appNamespace;
+    }
+    String prefix = policy.appNamePrefix.removeEnd('_');
+    return String.isNotBlank(prefix) &&
+      String.isNotBlank(bundleName) &&
+      bundleName.length() > prefix.length() &&
+      bundleName.toLowerCase().startsWith(prefix) &&
+      bundleName.substring(prefix.length(), prefix.length() + 1)
+        .isAllUpperCase();
+  }
+
+  /** Whether an object or field API name (ns__Name__c or OI_Name__c) belongs to this app. */
+  public static Boolean isAppApiName(String apiName) {
+    return String.isNotBlank(apiName) &&
+      isAppApiName(apiName.toLowerCase(), getPolicy());
   }
 
   /**

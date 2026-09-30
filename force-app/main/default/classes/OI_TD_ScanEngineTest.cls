@@ -85,6 +85,39 @@ private class OI_TD_ScanEngineTest {
     System.assertEquals(true, rule.get('ac'));
   }
 
+  /** With the app identified by its OI_ prefix, none of its classes are scanned or reported. */
+  @isTest
+  static void theAppsOwnClassesAreLeftOut() {
+    OI_TD_TestSupport.installEngineFakes();
+    OI_ObjectScopeFilter.ScopePolicy policy = new OI_ObjectScopeFilter.ScopePolicy();
+    policy.appNamePrefix = 'oi_';
+    OI_ObjectScopeFilter.policyOverride = policy;
+    OI_TD_Scan__c scan = runningScan();
+    OI_TD_ScanState st = new OI_TD_ScanState(scan.Id);
+
+    Test.startTest();
+    runToCompletion(st);
+    Test.stopTest();
+
+    for (Object raw : OI_TD_DataStore.readList(scan.Id, 'classes')) {
+      String name = (String) ((Map<String, Object>) raw).get('n');
+      System.assert(
+        !name.startsWithIgnoreCase('OI_'),
+        'App class scanned: ' + name
+      );
+    }
+    for (OI_TD_Finding__c f : [
+      SELECT Component_Name__c
+      FROM OI_TD_Finding__c
+      WHERE Scan__c = :scan.Id AND Component_Type__c = 'ApexClass'
+    ]) {
+      System.assert(
+        !f.Component_Name__c.startsWithIgnoreCase('OI_'),
+        'Finding on an app class: ' + f.Component_Name__c
+      );
+    }
+  }
+
   @isTest
   static void scanWithoutDependencyDataFallsBackToTextSearch() {
     OI_TD_TestSupport.FakeTooling tooling = OI_TD_TestSupport.installEngineFakes();
