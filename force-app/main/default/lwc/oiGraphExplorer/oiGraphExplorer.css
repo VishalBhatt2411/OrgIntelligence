@@ -318,6 +318,12 @@
   font-size: var(--oi-font-size-body);
 }
 
+.oi-field-mode-hint {
+  margin: 0;
+  color: var(--oi-color-text-muted);
+  font-size: var(--oi-font-size-micro);
+}
+
 .oi-record-mode-picker {
   display: flex;
   flex-direction: column;

@@ -300,6 +300,26 @@ describe("c-oi-search-bar", () => {
     ).toBeNull();
   });
 
+  it("tells the user when a completed search finds nothing, instead of leaving the box silent", async () => {
+    search.mockResolvedValue([]);
+    const element = createElement("c-oi-search-bar", { is: OiSearchBar });
+    document.body.appendChild(element);
+
+    const input = element.shadowRoot.querySelector("lightning-input");
+    input.value = "Nope";
+    input.dispatchEvent(new CustomEvent("change"));
+    expect(
+      element.shadowRoot.querySelector('[data-id="search-no-matches"]')
+    ).toBeNull();
+    await wait(400);
+
+    const empty = element.shadowRoot.querySelector(
+      '[data-id="search-no-matches"]'
+    );
+    expect(empty).not.toBeNull();
+    expect(empty.textContent).toContain('"Nope"');
+  });
+
   it("focusing an empty box loads and shows the bounded alphabetical browse list, scoped to typeKeyFilter", async () => {
     browse.mockResolvedValue([
       {

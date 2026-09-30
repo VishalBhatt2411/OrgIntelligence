@@ -1896,6 +1896,51 @@ describe("c-oi-node-detail-panel", () => {
     expect(table.textContent).toContain("Opportunity (count unavailable)");
   });
 
+  it("collapses a polymorphic lookup's long target list to the first five plus a count, keeping the full list in the tooltip", async () => {
+    const targetNames = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"];
+    getNodeDetail.mockResolvedValue({
+      nodeKey: "eventObj",
+      typeKey: "SalesforceMetadata.CustomObject",
+      label: "Event",
+      secondaryKey: "Event",
+      attributes: { custom: false },
+      outgoingRelationshipCounts: {},
+      incomingRelationshipCounts: {},
+      directConnectionCount: 0
+    });
+    getRelationshipFieldDetail.mockResolvedValue({
+      fields: [
+        {
+          fieldNodeKey: "eventObj.WhatId",
+          label: "Related To ID",
+          apiName: "Event.WhatId",
+          relationshipType: "Lookup",
+          isRequired: false,
+          cascadeDeleteBehavior: null,
+          targetObjects: targetNames.map((objectApiName) => ({
+            objectApiName,
+            recordCount: null
+          }))
+        }
+      ]
+    });
+    const element = createElement("c-oi-node-detail-panel", {
+      is: OiNodeDetailPanel
+    });
+    document.body.appendChild(element);
+
+    element.nodeKey = "eventObj";
+    await flushPromises();
+
+    const cell = Array.from(
+      element.shadowRoot.querySelectorAll(
+        '[data-id="relationship-field-table"] td'
+      )
+    ).find((td) => td.textContent.startsWith("A1"));
+    expect(cell.textContent).toBe("A1, A2, A3, A4, A5, +3 more");
+    expect(cell.title).toBe(targetNames.join(", "));
+  });
+
   it("renders a retryable error banner when getRelationshipTargetObjectRecordCounts fails, without discarding the already-loaded field rows", async () => {
     getNodeDetail.mockResolvedValue({
       nodeKey: "acct",
@@ -2494,6 +2539,81 @@ describe("c-oi-node-detail-panel", () => {
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler.mock.calls[0][0].detail.nodeKey).toBe("f1");
+    });
+
+    it("a live-schema field row with no graph node is listed but never dispatches select (ADR-0031)", async () => {
+      getNodeDetail.mockResolvedValue(objectDetail());
+      getFieldSummaries.mockResolvedValue([
+        fieldSummary({
+          nodeKey: null,
+          rowKey: "Account.Name",
+          apiName: "Account.Name",
+          label: "Account Name"
+        })
+      ]);
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "fields");
+      element.shadowRoot
+        .querySelector('[data-id="show-fields-button"]')
+        .click();
+      await flushPromises();
+
+      const handler = jest.fn();
+      element.addEventListener("select", handler);
+      const row = element.shadowRoot.querySelector('[data-id="field-row"]');
+      expect(row.textContent).toContain("Account Name");
+      expect(row.classList.contains("is-navigable")).toBe(false);
+      row.click();
+      await flushPromises();
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("prefers the object's scanned fieldCount attribute over the HAS_FIELD edge count before the list is loaded", async () => {
+      getNodeDetail.mockResolvedValue(
+        objectDetail({ attributes: { custom: false, fieldCount: 57 } })
+      );
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "fields");
+
+      expect(
+        element.shadowRoot.querySelector(
+          '[data-id="fields-section-toggle"] .oi-node-detail-panel-section-count'
+        ).textContent
+      ).toBe("57");
+    });
+
+    it("shows the scanned Standard/Custom split before the list is loaded, leaving Relationship pending", async () => {
+      getNodeDetail.mockResolvedValue(
+        objectDetail({
+          attributes: { custom: false, fieldCount: 71, customFieldCount: 9 }
+        })
+      );
+      const element = createElement("c-oi-node-detail-panel", {
+        is: OiNodeDetailPanel
+      });
+      document.body.appendChild(element);
+      element.nodeKey = "account";
+      await flushPromises();
+      await expandSection(element, "fields");
+
+      const values = Array.from(
+        element.shadowRoot.querySelectorAll(
+          '[data-id="field-metrics"] .oi-node-detail-panel-metric-value'
+        )
+      ).map((node) => node.textContent);
+      expect(values).toEqual(["71", "62", "9", "—"]);
+      expect(getFieldSummaries).not.toHaveBeenCalled();
     });
 
     it("selecting a new node resets the field browser back to its unloaded, unfiltered state", async () => {

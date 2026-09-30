@@ -39,6 +39,8 @@ export default class OiSearchBar extends LightningElement {
   @track isSearching = false;
   @track errorMessage = null;
   queryTerm = "";
+  /** The term the last completed server search ran for — "no matches" is only claimed for that exact term, never mid-typing. */
+  lastSearchedTerm = null;
   debounceTimer;
   browseResults = [];
   isPanelOpen = false;
@@ -100,11 +102,13 @@ export default class OiSearchBar extends LightningElement {
     }
     this.isSearching = true;
     this.errorMessage = null;
+    const term = this.queryTerm;
     try {
-      const rawResults = await search({ queryTerm: this.queryTerm });
+      const rawResults = await search({ queryTerm: term });
       this.results = this.typeKeyFilter
         ? (rawResults || []).filter((r) => r.typeKey === this.typeKeyFilter)
-        : rawResults;
+        : rawResults || [];
+      this.lastSearchedTerm = term;
     } catch (error) {
       this.results = [];
       this.errorMessage =
@@ -169,6 +173,15 @@ export default class OiSearchBar extends LightningElement {
     return !!this.errorMessage;
   }
 
+  /** A completed search for the current term found nothing — say so instead of leaving a silent, unresponsive box. */
+  get hasNoMatches() {
+    return (
+      this.hasQueryTerm &&
+      this.lastSearchedTerm === this.queryTerm &&
+      !(this.results && this.results.length > 0)
+    );
+  }
+
   /** Enriches each raw result with a human-readable type label — never rendering the raw typeKey directly. */
   get displayResults() {
     return (this.results || []).map((result) => {
@@ -198,6 +211,7 @@ export default class OiSearchBar extends LightningElement {
   /** Closes the suggestion list and leaves the chosen label visible in the box — the only record of what's currently loaded besides the "Analyzing" pill elsewhere on the page, so it must not revert to the placeholder. */
   selectResult(result) {
     this.results = [];
+    this.lastSearchedTerm = null;
     this.isPanelOpen = false;
     this.queryTerm = result.label || this.queryTerm;
     this.dispatchEvent(

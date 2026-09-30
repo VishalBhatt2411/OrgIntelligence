@@ -42,6 +42,16 @@
         {errorMessage}
       </div>
     </template>
+    <template lwc:elseif={hasNoMatches}>
+      <div
+        class="oi-combobox-panel oi-combobox-status"
+        data-id="search-no-matches"
+        role="status"
+      >
+        No matches for "{queryTerm}". Only scanned metadata can be searched; run
+        a metadata scan if this org hasn't been scanned yet.
+      </div>
+    </template>
     <template lwc:elseif={hasResults}>
       <ul
         class="oi-combobox-panel oi-combobox-results"

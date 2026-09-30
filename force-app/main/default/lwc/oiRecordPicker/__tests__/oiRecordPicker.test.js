@@ -55,6 +55,35 @@ describe("c-oi-record-picker", () => {
     });
   });
 
+  it("says so when a completed search finds no records, but never mid-typing", async () => {
+    searchRecords.mockResolvedValue([]);
+    const element = createElement("c-oi-record-picker", { is: OiRecordPicker });
+    element.objectApiName = "Account";
+    document.body.appendChild(element);
+
+    const input = element.shadowRoot.querySelector("lightning-input");
+    input.value = "zzqx";
+    input.dispatchEvent(new CustomEvent("change"));
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="search-no-matches"]')
+    ).toBeNull();
+
+    await wait(400);
+    const banner = element.shadowRoot.querySelector(
+      '[data-id="search-no-matches"]'
+    );
+    expect(banner).not.toBeNull();
+    expect(banner.textContent).toContain("zzqx");
+
+    input.value = "zzqxy";
+    input.dispatchEvent(new CustomEvent("change"));
+    await flushPromises();
+    expect(
+      element.shadowRoot.querySelector('[data-id="search-no-matches"]')
+    ).toBeNull();
+  });
+
   it("never calls search for a blank query", async () => {
     const element = createElement("c-oi-record-picker", { is: OiRecordPicker });
     element.objectApiName = "Account";

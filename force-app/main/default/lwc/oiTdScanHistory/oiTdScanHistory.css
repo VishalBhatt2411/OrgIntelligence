@@ -36,3 +36,7 @@
   min-width: 90px;
   justify-content: center;
 }
+
+.partial-text {
+  margin-top: 2px;
+}

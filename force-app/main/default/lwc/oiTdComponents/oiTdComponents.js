@@ -141,6 +141,12 @@ export default class OiTdComponents extends LightningElement {
     return this.filteredObjects.length === 0;
   }
 
+  /** An empty list reads differently when a search filtered it out versus when the scan found no objects at all. */
+  get noObjectsMessage() {
+    const q = this.objectSearch.trim();
+    return q ? `No objects match "${q}".` : "No objects in this scan.";
+  }
+
   get activeFields() {
     const active = this.activeObject;
     return active ? this.fieldsByObject[active.apiName] : undefined;

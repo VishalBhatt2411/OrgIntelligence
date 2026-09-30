@@ -330,6 +330,18 @@ private class OI_TD_RulesTest {
     System.assertEquals(100, h.categoryScores.get('code_quality'));
     System.assertEquals(3, h.totalFindings);
     System.assertEquals(98, h.overall);
+    // 567 / 6 = 94.5 rounds half-up (like the reference app's Math.round), not half-even.
+    OI_TD_Rules.Health half = OI_TD_Rules.computeHealth(
+      new List<String>{
+        'security',
+        'security',
+        'security',
+        'automation',
+        'automation'
+      },
+      new List<String>{ 'critical', 'critical', 'critical', 'low', 'medium' }
+    );
+    System.assertEquals(95, half.overall);
     System.assertEquals('1,234,567', OI_TD_Rules.formatNumber(1234567L));
     System.assertEquals('-1,000', OI_TD_Rules.formatNumber(-1000L));
     System.assertEquals('12', OI_TD_Rules.formatNumber(12L));
@@ -337,5 +349,88 @@ private class OI_TD_RulesTest {
       2,
       OI_TD_Rules.countMatches(Pattern.compile('a'), 'banana'.left(4))
     );
+  }
+
+  @isTest
+  static void soqlForLoopAtTopLevelIsNotSoqlInALoop() {
+    String body =
+      'public with sharing class Bulk {\n' +
+      '  void run() {\n' +
+      '    for (Account a : [SELECT Id FROM Account]) {\n' +
+      '      System.assert(a != null);\n' +
+      '    }\n' +
+      '    for (Contact c : [\n' +
+      '      SELECT Id FROM Contact WHERE AccountId IN (SELECT Id FROM Account)\n' +
+      '    ]) {\n' +
+      '      System.assert(c != null);\n' +
+      '    }\n' +
+      '  }\n' +
+      '}';
+    List<Boolean> inLoop = OI_TD_Rules.findInLoops(
+      OI_TD_Rules.maskNonCode(body)
+    );
+    System.assertEquals(false, inLoop[0], 'A SOQL for-loop queries once.');
+  }
+
+  @isTest
+  static void soqlForLoopNestedInAnotherLoopIsSoqlInALoop() {
+    String body =
+      'public with sharing class Nested {\n' +
+      '  void run(List<Account> accts) {\n' +
+      '    for (Account a : accts) {\n' +
+      '      for (Contact c : [SELECT Id FROM Contact WHERE AccountId = :a.Id]) {\n' +
+      '        System.assert(c != null);\n' +
+      '      }\n' +
+      '    }\n' +
+      '  }\n' +
+      '}';
+    List<Boolean> inLoop = OI_TD_Rules.findInLoops(
+      OI_TD_Rules.maskNonCode(body)
+    );
+    System.assertEquals(
+      true,
+      inLoop[0],
+      'The inner query runs once per account.'
+    );
+  }
+
+  @isTest
+  static void codeInsideStringsAndCommentsIsNotFlagged() {
+    String body =
+      'public with sharing class Fixture {\n' +
+      '  // for (Account a : accts) { insert a; }\n' +
+      '  /* for (Account a : accts) {\n' +
+      '       List<Contact> c = [SELECT Id FROM Contact];\n' +
+      '     } */\n' +
+      '  String src = \'for (Account a : accts) { update a; } try {} catch (Exception e) {}\';\n' +
+      '  String quoted = \'it\\\'s // not a comment\';\n' +
+      '}';
+    OI_TD_Rules.BodyResult r = OI_TD_Rules.analyzeBody(
+      'ApexClass',
+      'Fixture',
+      body,
+      OI_TD_Rules.lineCount(body)
+    );
+    Set<String> cq = ruleKeys(r.codeQuality);
+    System.assert(!cq.contains('soql_in_loop'), cq);
+    System.assert(!cq.contains('dml_in_loop'), cq);
+    System.assert(!cq.contains('empty_catch_block'), cq);
+
+    String masked = OI_TD_Rules.maskNonCode(body);
+    System.assertEquals(
+      body.split('\n').size(),
+      masked.split('\n').size(),
+      'Masking must keep the line structure.'
+    );
+    System.assert(!masked.contains('not a comment'), masked);
+    System.assert(masked.contains('String quoted = \'\';'), masked);
+  }
+
+  @isTest
+  static void maskingHandlesBlankAndUnclosedInput() {
+    System.assertEquals(null, OI_TD_Rules.maskNonCode(null));
+    System.assertEquals('', OI_TD_Rules.maskNonCode(''));
+    String unclosed = 'for (Account a : [SELECT Id FROM Account) {';
+    System.assertEquals(unclosed, OI_TD_Rules.maskSoqlForIterables(unclosed));
   }
 }

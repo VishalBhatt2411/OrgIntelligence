@@ -47,6 +47,16 @@ public with sharing class OI_TD_Rules {
   private static final Pattern LOOP_RE = Pattern.compile(
     '\\b(for|while)\\s*\\('
   );
+  /** Apex string literals, // line comments and block comments, in one alternation so the leftmost construct wins (a // inside a string is not a comment). */
+  private static final Pattern NON_CODE_RE = Pattern.compile(
+    '\'[^\'\\\\\\n]*(?:\\\\.[^\'\\\\\\n]*)*\'|//[^\\n]*|/\\*[\\s\\S]*?\\*/'
+  );
+  /** The start of a SOQL for-loop header up to its opening bracket: for (Account a : [ */
+  private static final Pattern SOQL_FOR_HEADER_RE = Pattern.compile(
+    '\\bfor\\s*\\([^;{}()]*:\\s*\\['
+  );
+  /** Stands in for a SOQL for-loop iterable after maskSoqlForIterables; it contains no [ or SELECT, so SOQL_RE never matches it. */
+  private static final String SOQL_FOR_MARKER = 'OI_TD_SOQL_FOR_ITERABLE';
   private static final Pattern COMPLEXITY_RE = Pattern.compile(
     '\\b(if|for|while|switch|case)\\s*[\\(:]'
   );
@@ -212,7 +222,11 @@ public with sharing class OI_TD_Rules {
     Boolean email = false;
     Integer depth = 0;
     Integer loopDepth = null;
-    for (String line : body.split('\n')) {
+    for (String line : maskSoqlForIterables(body).split('\n')) {
+      // A SOQL for-loop runs its query once, so its own iterable is only a query in a loop when an enclosing loop is already open.
+      if (!soql && loopDepth != null && line.contains(SOQL_FOR_MARKER)) {
+        soql = true;
+      }
       if (
         (line.contains('for') || line.contains('while')) &&
         LOOP_RE.matcher(line).find()
@@ -267,6 +281,90 @@ public with sharing class OI_TD_Rules {
       lower.contains('merge');
   }
 
+  /**
+   * Blanks string literals and comments, so rules that look for code (loops, SOQL, DML, empty catches) are not
+   * triggered by text: a test fixture holding Apex source in a string, or commented-out code. Newlines inside a
+   * masked block comment are kept so line-based rules see the same line structure. Falls back to the raw body if
+   * the regex cannot run over it (a very large body), which keeps the previous unmasked behaviour.
+   */
+  public static String maskNonCode(String body) {
+    if (String.isBlank(body)) {
+      return body;
+    }
+    try {
+      Matcher m = NON_CODE_RE.matcher(body);
+      List<String> parts = new List<String>();
+      Integer last = 0;
+      while (m.find()) {
+        parts.add(body.substring(last, m.start()));
+        String token = m.group();
+        if (token.startsWith('\'')) {
+          parts.add('\'\'');
+        } else if (token.startsWith('/*')) {
+          parts.add('\n'.repeat(token.countMatches('\n')));
+        }
+        last = m.end();
+      }
+      parts.add(body.substring(last));
+      return String.join(parts, '');
+    } catch (Exception e) {
+      return body;
+    }
+  }
+
+  /** Replaces the bracketed iterable of each SOQL for-loop (for (X x : [SELECT ...])) with SOQL_FOR_MARKER, keeping its newlines. Expects strings and comments already masked, so bracket counting is reliable. */
+  public static String maskSoqlForIterables(String code) {
+    if (String.isBlank(code) || !code.containsIgnoreCase('select')) {
+      return code;
+    }
+    try {
+      Matcher m = SOQL_FOR_HEADER_RE.matcher(code);
+      List<String> parts = new List<String>();
+      Integer last = 0;
+      while (m.find()) {
+        Integer open = m.end() - 1;
+        Integer close = matchingBracket(code, open);
+        if (close < 0) {
+          break;
+        }
+        parts.add(code.substring(last, open));
+        parts.add(
+          SOQL_FOR_MARKER +
+          '\n'.repeat(code.substring(open, close + 1).countMatches('\n'))
+        );
+        last = close + 1;
+      }
+      parts.add(code.substring(last));
+      return String.join(parts, '');
+    } catch (Exception e) {
+      return code;
+    }
+  }
+
+  /** Index of the ] that closes the [ at openIndex, or -1 if it never closes. */
+  private static Integer matchingBracket(String code, Integer openIndex) {
+    Integer depth = 0;
+    Integer i = openIndex;
+    while (i < code.length()) {
+      Integer nextOpen = code.indexOf('[', i);
+      Integer nextClose = code.indexOf(']', i);
+      if (nextClose < 0) {
+        return -1;
+      }
+      if (nextOpen >= 0 && nextOpen < nextClose) {
+        depth++;
+        i = nextOpen + 1;
+      } else {
+        depth--;
+        if (depth == 0) {
+          return nextClose;
+        }
+        i = nextClose + 1;
+      }
+    }
+    return -1;
+  }
+
   /** Counts non-overlapping matches; falls back to per-line counting if the body is too large for one regex run. */
   public static Integer countMatches(Pattern p, String body) {
     try {
@@ -309,7 +407,9 @@ public with sharing class OI_TD_Rules {
   ) {
     BodyResult result = new BodyResult();
     List<NewFinding> f = result.codeQuality;
-    List<Boolean> inLoop = findInLoops(body);
+    // Loop and empty-catch checks read code only; the hardcoded-ID and TODO checks need the raw body's strings and comments.
+    String code = maskNonCode(body);
+    List<Boolean> inLoop = findInLoops(code);
 
     if (inLoop[0]) {
       f.add(
@@ -383,7 +483,7 @@ public with sharing class OI_TD_Rules {
         )
       );
     }
-    Integer emptyCatches = countMatches(EMPTY_CATCH_RE, body);
+    Integer emptyCatches = countMatches(EMPTY_CATCH_RE, code);
     if (emptyCatches > 0) {
       f.add(
         new NewFinding(
@@ -1267,9 +1367,10 @@ public with sharing class OI_TD_Rules {
       h.categoryScores.put(c, score);
       sum += score;
     }
-    h.overall = (Integer) Math.round(
-      Decimal.valueOf(sum) / DEBT_CATEGORIES.size()
-    );
+    // Half-up, like JavaScript Math.round (Apex Math.round(Decimal) rounds half-even).
+    h.overall = Decimal.valueOf(sum)
+      .divide(DEBT_CATEGORIES.size(), 0, RoundingMode.HALF_UP)
+      .intValue();
     h.totalFindings = categories.size();
     return h;
   }

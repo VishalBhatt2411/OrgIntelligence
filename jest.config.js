@@ -26,7 +26,7 @@ module.exports = {
      *
      * Add any new CSS-only module to this alternation.
      */
-    "^c/(oiDesignTokens|oiComboboxStyles|oiButtonStyles)$":
+    "^c/(oiDesignTokens|oiComboboxStyles|oiButtonStyles|oiTdStyles)$":
       "<rootDir>/force-app/main/default/lwc/$1/$1.css"
   }
 };

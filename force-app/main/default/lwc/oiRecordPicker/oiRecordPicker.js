@@ -37,10 +37,17 @@ export default class OiRecordPicker extends LightningElement {
   @track isSearching = false;
   @track errorMessage = null;
   queryTerm = "";
+  /** The term the last completed server search ran for — "no matches" is only claimed for that exact term, never mid-typing. */
+  lastSearchedTerm = null;
   debounceTimer;
   browseResults = [];
   isPanelOpen = false;
   browseCacheKey;
+
+  /** A pending debounced search must never fire after the picker is gone (e.g. the shell switched lens or object). */
+  disconnectedCallback() {
+    clearTimeout(this.debounceTimer);
+  }
 
   /** Typing implies the box is focused and its panel should be open — covers callers (and tests) that drive input changes without a separate focus event. */
   handleInputChange(event) {
@@ -84,11 +91,14 @@ export default class OiRecordPicker extends LightningElement {
     }
     this.isSearching = true;
     this.errorMessage = null;
+    const term = this.queryTerm;
     try {
-      this.results = await searchRecords({
-        objectApiName: this.objectApiName,
-        queryTerm: this.queryTerm
-      });
+      this.results =
+        (await searchRecords({
+          objectApiName: this.objectApiName,
+          queryTerm: term
+        })) || [];
+      this.lastSearchedTerm = term;
     } catch (error) {
       this.results = [];
       this.errorMessage =
@@ -156,6 +166,15 @@ export default class OiRecordPicker extends LightningElement {
     return !!this.errorMessage;
   }
 
+  /** A completed search for the current term found nothing — say so instead of leaving a silent, unresponsive box. */
+  get hasNoMatches() {
+    return (
+      this.hasQueryTerm &&
+      this.lastSearchedTerm === this.queryTerm &&
+      !(this.results && this.results.length > 0)
+    );
+  }
+
   get displayResults() {
     return (this.results || []).map((result) => ({
       ...result,
@@ -175,6 +194,7 @@ export default class OiRecordPicker extends LightningElement {
       (candidate) => candidate.recordId === recordId
     );
     this.results = [];
+    this.lastSearchedTerm = null;
     this.isPanelOpen = false;
     this.queryTerm = "";
     this.dispatchEvent(

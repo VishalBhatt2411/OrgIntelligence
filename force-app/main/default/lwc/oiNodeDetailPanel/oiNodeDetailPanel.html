@@ -171,10 +171,11 @@
                       <tbody>
                         <template for:each={filteredFieldRows} for:item="row">
                           <tr
-                            key={row.nodeKey}
-                            class="oi-node-detail-panel-field-row"
+                            key={row.rowKey}
+                            class={row.rowClass}
                             data-id="field-row"
                             data-node-key={row.nodeKey}
+                            title={row.rowTitle}
                             onclick={handleFieldRowClick}
                           >
                             <td title={row.label}>{row.label}</td>
@@ -388,7 +389,9 @@
                             <td>{field.relationshipType}</td>
                             <td>{field.requiredLabel}</td>
                             <td>{field.cascadeDeleteLabel}</td>
-                            <td>{field.targetObjectsDisplay}</td>
+                            <td title={field.targetObjectsTitle}>
+                              {field.targetObjectsDisplay}
+                            </td>
                           </tr>
                         </template>
                       </tbody>

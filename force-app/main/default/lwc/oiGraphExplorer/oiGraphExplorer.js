@@ -291,15 +291,22 @@ export default class OiGraphExplorer extends NavigationMixin(LightningElement) {
    * from OI_RelationshipCounts (server-computed, independent of canvas pagination), and reusing
    * those is both simpler and more robust than trusting the canvas's own working set to be
    * exhaustive. null outside Object mode (or before a center is selected) so the panel can fall
-   * back to its existing generic relationship rows for Field/Record.
+   * back to its existing generic relationship rows for Field/Record. Also null while a
+   * non-center node is selected: the working set is centred on the anchor, so it cannot
+   * answer these distinct-object counts for any other object, and the panel omits the rows
+   * rather than showing the anchor's numbers under another object's name.
    */
   get objectRelationshipSummary() {
     if (!this.isObjectMode || !this.hasCenterNode) {
       return null;
     }
+    const centerNodeKey = this.viewState.centerNodeKey;
+    const selectedNodeKey = this.viewState.selectedNodeKey;
+    if (selectedNodeKey && selectedNodeKey !== centerNodeKey) {
+      return null;
+    }
     const nodes = this.allCanvasNodes;
     const edges = this.allCanvasEdges;
-    const centerNodeKey = this.viewState.centerNodeKey;
     if (
       this._objectRelationshipSummaryCache &&
       this._objectRelationshipSummaryCache.nodes === nodes &&

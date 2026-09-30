@@ -72,13 +72,18 @@
                 options={fieldModeFieldOptions}
                 onchange={handleFieldPicked}
               ></c-oi-field-picker>
+              <p class="oi-field-mode-hint" data-id="field-mode-hint">
+                Lists lookup and master-detail fields, the fields that connect
+                objects in the graph. The object's detail panel lists every
+                field.
+              </p>
             </template>
             <template lwc:else>
               <div
                 class="oi-field-mode-no-fields"
                 data-id="field-mode-no-fields"
               >
-                This object has no scanned fields yet.
+                This object has no relationship fields in the graph yet.
               </div>
             </template>
           </div>

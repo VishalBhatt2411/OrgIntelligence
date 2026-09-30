@@ -416,11 +416,12 @@
   table-layout: fixed;
 }
 
-.oi-node-detail-panel-field-row {
+/* Only rows with a graph node are selectable (ADR-0031); live-schema rows stay static. */
+.oi-node-detail-panel-field-row.is-navigable {
   cursor: pointer;
 }
 
-.oi-node-detail-panel-field-row:hover {
+.oi-node-detail-panel-field-row.is-navigable:hover {
   background: var(--oi-color-accent-wash);
 }
 

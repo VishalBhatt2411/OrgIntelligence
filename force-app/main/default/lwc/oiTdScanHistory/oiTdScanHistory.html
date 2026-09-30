@@ -21,10 +21,20 @@
             <div class="grow">
               <p class="body2 semibold">{r.started}</p>
               <span class="caption muted">{r.finished}</span>
+              <template lwc:if={r.partial}>
+                <span class="caption block partial-text" title={r.partialTitle}
+                  >{r.partialText}</span
+                >
+              </template>
             </div>
             <template lwc:if={r.hasScore}>
               <span class="body2 bold score" style={r.scoreStyle}
                 >{r.score}</span
+              >
+            </template>
+            <template lwc:if={r.partial}>
+              <span class="chip chip-warning" title={r.partialTitle}
+                >Partial</span
               >
             </template>
             <span class={r.chipClass}>{r.status}</span>

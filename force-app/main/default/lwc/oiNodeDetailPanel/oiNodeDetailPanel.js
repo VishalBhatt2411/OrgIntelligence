@@ -80,6 +80,8 @@ import { parseRecordNodeKey } from "c/recordNodeKey";
 const OBJECT_TYPE_KEY = "SalesforceMetadata.CustomObject";
 const FIELD_TYPE_KEY = "SalesforceMetadata.CustomField";
 const HAS_FIELD_TYPE_KEY = "SalesforceMetadata.HAS_FIELD";
+/** Target objects named inline per relationship-field row before collapsing to "+N more". */
+const MAX_INLINE_TARGET_OBJECTS = 5;
 const LOOKUP_TO_TYPE_KEY = "SalesforceMetadata.LOOKUP_TO";
 const MASTER_DETAIL_TO_TYPE_KEY = "SalesforceMetadata.MASTER_DETAIL_TO";
 const RECORD_TYPE_PREFIX = "SalesforceRecord.";
@@ -1476,18 +1478,33 @@ export default class OiNodeDetailPanel extends LightningElement {
             ? "Yes"
             : "No",
       cascadeDeleteLabel: field.cascadeDeleteBehavior || "Not available",
-      targetObjectsDisplay: (field.targetObjects || [])
-        .map((target) => {
-          if (!counts) {
-            return target.objectApiName;
-          }
-          const recordCount = counts[target.objectApiName];
-          return recordCount === null || recordCount === undefined
-            ? `${target.objectApiName} (count unavailable)`
-            : `${target.objectApiName} (${recordCount.toLocaleString()} records)`;
-        })
-        .join(", ")
+      ...this.describeTargetObjects(field.targetObjects || [], counts)
     }));
+  }
+
+  /**
+   * A polymorphic lookup (Event/Task "Related To", for example) can target hundreds of
+   * objects. The cell names the first few and says how many more; the full list stays in
+   * the cell's tooltip.
+   */
+  describeTargetObjects(targets, counts) {
+    const labels = targets.map((target) => {
+      if (!counts) {
+        return target.objectApiName;
+      }
+      const recordCount = counts[target.objectApiName];
+      return recordCount === null || recordCount === undefined
+        ? `${target.objectApiName} (count unavailable)`
+        : `${target.objectApiName} (${recordCount.toLocaleString()} records)`;
+    });
+    const hiddenCount = labels.length - MAX_INLINE_TARGET_OBJECTS;
+    return {
+      targetObjectsDisplay:
+        hiddenCount > 0
+          ? `${labels.slice(0, MAX_INLINE_TARGET_OBJECTS).join(", ")}, +${hiddenCount} more`
+          : labels.join(", "),
+      targetObjectsTitle: labels.join(", ")
+    };
   }
 
   get hasRelationshipFieldRows() {
@@ -1712,8 +1729,23 @@ export default class OiNodeDetailPanel extends LightningElement {
     return this.attributeRows.length > 0;
   }
 
-  /** Free — already part of every getNodeDetail response via OI_RelationshipCounts, so the field count is visible even before the user asks to load the actual field list. */
+  /**
+   * Free — visible before the user asks to load the field list. Once loaded, the list itself
+   * is the truth. Before that, the object's scanned fieldCount attribute (ADR-0031: only
+   * relationship fields are graph nodes, so counting HAS_FIELD edges would under-report),
+   * falling back to the HAS_FIELD edge count for objects scanned before that attribute existed.
+   */
   get fieldCount() {
+    if (this.areFieldsLoaded) {
+      return this.fieldSummaries.length;
+    }
+    const scannedCount =
+      this.detail && this.detail.attributes
+        ? this.detail.attributes.fieldCount
+        : undefined;
+    if (typeof scannedCount === "number") {
+      return scannedCount;
+    }
     return (
       (this.detail &&
         this.detail.outgoingRelationshipCounts &&
@@ -1722,9 +1754,24 @@ export default class OiNodeDetailPanel extends LightningElement {
     );
   }
 
+  /**
+   * Before the list loads, Standard and Custom come from the scanned fieldCount and
+   * customFieldCount attributes (ADR-0031) when both exist. Relationship has no scanned
+   * equivalent — only in-scope reference fields are graph nodes — so it waits for the list.
+   */
   get fieldMetricRows() {
     const summaries = this.fieldSummaries || [];
     const unloadedValue = this.areFieldsLoaded ? 0 : "—";
+    const attributes = (this.detail && this.detail.attributes) || {};
+    const hasScannedSplit =
+      typeof attributes.fieldCount === "number" &&
+      typeof attributes.customFieldCount === "number";
+    const scannedCustom = hasScannedSplit
+      ? attributes.customFieldCount
+      : unloadedValue;
+    const scannedStandard = hasScannedSplit
+      ? Math.max(attributes.fieldCount - attributes.customFieldCount, 0)
+      : unloadedValue;
     return [
       { key: "total", label: "Total", value: this.fieldCount },
       {
@@ -1732,14 +1779,14 @@ export default class OiNodeDetailPanel extends LightningElement {
         label: "Standard",
         value: this.areFieldsLoaded
           ? summaries.filter((field) => field.isCustom === false).length
-          : unloadedValue
+          : scannedStandard
       },
       {
         key: "custom",
         label: "Custom",
         value: this.areFieldsLoaded
           ? summaries.filter((field) => field.isCustom === true).length
-          : unloadedValue
+          : scannedCustom
       },
       {
         key: "relationship",
@@ -1857,7 +1904,15 @@ export default class OiNodeDetailPanel extends LightningElement {
         );
       })
       .map((field) => ({
+        rowKey: field.rowKey || field.nodeKey || field.apiName,
         nodeKey: field.nodeKey,
+        isInGraph: !!field.nodeKey,
+        rowClass:
+          "oi-node-detail-panel-field-row" +
+          (field.nodeKey ? " is-navigable" : ""),
+        rowTitle: field.nodeKey
+          ? "Open this field in the graph"
+          : "Listed from live schema. Only relationship fields are graph nodes.",
         label: field.label,
         apiName: field.apiName,
         dataType: field.dataType || "—",
@@ -1885,6 +1940,10 @@ export default class OiNodeDetailPanel extends LightningElement {
   /** A field row selection is a plain selection, not a re-center — the canvas's own selectedNodeKey flows down to this same panel, so clicking a field here just makes this panel reload to show that field's own detail next, exactly as clicking an already-visible field pill on the canvas would. */
   handleFieldRowClick(event) {
     const nodeKey = event.currentTarget.dataset.nodeKey;
+    // Plain data fields are listed from live Describe (ADR-0031) and have no graph node to select.
+    if (!nodeKey) {
+      return;
+    }
     this.dispatchEvent(new CustomEvent("select", { detail: { nodeKey } }));
   }
 

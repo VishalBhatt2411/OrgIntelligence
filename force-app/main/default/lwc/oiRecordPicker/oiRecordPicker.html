@@ -41,6 +41,15 @@
         {errorMessage}
       </div>
     </template>
+    <template lwc:elseif={hasNoMatches}>
+      <div
+        class="oi-combobox-panel oi-combobox-status"
+        data-id="search-no-matches"
+        role="status"
+      >
+        No {objectApiName} records match "{queryTerm}".
+      </div>
+    </template>
     <template lwc:elseif={hasResults}>
       <ul
         class="oi-combobox-panel oi-combobox-results"

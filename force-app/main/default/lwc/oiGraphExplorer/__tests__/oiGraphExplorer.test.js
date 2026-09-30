@@ -358,6 +358,28 @@ describe("c-oi-graph-explorer", () => {
         referencedObjects: 1,
         referencingObjects: 1
       });
+
+      // Selecting a neighbor must not show the anchor's distinct-object counts under the neighbor's name.
+      element.shadowRoot
+        .querySelector("c-oi-relationship-canvas")
+        .dispatchEvent(
+          new CustomEvent("select", { detail: { nodeKey: "opportunity" } })
+        );
+      await flushPromises();
+      expect(panel.nodeKey).toBe("opportunity");
+      expect(panel.objectRelationshipSummary).toBeNull();
+
+      element.shadowRoot
+        .querySelector("c-oi-relationship-canvas")
+        .dispatchEvent(
+          new CustomEvent("select", { detail: { nodeKey: "account" } })
+        );
+      await flushPromises();
+      expect(panel.objectRelationshipSummary).toEqual({
+        selfRelationships: 1,
+        referencedObjects: 1,
+        referencingObjects: 1
+      });
     });
 
     it('"Explore From Here" re-centers the graph on the neighbor object exactly like a fresh search selection, using Object mode\'s own 2-hop depth', async () => {

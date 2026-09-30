@@ -43,4 +43,49 @@ describe("c-oi-field-picker", () => {
     options[0].click();
     expect(listener.mock.calls[0][0].detail.value).toBe("Account.BillingCity");
   });
+
+  it("closes the overlaying list once a field is picked, and reopens it on focus", async () => {
+    const element = createPicker();
+    element.shadowRoot.querySelector(".oi-field-picker-option").click();
+    await Promise.resolve();
+    expect(
+      element.shadowRoot.querySelector(".oi-field-picker-results")
+    ).toBeNull();
+
+    element.shadowRoot
+      .querySelector("input")
+      .dispatchEvent(new CustomEvent("focus"));
+    await Promise.resolve();
+    expect(
+      element.shadowRoot.querySelectorAll(".oi-field-picker-option")
+    ).toHaveLength(2);
+  });
+
+  it("closes the list on Escape and on blur", async () => {
+    jest.useFakeTimers();
+    try {
+      const element = createPicker();
+      const input = element.shadowRoot.querySelector("input");
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await Promise.resolve();
+      expect(
+        element.shadowRoot.querySelector(".oi-field-picker-results")
+      ).toBeNull();
+
+      input.dispatchEvent(new CustomEvent("input"));
+      await Promise.resolve();
+      expect(
+        element.shadowRoot.querySelector(".oi-field-picker-results")
+      ).not.toBeNull();
+
+      input.dispatchEvent(new CustomEvent("blur"));
+      jest.advanceTimersByTime(200);
+      await Promise.resolve();
+      expect(
+        element.shadowRoot.querySelector(".oi-field-picker-results")
+      ).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

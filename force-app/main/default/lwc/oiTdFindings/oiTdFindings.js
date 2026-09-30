@@ -1,11 +1,17 @@
 import { LightningElement, api } from "lwc";
-import { SEVERITY_ORDER, STATUS_OPTIONS, sortBySeverity } from "c/oiTdUtils";
+import {
+  SEVERITY_ORDER,
+  STATUS_OPTIONS,
+  sortBySeverity,
+  titleCase
+} from "c/oiTdUtils";
 
 const ALL = "all";
 const PAGE_SIZE = 20;
 
 /**
- * Findings page (reference: pages/FindingsPage.tsx) — search + category/severity/status filters,
+ * Findings page (reference: pages/FindingsPage.tsx) — search (title, component name or type) +
+ * category/severity/status filters,
  * severity-sorted list, 20 per page. The shell owns the findings array and applies "findingchange".
  */
 export default class OiTdFindings extends LightningElement {
@@ -60,7 +66,7 @@ export default class OiTdFindings extends LightningElement {
       { value: ALL, label: "All categories", selected: this.category === ALL },
       ...cats.map((c) => ({
         value: c,
-        label: String(c).replace("_", " "),
+        label: titleCase(c),
         selected: this.category === c
       }))
     ];
@@ -71,7 +77,7 @@ export default class OiTdFindings extends LightningElement {
       { value: ALL, label: "All severities", selected: this.severity === ALL },
       ...SEVERITY_ORDER.map((s) => ({
         value: s,
-        label: s,
+        label: titleCase(s),
         selected: this.severity === s
       }))
     ];
@@ -95,8 +101,9 @@ export default class OiTdFindings extends LightningElement {
         (this.severity === ALL || f.severity === this.severity) &&
         (this.status === ALL || f.status === this.status) &&
         (!q ||
-          (f.title || "").toLowerCase().includes(q) ||
-          (f.componentName || "").toLowerCase().includes(q))
+          [f.title, f.componentName, f.componentType].some((text) =>
+            (text || "").toLowerCase().includes(q)
+          ))
     );
     return sortBySeverity(scoped);
   }
