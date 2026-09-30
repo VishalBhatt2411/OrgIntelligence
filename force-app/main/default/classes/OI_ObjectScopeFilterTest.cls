@@ -157,15 +157,122 @@ private class OI_ObjectScopeFilterTest {
       'Installed-package code is skipped by default.'
     );
 
-    policy.localNamespace = 'oi';
+    policy.localNamespace = 'acme';
     System.assertEquals(
       true,
-      OI_ObjectScopeFilter.isNamespaceInScope('OI'),
-      'The local namespace matches case-insensitively.'
+      OI_ObjectScopeFilter.isNamespaceInScope('ACME'),
+      'The org namespace matches case-insensitively.'
     );
 
     policy.includeManagedPackages = true;
     System.assertEquals(true, OI_ObjectScopeFilter.isNamespaceInScope('FSL'));
+  }
+
+  /** Packaged: the app's namespace is out even with managed packages switched on. */
+  @isTest
+  static void testAppNamespaceIsAlwaysOutOfScope() {
+    OI_ObjectScopeFilter.ScopePolicy policy = useEmptyPolicy();
+    policy.appNamespace = 'orgintel';
+    policy.includeManagedPackages = true;
+
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isNamespaceInScope('OrgIntel'),
+      'The app never maps its own packaged code.'
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isComponentInScope('orgintel', 'OI_GraphEngine')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isComponentInScope('FSL', 'FSL_Admin'),
+      'Other packages still follow the package switch.'
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isComponentInScope(null, 'OI_CustomerClass'),
+      'Packaged, the name prefix is not used: a customer OI_ class stays in scope.'
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isFieldNamespaceInScope('orgintel__Status__c')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isFieldNamespaceInScope('FSL__Status__c')
+    );
+  }
+
+  /** Un-namespaced: the OI_ prefix identifies the app's components, case-insensitively. */
+  @isTest
+  static void testAppNamePrefixExcludesUnNamespacedAppComponents() {
+    OI_ObjectScopeFilter.ScopePolicy policy = useEmptyPolicy();
+    policy.appNamePrefix = 'oi_';
+
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isComponentInScope(null, 'OI_GraphEngine')
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isComponentInScope('', 'oi_logEventTrigger')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isComponentInScope(null, 'AccountService')
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isComponentInScope(null, 'OIS_Helper'),
+      'Only the full OI_ prefix matches.'
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isComponentInScope(null, null),
+      'A missing name cannot be matched, so only the namespace decides.'
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isFieldNamespaceInScope('OI_Health_Score__c')
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isInScope(OI_Scan_Run__c.SObjectType.getDescribe()),
+      'The app never maps its own objects.'
+    );
+    System.assertEquals(
+      true,
+      OI_ObjectScopeFilter.isInScope(Account.SObjectType.getDescribe())
+    );
+  }
+
+  /** The shipped policy with self-exclusion on (as in production) leaves out this app's own object and class. */
+  @isTest
+  static void testShippedPolicyExcludesTheAppsOwnComponents() {
+    OI_ObjectScopeFilter.policyOverride = null;
+    OI_ObjectScopeFilter.excludeOwnComponents = true;
+    OI_ObjectScopeFilter.resetCache();
+
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isInScope(OI_Scan_Run__c.SObjectType.getDescribe())
+    );
+    ApexClass self = [
+      SELECT Name, NamespacePrefix
+      FROM ApexClass
+      WHERE Name = 'OI_ObjectScopeFilter'
+      LIMIT 1
+    ];
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.isComponentInScope(self.NamespacePrefix, self.Name)
+    );
+    System.assertEquals(
+      false,
+      OI_ObjectScopeFilter.includeStandardPermissionSets(),
+      'Salesforce-supplied permission sets are off in the shipped settings.'
+    );
   }
 
   @isTest

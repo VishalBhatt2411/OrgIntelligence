@@ -31,7 +31,21 @@ Superseded versions (ADR-0014) also stayed in the Custom Objects indefinitely, b
 
 The same managed-package rule covers code components. `OI_ObjectScopeFilter.isNamespaceInScope` checks an Apex class's, trigger's or flow's `NamespacePrefix`, and the Apex class, Apex trigger and Flow scanners skip other namespaces unless `Scan_Managed_Package_Objects__c` is checked. Managed code bodies are hidden, so those nodes would add storage cost but no dependency edges. In the development org this removes 823 of 1,182 Apex nodes (the FSL, thsecurity and sf_fieldservice packages).
 
-Decisions are memoised per transaction, so every scanner in a hop gets the same answer. The local namespace comes from the class's own runtime type name, so no SOQL is needed.
+Code and security components go through `OI_ObjectScopeFilter.isComponentInScope(namespacePrefix, name)`, which applies the managed-package rule above and two more rules.
+
+**The app never maps itself.** Its own objects, fields, Apex classes, triggers, flows and permission sets are always out of scope, even when managed packages are switched on. When the app is installed as a package, the package namespace (read from the filter class's own runtime type name) identifies its components. When it is deployed un-namespaced, as in development, the `OI_` prefix that every app component carries identifies them. The prefix is detected, not a setting, because a shipped prefix setting could silently exclude a customer's own `OI_`-named components. The prefix rule applies only to un-namespaced deployments, and only there could it collide with customer components. In the development org this removes 301 of 302 Apex class nodes and the app's own permission sets and objects.
+
+**Permission sets follow the standard-object rule.** `OI_PermissionSetScanner` skips:
+
+- rows with `Type = 'Group'`, the synthetic shadows of Permission Set Groups, excluded for the same reason as profile-owned sets;
+- Salesforce-supplied sets (`IsCustom = false`), unless the new `Scan_Standard_Permission_Sets__c` setting is checked (off by default);
+- managed-package and app-owned sets, through `isComponentInScope`.
+
+Apex-class grant edges target only in-scope classes, so no edge dangles. In the development org this removes about 90 of 108 permission-set nodes and most `GRANTS_ACCESS_TO` edges.
+
+"Local" namespace means the org's own namespace (`Organization.NamespacePrefix`, one query per transaction). It is not the package's namespace. In a subscriber org the two differ, and only the org's own components belong to the customer. An earlier version of this ADR derived the local namespace from the class name, which would have treated the app's packaged namespace as the customer's.
+
+Decisions are memoised per transaction, so every scanner in a hop gets the same answer.
 
 If the settings record is missing, the scan falls back to the defaults and logs a warning; it does not fail.
 

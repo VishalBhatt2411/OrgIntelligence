@@ -23,6 +23,18 @@
  * mean a "Permission Set" node the user cannot find or manage as one. Profiles warrant their
  * own componentKind and scanner (Backlog MS-7), which is where those grants belong.
  *
+ * Scope (ADR-0031): the same policy the other scanners follow, applied through
+ * OI_ObjectScopeFilter.
+ *   - Type = 'Group' rows are excluded for the same reason as profile-owned ones: the platform
+ *     creates them as the synthetic shadow of a Permission Set Group, so they are not sets
+ *     an admin manages.
+ *   - Salesforce-supplied sets (IsCustom = false: license and feature sets the platform
+ *     provisions) are skipped unless Scan_Standard_Permission_Sets__c is checked, mirroring
+ *     how uncustomised standard objects are skipped.
+ *   - Managed-package sets and this app's own sets follow isComponentInScope.
+ *   - An Apex-class grant is emitted only toward a class the Apex class scanner also keeps,
+ *     so no edge dangles.
+ *
  * Limitations: **Object and Apex-class grants only — FIELD-level grants are deliberately not
  *              scanned.** FieldPermissions is the highest-cardinality table in this entire
  *              domain (permission sets x fields, routinely hundreds of thousands of rows in a
@@ -44,182 +56,289 @@
  *              Always a full snapshot; no incremental watermark yet.
  */
 public inherited sharing class OI_PermissionSetScanner implements OI_IMetadataScanner {
-    private static final String COMPONENT_KIND = 'PermissionSet';
-    private static final String APEX_CLASS_COMPONENT_KIND = 'ApexClass';
-    private static final String GRANTS_ACCESS_RELATIONSHIP_KIND = 'GRANTS_ACCESS_TO';
-    /** A defensive ceiling on grant rows read in one scan hop. Object/Apex grants are far lower-cardinality than field grants (see Limitations), so this is a safety net against a pathological org rather than an expected boundary — but it is a real cap, and a scan that hits it is reported as truncated rather than silently returning partial data as if complete. */
-    private static final Integer MAX_GRANT_ROWS = 20000;
+  private static final String COMPONENT_KIND = 'PermissionSet';
+  private static final String APEX_CLASS_COMPONENT_KIND = 'ApexClass';
+  private static final String GRANTS_ACCESS_RELATIONSHIP_KIND = 'GRANTS_ACCESS_TO';
+  /** A defensive ceiling on grant rows read in one scan hop. Object/Apex grants are far lower-cardinality than field grants (see Limitations), so this is a safety net against a pathological org rather than an expected boundary — but it is a real cap, and a scan that hits it is reported as truncated rather than silently returning partial data as if complete. */
+  private static final Integer MAX_GRANT_ROWS = 20000;
 
-    public OI_DiscoveryBatch scan(OI_ScanContext context) {
-        List<PermissionSet> permissionSets = [
-            SELECT Id, Name, Label, Description, NamespacePrefix, IsCustom, License.Name
-            FROM PermissionSet
-            WHERE IsOwnedByProfile = false
-        ];
+  public OI_DiscoveryBatch scan(OI_ScanContext context) {
+    List<PermissionSet> permissionSets = [
+      SELECT
+        Id,
+        Name,
+        Label,
+        Description,
+        NamespacePrefix,
+        IsCustom,
+        Type,
+        License.Name
+      FROM PermissionSet
+      WHERE IsOwnedByProfile = FALSE
+    ];
 
-        List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
-        Map<Id, String> componentKeyByPermissionSetId = new Map<Id, String>();
-        for (PermissionSet permissionSet : permissionSets) {
-            OI_DiscoveredComponent component = toComponent(permissionSet);
-            components.add(component);
-            componentKeyByPermissionSetId.put(permissionSet.Id, component.componentKey);
-        }
-
-        List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
-        relationships.addAll(buildObjectGrants(componentKeyByPermissionSetId));
-        relationships.addAll(buildApexClassGrants(componentKeyByPermissionSetId));
-
-        return new OI_DiscoveryBatch(
-            context.scanTaskId,
-            COMPONENT_KIND,
-            components,
-            relationships,
-            true,
-            1,
-            /** PARTIAL: object and Apex-class grants are exact and complete, but field-level grants are deliberately not scanned (FieldPermissions volume needs Batch Apex chunking). Named explicitly so "which permission sets expose this FIELD" reads as a known gap rather than an empty answer. */
-            OI_ScanCoverage.partial(
-                relationships.size(),
-                'Object-level and Apex-class grants are fully detected. Field-level grants are not scanned yet, so ' +
-                '"which permission sets expose this field" cannot be answered. Profile-owned permission sets are ' +
-                'excluded by design and are reported separately once Profile scanning exists.'
-            )
-        );
+    List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
+    Map<Id, String> componentKeyByPermissionSetId = new Map<Id, String>();
+    for (PermissionSet permissionSet : permissionSets) {
+      if (
+        !isPermissionSetInScope(
+          permissionSet.Type,
+          permissionSet.IsCustom,
+          permissionSet.NamespacePrefix,
+          permissionSet.Name
+        )
+      ) {
+        continue;
+      }
+      OI_DiscoveredComponent component = toComponent(permissionSet);
+      components.add(component);
+      componentKeyByPermissionSetId.put(
+        permissionSet.Id,
+        component.componentKey
+      );
     }
 
-    /**
-     * PermissionSet -> CustomObject grants. Every candidate object goes through
-     * OI_ScannerObjectResolver, so a grant on an object OI_ObjectScanner does not create a node
-     * for (a Platform Event, a __mdt type, a companion History object — all of which really do
-     * appear in ObjectPermissions) produces no edge instead of a dangling one.
-     */
-    private List<OI_DiscoveredRelationship> buildObjectGrants(Map<Id, String> componentKeyByPermissionSetId) {
-        List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
-        if (componentKeyByPermissionSetId.isEmpty()) {
-            return found;
-        }
-        for (ObjectPermissions grant : [
-            SELECT ParentId, SobjectType, PermissionsRead, PermissionsCreate, PermissionsEdit, PermissionsDelete, PermissionsViewAllRecords, PermissionsModifyAllRecords
-            FROM ObjectPermissions
-            WHERE ParentId IN :componentKeyByPermissionSetId.keySet()
-            LIMIT :MAX_GRANT_ROWS
-        ]) {
-            List<String> grantedPermissions = describeObjectPermissions(grant);
-            if (grantedPermissions.isEmpty()) {
-                continue;
-            }
-            String fromComponentKey = componentKeyByPermissionSetId.get(grant.ParentId);
-            String toComponentKey = OI_ScannerObjectResolver.toObjectComponentKey(grant.SobjectType);
-            if (fromComponentKey == null || toComponentKey == null) {
-                continue;
-            }
-            found.add(
-                new OI_DiscoveredRelationship(
-                    fromComponentKey + '::' + GRANTS_ACCESS_RELATIONSHIP_KIND + '::' + toComponentKey,
-                    GRANTS_ACCESS_RELATIONSHIP_KIND,
-                    fromComponentKey,
-                    toComponentKey,
-                    new Map<String, Object>{ 'grantedPermissions' => grantedPermissions }
-                )
-            );
-        }
-        return found;
+    List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
+    relationships.addAll(buildObjectGrants(componentKeyByPermissionSetId));
+    relationships.addAll(buildApexClassGrants(componentKeyByPermissionSetId));
+
+    return new OI_DiscoveryBatch(
+      context.scanTaskId,
+      COMPONENT_KIND,
+      components,
+      relationships,
+      true,
+      1,
+      /** PARTIAL: object and Apex-class grants are exact and complete, but field-level grants are deliberately not scanned (FieldPermissions volume needs Batch Apex chunking). Named explicitly so "which permission sets expose this FIELD" reads as a known gap rather than an empty answer. */
+      OI_ScanCoverage.partial(
+        relationships.size(),
+        'Object-level and Apex-class grants are fully detected. Field-level grants are not scanned yet, so ' +
+          '"which permission sets expose this field" cannot be answered. Profile-owned permission sets are ' +
+          'excluded by design and are reported separately once Profile scanning exists. Salesforce-supplied ' +
+          'and permission-set-group shadow sets are skipped by the scan scope policy.'
+      )
+    );
+  }
+
+  /** The scope rule for one permission set (see the class comment); primitives in so each branch is unit-testable without DML. */
+  @TestVisible
+  private static Boolean isPermissionSetInScope(
+    String permissionSetType,
+    Boolean isCustom,
+    String namespacePrefix,
+    String name
+  ) {
+    if (permissionSetType == 'Group') {
+      return false;
+    }
+    if (
+      isCustom != true && !OI_ObjectScopeFilter.includeStandardPermissionSets()
+    ) {
+      return false;
+    }
+    return OI_ObjectScopeFilter.isComponentInScope(namespacePrefix, name);
+  }
+
+  /**
+   * PermissionSet -> CustomObject grants. Every candidate object goes through
+   * OI_ScannerObjectResolver, so a grant on an object OI_ObjectScanner does not create a node
+   * for (a Platform Event, a __mdt type, a companion History object — all of which really do
+   * appear in ObjectPermissions) produces no edge instead of a dangling one.
+   */
+  private List<OI_DiscoveredRelationship> buildObjectGrants(
+    Map<Id, String> componentKeyByPermissionSetId
+  ) {
+    List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
+    if (componentKeyByPermissionSetId.isEmpty()) {
+      return found;
+    }
+    for (ObjectPermissions grant : [
+      SELECT
+        ParentId,
+        SobjectType,
+        PermissionsRead,
+        PermissionsCreate,
+        PermissionsEdit,
+        PermissionsDelete,
+        PermissionsViewAllRecords,
+        PermissionsModifyAllRecords
+      FROM ObjectPermissions
+      WHERE ParentId IN :componentKeyByPermissionSetId.keySet()
+      LIMIT :MAX_GRANT_ROWS
+    ]) {
+      List<String> grantedPermissions = describeObjectPermissions(grant);
+      if (grantedPermissions.isEmpty()) {
+        continue;
+      }
+      String fromComponentKey = componentKeyByPermissionSetId.get(
+        grant.ParentId
+      );
+      String toComponentKey = OI_ScannerObjectResolver.toObjectComponentKey(
+        grant.SobjectType
+      );
+      if (fromComponentKey == null || toComponentKey == null) {
+        continue;
+      }
+      found.add(
+        new OI_DiscoveredRelationship(
+          fromComponentKey +
+            '::' +
+            GRANTS_ACCESS_RELATIONSHIP_KIND +
+            '::' +
+            toComponentKey,
+          GRANTS_ACCESS_RELATIONSHIP_KIND,
+          fromComponentKey,
+          toComponentKey,
+          new Map<String, Object>{ 'grantedPermissions' => grantedPermissions }
+        )
+      );
+    }
+    return found;
+  }
+
+  /**
+   * PermissionSet -> ApexClass grants, via SetupEntityAccess. SetupEntityId is the ApexClass
+   * Id, so the class NAME (which componentKey needs) requires a second query — done as one
+   * bulk lookup over the collected Ids, never per row.
+   */
+  private List<OI_DiscoveredRelationship> buildApexClassGrants(
+    Map<Id, String> componentKeyByPermissionSetId
+  ) {
+    List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
+    if (componentKeyByPermissionSetId.isEmpty()) {
+      return found;
+    }
+    List<SetupEntityAccess> grants = [
+      SELECT ParentId, SetupEntityId
+      FROM SetupEntityAccess
+      WHERE
+        ParentId IN :componentKeyByPermissionSetId.keySet()
+        AND SetupEntityType = 'ApexClass'
+      LIMIT :MAX_GRANT_ROWS
+    ];
+    if (grants.isEmpty()) {
+      return found;
     }
 
-    /**
-     * PermissionSet -> ApexClass grants, via SetupEntityAccess. SetupEntityId is the ApexClass
-     * Id, so the class NAME (which componentKey needs) requires a second query — done as one
-     * bulk lookup over the collected Ids, never per row.
-     */
-    private List<OI_DiscoveredRelationship> buildApexClassGrants(Map<Id, String> componentKeyByPermissionSetId) {
-        List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
-        if (componentKeyByPermissionSetId.isEmpty()) {
-            return found;
-        }
-        List<SetupEntityAccess> grants = [
-            SELECT ParentId, SetupEntityId
-            FROM SetupEntityAccess
-            WHERE ParentId IN :componentKeyByPermissionSetId.keySet() AND SetupEntityType = 'ApexClass'
-            LIMIT :MAX_GRANT_ROWS
-        ];
-        if (grants.isEmpty()) {
-            return found;
-        }
-
-        Set<Id> apexClassIds = new Set<Id>();
-        for (SetupEntityAccess grant : grants) {
-            apexClassIds.add(grant.SetupEntityId);
-        }
-        Map<Id, String> componentKeyByApexClassId = new Map<Id, String>();
-        for (ApexClass apexClass : [SELECT Id, Name, NamespacePrefix FROM ApexClass WHERE Id IN :apexClassIds]) {
-            String namespace = String.isBlank(apexClass.NamespacePrefix) ? null : apexClass.NamespacePrefix;
-            String fullyQualifiedName = namespace == null ? apexClass.Name : namespace + '.' + apexClass.Name;
-            componentKeyByApexClassId.put(apexClass.Id, OI_ComponentKeyUtil.build(APEX_CLASS_COMPONENT_KIND, namespace, fullyQualifiedName));
-        }
-
-        for (SetupEntityAccess grant : grants) {
-            String fromComponentKey = componentKeyByPermissionSetId.get(grant.ParentId);
-            String toComponentKey = componentKeyByApexClassId.get(grant.SetupEntityId);
-            /** A SetupEntityId whose ApexClass row is not visible/queryable to the running user yields no edge — skip-never-fabricate, matching this package's established discipline. */
-            if (fromComponentKey == null || toComponentKey == null) {
-                continue;
-            }
-            found.add(
-                new OI_DiscoveredRelationship(
-                    fromComponentKey + '::' + GRANTS_ACCESS_RELATIONSHIP_KIND + '::' + toComponentKey,
-                    GRANTS_ACCESS_RELATIONSHIP_KIND,
-                    fromComponentKey,
-                    toComponentKey,
-                    new Map<String, Object>{ 'grantedPermissions' => new List<String>{ 'execute' } }
-                )
-            );
-        }
-        return found;
+    Set<Id> apexClassIds = new Set<Id>();
+    for (SetupEntityAccess grant : grants) {
+      apexClassIds.add(grant.SetupEntityId);
+    }
+    Map<Id, String> componentKeyByApexClassId = new Map<Id, String>();
+    for (ApexClass apexClass : [
+      SELECT Id, Name, NamespacePrefix
+      FROM ApexClass
+      WHERE Id IN :apexClassIds
+    ]) {
+      /** The Apex class scanner applies the same check, so only classes that have nodes become targets. */
+      if (
+        !OI_ObjectScopeFilter.isComponentInScope(
+          apexClass.NamespacePrefix,
+          apexClass.Name
+        )
+      ) {
+        continue;
+      }
+      String namespace = String.isBlank(apexClass.NamespacePrefix)
+        ? null
+        : apexClass.NamespacePrefix;
+      String fullyQualifiedName = namespace == null
+        ? apexClass.Name
+        : namespace + '.' + apexClass.Name;
+      componentKeyByApexClassId.put(
+        apexClass.Id,
+        OI_ComponentKeyUtil.build(
+          APEX_CLASS_COMPONENT_KIND,
+          namespace,
+          fullyQualifiedName
+        )
+      );
     }
 
-    /** The grant's actual conferred permissions, as display-ready tokens. An empty list means the row confers nothing — see Limitations for why such a row is skipped rather than edged. */
-    @TestVisible
-    private List<String> describeObjectPermissions(ObjectPermissions grant) {
-        List<String> granted = new List<String>();
-        if (grant.PermissionsRead == true) {
-            granted.add('read');
-        }
-        if (grant.PermissionsCreate == true) {
-            granted.add('create');
-        }
-        if (grant.PermissionsEdit == true) {
-            granted.add('edit');
-        }
-        if (grant.PermissionsDelete == true) {
-            granted.add('delete');
-        }
-        if (grant.PermissionsViewAllRecords == true) {
-            granted.add('view all');
-        }
-        if (grant.PermissionsModifyAllRecords == true) {
-            granted.add('modify all');
-        }
-        return granted;
+    for (SetupEntityAccess grant : grants) {
+      String fromComponentKey = componentKeyByPermissionSetId.get(
+        grant.ParentId
+      );
+      String toComponentKey = componentKeyByApexClassId.get(
+        grant.SetupEntityId
+      );
+      /** A SetupEntityId whose ApexClass row is not visible/queryable to the running user yields no edge — skip-never-fabricate, matching this package's established discipline. */
+      if (fromComponentKey == null || toComponentKey == null) {
+        continue;
+      }
+      found.add(
+        new OI_DiscoveredRelationship(
+          fromComponentKey +
+            '::' +
+            GRANTS_ACCESS_RELATIONSHIP_KIND +
+            '::' +
+            toComponentKey,
+          GRANTS_ACCESS_RELATIONSHIP_KIND,
+          fromComponentKey,
+          toComponentKey,
+          new Map<String, Object>{
+            'grantedPermissions' => new List<String>{ 'execute' }
+          }
+        )
+      );
     }
+    return found;
+  }
 
-    private OI_DiscoveredComponent toComponent(PermissionSet permissionSet) {
-        String namespace = String.isBlank(permissionSet.NamespacePrefix) ? null : permissionSet.NamespacePrefix;
-        String fullyQualifiedName = namespace == null ? permissionSet.Name : namespace + '.' + permissionSet.Name;
-        Map<String, Object> attributes = new Map<String, Object>{
-            'label' => permissionSet.Label,
-            'description' => permissionSet.Description,
-            'isCustom' => permissionSet.IsCustom,
-            'license' => permissionSet.License == null ? null : permissionSet.License.Name
-        };
-        return new OI_DiscoveredComponent(
-            OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
-            COMPONENT_KIND,
-            fullyQualifiedName,
-            namespace,
-            'SOQL',
-            attributes,
-            OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, fullyQualifiedName, attributes),
-            null,
-            null
-        );
+  /** The grant's actual conferred permissions, as display-ready tokens. An empty list means the row confers nothing — see Limitations for why such a row is skipped rather than edged. */
+  @TestVisible
+  private List<String> describeObjectPermissions(ObjectPermissions grant) {
+    List<String> granted = new List<String>();
+    if (grant.PermissionsRead == true) {
+      granted.add('read');
     }
+    if (grant.PermissionsCreate == true) {
+      granted.add('create');
+    }
+    if (grant.PermissionsEdit == true) {
+      granted.add('edit');
+    }
+    if (grant.PermissionsDelete == true) {
+      granted.add('delete');
+    }
+    if (grant.PermissionsViewAllRecords == true) {
+      granted.add('view all');
+    }
+    if (grant.PermissionsModifyAllRecords == true) {
+      granted.add('modify all');
+    }
+    return granted;
+  }
+
+  private OI_DiscoveredComponent toComponent(PermissionSet permissionSet) {
+    String namespace = String.isBlank(permissionSet.NamespacePrefix)
+      ? null
+      : permissionSet.NamespacePrefix;
+    String fullyQualifiedName = namespace == null
+      ? permissionSet.Name
+      : namespace + '.' + permissionSet.Name;
+    Map<String, Object> attributes = new Map<String, Object>{
+      'label' => permissionSet.Label,
+      'description' => permissionSet.Description,
+      'isCustom' => permissionSet.IsCustom,
+      'license' => permissionSet.License == null
+        ? null
+        : permissionSet.License.Name
+    };
+    return new OI_DiscoveredComponent(
+      OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
+      COMPONENT_KIND,
+      fullyQualifiedName,
+      namespace,
+      'SOQL',
+      attributes,
+      OI_ChecksumUtil.computeChecksum(
+        COMPONENT_KIND,
+        fullyQualifiedName,
+        attributes
+      ),
+      null,
+      null
+    );
+  }
 }

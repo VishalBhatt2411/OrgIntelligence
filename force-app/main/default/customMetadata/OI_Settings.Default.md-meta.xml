@@ -90,4 +90,8 @@
         <field>Scan_Customized_Standard_Objects__c</field>
         <value xsi:type="xsd:boolean">true</value>
     </values>
+    <values>
+        <field>Scan_Standard_Permission_Sets__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
 </CustomMetadata>

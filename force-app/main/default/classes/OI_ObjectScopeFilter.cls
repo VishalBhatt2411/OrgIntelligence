@@ -25,8 +25,15 @@
  *      org has — is out of scope. This is what keeps graph storage proportional to the
  *      org's own customisation instead of the platform's size.
  * The same managed-package rule applies to code components by NamespacePrefix
- * (isNamespaceInScope), so Apex classes, triggers and flows from installed packages are
- * skipped by default too.
+ * (isComponentInScope), so Apex classes, triggers, flows and permission sets from installed
+ * packages are skipped by default too.
+ * This app never maps itself: its own objects, fields, classes, triggers, flows and
+ * permission sets are always out of scope. Installed as a package they are recognised by the
+ * package's namespace; deployed un-namespaced (development) by the OI_ prefix every app
+ * component carries. Only the second case can collide with a customer's own OI_-prefixed
+ * components, and only in an org running the app un-namespaced.
+ * "Local" namespace means the org's own (Organization.NamespacePrefix), not the package's:
+ * in a subscriber org the two differ, and only the org's own components are the customer's.
  * Limitations: The structural exclusions are unchanged — Custom Metadata Types (__mdt),
  *              Platform Events (__e), Big Objects (__b), External Objects (__x), and the
  *              platform-generated History/Feed/Share/ChangeEvent companions are never in
@@ -48,22 +55,32 @@ public inherited sharing class OI_ObjectScopeFilter {
     'ChangeEvent'
   };
   private static final String CUSTOM_SUFFIX = '__c';
+  /** Every component this app ships is named with this prefix (CLAUDE.md naming convention). */
+  private static final String APP_COMPONENT_PREFIX = 'oi_';
   private static final String NAMESPACE_SEPARATOR = '__';
 
   /** Test seam: replaces the settings/CMT-derived policy for the running transaction. */
   @TestVisible
   private static ScopePolicy policyOverride;
+  /** Test seam: scanner tests use the app's own deployed components as live fixtures, so the self-exclusion is off under test unless a test turns it on. */
+  @TestVisible
+  private static Boolean excludeOwnComponents = !Test.isRunningTest();
   private static ScopePolicy cachedPolicy;
   private static Map<String, Boolean> decisionsByApiName = new Map<String, Boolean>();
 
   /**
    * The resolved scope configuration. Object names in the two override sets are
-   * lowercase. localNamespace is lowercase, or blank when the code runs un-namespaced.
+   * lowercase. localNamespace is the org's own namespace, lowercase, or blank.
+   * appNamespace and appNamePrefix identify this app's own components (see the class
+   * comment); both blank means nothing is treated as the app's own.
    */
   public class ScopePolicy {
     public Boolean includeManagedPackages = false;
     public Boolean includeCustomizedStandardObjects = true;
+    public Boolean includeStandardPermissionSets = false;
     public String localNamespace = '';
+    public String appNamespace = '';
+    public String appNamePrefix = '';
     public Set<String> alwaysInclude = new Set<String>();
     public Set<String> alwaysExclude = new Set<String>();
   }
@@ -91,8 +108,48 @@ public inherited sharing class OI_ObjectScopeFilter {
       return false;
     }
     ScopePolicy policy = getPolicy();
+    if (isAppApiName(fieldApiName.toLowerCase(), policy)) {
+      return false;
+    }
     return policy.includeManagedPackages ||
       !isForeignNamespaced(fieldApiName, policy.localNamespace);
+  }
+
+  /**
+   * Whether a code or security component (Apex class, trigger, flow, permission set) with
+   * this NamespacePrefix and API name is in scope: never when it is this app's own, else as
+   * isNamespaceInScope decides.
+   */
+  public static Boolean isComponentInScope(
+    String namespacePrefix,
+    String componentName
+  ) {
+    ScopePolicy policy = getPolicy();
+    if (
+      String.isNotBlank(policy.appNamespace) &&
+      String.isNotBlank(namespacePrefix) &&
+      namespacePrefix.toLowerCase() == policy.appNamespace
+    ) {
+      return false;
+    }
+    if (
+      String.isBlank(namespacePrefix) &&
+      String.isNotBlank(policy.appNamePrefix) &&
+      String.isNotBlank(componentName) &&
+      componentName.toLowerCase().startsWith(policy.appNamePrefix)
+    ) {
+      return false;
+    }
+    return isNamespaceInScope(namespacePrefix);
+  }
+
+  /**
+   * Whether Salesforce-supplied permission sets (IsCustom = false: license and feature sets
+   * the platform provisions) are scanned. Off by default: they are numerous, the customer did
+   * not build them, and each carries many access edges (Scan_Standard_Permission_Sets__c).
+   */
+  public static Boolean includeStandardPermissionSets() {
+    return getPolicy().includeStandardPermissionSets;
   }
 
   /**
@@ -107,8 +164,12 @@ public inherited sharing class OI_ObjectScopeFilter {
       return true;
     }
     ScopePolicy policy = getPolicy();
+    String lowerNamespace = namespacePrefix.toLowerCase();
+    if (lowerNamespace == policy.appNamespace) {
+      return false;
+    }
     return policy.includeManagedPackages ||
-      namespacePrefix.toLowerCase() == policy.localNamespace;
+      lowerNamespace == policy.localNamespace;
   }
 
   /** Clears the per-transaction memo — for tests that swap policyOverride mid-method. */
@@ -138,6 +199,9 @@ public inherited sharing class OI_ObjectScopeFilter {
     ScopePolicy policy
   ) {
     String lowerName = describeResult.getName().toLowerCase();
+    if (isAppApiName(lowerName, policy)) {
+      return false;
+    }
     if (policy.alwaysExclude.contains(lowerName)) {
       return false;
     }
@@ -198,6 +262,15 @@ public inherited sharing class OI_ObjectScopeFilter {
       firstSeparator != name.lastIndexOf(NAMESPACE_SEPARATOR);
   }
 
+  /** An object or field API name (lowercase) that belongs to this app: ns__Name__c when packaged, OI_Name__c un-namespaced. */
+  private static Boolean isAppApiName(String lowerApiName, ScopePolicy policy) {
+    if (String.isNotBlank(policy.appNamespace)) {
+      return lowerApiName.startsWith(policy.appNamespace + NAMESPACE_SEPARATOR);
+    }
+    return String.isNotBlank(policy.appNamePrefix) &&
+      lowerApiName.startsWith(policy.appNamePrefix);
+  }
+
   private static ScopePolicy getPolicy() {
     if (policyOverride != null) {
       return policyOverride;
@@ -210,13 +283,21 @@ public inherited sharing class OI_ObjectScopeFilter {
 
   private static ScopePolicy loadPolicy() {
     ScopePolicy policy = new ScopePolicy();
-    policy.localNamespace = resolveLocalNamespace();
+    policy.localNamespace = resolveOrgNamespace();
+    if (excludeOwnComponents) {
+      policy.appNamespace = resolveAppNamespace();
+      policy.appNamePrefix = String.isBlank(policy.appNamespace)
+        ? APP_COMPONENT_PREFIX
+        : '';
+    }
     try {
       OI_Settings__mdt settings = new OI_SettingsService().getSettings();
       policy.includeManagedPackages =
         settings.Scan_Managed_Package_Objects__c == true;
       policy.includeCustomizedStandardObjects =
         settings.Scan_Customized_Standard_Objects__c != false;
+      policy.includeStandardPermissionSets =
+        settings.Scan_Standard_Permission_Sets__c == true;
     } catch (OI_ServiceException e) {
       // Documented degradation: keep the storage-light defaults and still scan.
       new OI_LoggerService()
@@ -243,7 +324,20 @@ public inherited sharing class OI_ObjectScopeFilter {
     return policy;
   }
 
-  private static String resolveLocalNamespace() {
+  /** The org's own namespace; blank for most orgs. One query per transaction (the policy is cached). */
+  private static String resolveOrgNamespace() {
+    List<Organization> orgs = [
+      SELECT NamespacePrefix
+      FROM Organization
+      LIMIT 1
+    ];
+    return orgs.isEmpty() || String.isBlank(orgs[0].NamespacePrefix)
+      ? ''
+      : orgs[0].NamespacePrefix.toLowerCase();
+  }
+
+  /** This app's namespace, from this class's own runtime type name: blank when deployed un-namespaced. */
+  private static String resolveAppNamespace() {
     String qualifiedName = OI_ObjectScopeFilter.class.getName();
     return qualifiedName.contains('.')
       ? qualifiedName.substringBefore('.').toLowerCase()

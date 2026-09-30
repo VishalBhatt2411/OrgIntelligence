@@ -123,7 +123,12 @@ public inherited sharing class OI_ApexClassScanner implements OI_IMetadataScanne
   private List<ApexClass> filterInScope(List<ApexClass> apexClasses) {
     List<ApexClass> inScope = new List<ApexClass>();
     for (ApexClass apexClass : apexClasses) {
-      if (OI_ObjectScopeFilter.isNamespaceInScope(apexClass.NamespacePrefix)) {
+      if (
+        OI_ObjectScopeFilter.isComponentInScope(
+          apexClass.NamespacePrefix,
+          apexClass.Name
+        )
+      ) {
         inScope.add(apexClass);
       }
     }

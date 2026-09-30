@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Scan_Standard_Permission_Sets__c</fullName>
+    <label>Scan Standard Permission Sets</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >When checked, the metadata scan also persists Salesforce-supplied permission sets (license and feature sets the platform provisions) and their access grants. Off by default to keep graph storage small (ADR-0031).</description>
+</CustomField>

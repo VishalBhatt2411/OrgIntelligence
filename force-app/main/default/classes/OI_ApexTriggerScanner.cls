@@ -286,7 +286,10 @@ public inherited sharing class OI_ApexTriggerScanner implements OI_IMetadataScan
     List<ApexTrigger> inScope = new List<ApexTrigger>();
     for (ApexTrigger apexTrigger : triggers) {
       if (
-        OI_ObjectScopeFilter.isNamespaceInScope(apexTrigger.NamespacePrefix)
+        OI_ObjectScopeFilter.isComponentInScope(
+          apexTrigger.NamespacePrefix,
+          apexTrigger.Name
+        )
       ) {
         inScope.add(apexTrigger);
       }
@@ -304,7 +307,12 @@ public inherited sharing class OI_ApexTriggerScanner implements OI_IMetadataScan
     Map<String, String> componentKeyByClassName = new Map<String, String>();
     for (ApexClass apexClass : [SELECT Name, NamespacePrefix FROM ApexClass]) {
       // Only classes that are themselves persisted may be edge targets, so no REFERENCES edge dangles.
-      if (!OI_ObjectScopeFilter.isNamespaceInScope(apexClass.NamespacePrefix)) {
+      if (
+        !OI_ObjectScopeFilter.isComponentInScope(
+          apexClass.NamespacePrefix,
+          apexClass.Name
+        )
+      ) {
         continue;
       }
       String namespace = String.isBlank(apexClass.NamespacePrefix)

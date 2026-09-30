@@ -64,7 +64,12 @@ public inherited sharing class OI_FlowScanner implements OI_IMetadataScanner {
 
     for (FlowDefinitionView flow : flows) {
       // Managed-package flows are skipped unless the scope policy includes them (ADR-0031 §1).
-      if (!OI_ObjectScopeFilter.isNamespaceInScope(flow.NamespacePrefix)) {
+      if (
+        !OI_ObjectScopeFilter.isComponentInScope(
+          flow.NamespacePrefix,
+          flow.ApiName
+        )
+      ) {
         continue;
       }
       OI_DiscoveredComponent component = toComponent(flow);
