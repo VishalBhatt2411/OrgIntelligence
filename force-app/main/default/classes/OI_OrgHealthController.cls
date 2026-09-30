@@ -429,6 +429,8 @@ public with sharing class OI_OrgHealthController {
       e instanceof OI_ValidationException || e instanceof OI_ServiceException
     ) {
       message = e.getMessage();
+    } else if (OI_StorageLimitUtil.isStorageLimitFailure(e)) {
+      message = OI_StorageLimitUtil.STORAGE_FULL_MESSAGE;
     } else {
       message = 'Something went wrong retrieving Org Health. Please try again.';
     }

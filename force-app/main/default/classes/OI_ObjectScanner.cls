@@ -25,58 +25,103 @@
  *              built this sprint, flagged as a known limitation (Sprint 8 report).
  */
 public class OI_ObjectScanner implements OI_IMetadataScanner {
-    private static final String COMPONENT_KIND = 'CustomObject';
-    private static final Integer DESCRIBE_CHUNK_SIZE = 100;
+  private static final String COMPONENT_KIND = 'CustomObject';
+  private static final Integer DESCRIBE_CHUNK_SIZE = 100;
 
-    public OI_DiscoveryBatch scan(OI_ScanContext context) {
-        List<String> apiNames = new List<String>(Schema.getGlobalDescribe().keySet());
-        apiNames.sort();
+  public OI_DiscoveryBatch scan(OI_ScanContext context) {
+    List<String> apiNames = new List<String>(
+      Schema.getGlobalDescribe().keySet()
+    );
+    apiNames.sort();
 
-        List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
-        Integer apiCallsConsumed = 0;
+    List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
+    Integer apiCallsConsumed = 0;
 
-        for (Integer startIndex = 0; startIndex < apiNames.size(); startIndex += DESCRIBE_CHUNK_SIZE) {
-            Integer endIndex = Math.min(startIndex + DESCRIBE_CHUNK_SIZE, apiNames.size());
-            List<String> chunk = new List<String>();
-            for (Integer i = startIndex; i < endIndex; i++) {
-                chunk.add(apiNames[i]);
-            }
-            for (Schema.DescribeSObjectResult describeResult : Schema.describeSObjects(chunk)) {
-                if (OI_ObjectScopeFilter.isInScope(describeResult)) {
-                    components.add(toComponent(describeResult));
-                }
-            }
-            apiCallsConsumed++;
+    for (
+      Integer startIndex = 0;
+      startIndex < apiNames.size();
+      startIndex += DESCRIBE_CHUNK_SIZE
+    ) {
+      Integer endIndex = Math.min(
+        startIndex + DESCRIBE_CHUNK_SIZE,
+        apiNames.size()
+      );
+      List<String> chunk = new List<String>();
+      for (Integer i = startIndex; i < endIndex; i++) {
+        chunk.add(apiNames[i]);
+      }
+      for (
+        Schema.DescribeSObjectResult describeResult : Schema.describeSObjects(
+          chunk
+        )
+      ) {
+        if (OI_ObjectScopeFilter.isInScope(describeResult)) {
+          components.add(toComponent(describeResult));
         }
-
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, new List<OI_DiscoveredRelationship>(), true, apiCallsConsumed);
+      }
+      apiCallsConsumed++;
     }
 
-    private OI_DiscoveredComponent toComponent(Schema.DescribeSObjectResult describeResult) {
-        String apiName = describeResult.getName();
-        String namespace = describeResult.isCustom() ? OI_ComponentKeyUtil.extractNamespaceFromApiName(apiName) : null;
-        Map<String, Object> attributes = new Map<String, Object>{
-            'label' => describeResult.getLabel(),
-            'pluralLabel' => describeResult.getLabelPlural(),
-            'custom' => describeResult.isCustom(),
-            'namespace' => namespace,
-            'keyPrefix' => describeResult.getKeyPrefix(),
-            'queryable' => describeResult.isQueryable(),
-            'createable' => describeResult.isCreateable(),
-            'updateable' => describeResult.isUpdateable(),
-            'deletable' => describeResult.isDeletable(),
-            'feedEnabled' => describeResult.isFeedEnabled()
-        };
-        return new OI_DiscoveredComponent(
-            OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, apiName),
-            COMPONENT_KIND,
-            apiName,
-            namespace,
-            'Describe',
-            attributes,
-            OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, apiName, attributes),
-            null,
-            null
-        );
+    return new OI_DiscoveryBatch(
+      context.scanTaskId,
+      COMPONENT_KIND,
+      components,
+      new List<OI_DiscoveredRelationship>(),
+      true,
+      apiCallsConsumed
+    );
+  }
+
+  private OI_DiscoveredComponent toComponent(
+    Schema.DescribeSObjectResult describeResult
+  ) {
+    String apiName = describeResult.getName();
+    String namespace = describeResult.isCustom()
+      ? OI_ComponentKeyUtil.extractNamespaceFromApiName(apiName)
+      : null;
+    Map<String, Object> attributes = new Map<String, Object>{
+      'label' => describeResult.getLabel(),
+      'pluralLabel' => describeResult.getLabelPlural(),
+      'custom' => describeResult.isCustom(),
+      'namespace' => namespace,
+      'keyPrefix' => describeResult.getKeyPrefix(),
+      'queryable' => describeResult.isQueryable(),
+      'createable' => describeResult.isCreateable(),
+      'updateable' => describeResult.isUpdateable(),
+      'deletable' => describeResult.isDeletable(),
+      'feedEnabled' => describeResult.isFeedEnabled()
+    };
+    putFieldCounts(describeResult, attributes);
+    return new OI_DiscoveredComponent(
+      OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, apiName),
+      COMPONENT_KIND,
+      apiName,
+      namespace,
+      'Describe',
+      attributes,
+      OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, apiName, attributes),
+      null,
+      null
+    );
+  }
+
+  /**
+   * Field totals as object attributes (ADR-0031): OI_FieldScanner persists only
+   * relationship-bearing fields, so counting field nodes would under-report. Counted from
+   * the field map's lowercase keys — no per-field describe.
+   */
+  private void putFieldCounts(
+    Schema.DescribeSObjectResult describeResult,
+    Map<String, Object> attributes
+  ) {
+    Set<String> fieldKeys = describeResult.fields.getMap().keySet();
+    Integer customFieldCount = 0;
+    for (String fieldKey : fieldKeys) {
+      if (fieldKey.endsWith('__c')) {
+        customFieldCount++;
+      }
     }
+    attributes.put('fieldCount', fieldKeys.size());
+    attributes.put('customFieldCount', customFieldCount);
+  }
 }

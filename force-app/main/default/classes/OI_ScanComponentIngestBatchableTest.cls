@@ -269,4 +269,90 @@ private class OI_ScanComponentIngestBatchableTest {
       [SELECT Status__c FROM OI_Scan_Run__c WHERE Id = :run.Id].Status__c
     );
   }
+
+  /**
+   * The orchestrator's large-type path hands over by recipe, not by value, so a type as
+   * large as a ~1,000-object org's CustomField set never serializes past the Batch Apex
+   * instance-state limit. start() must re-discover through the configured Scanner.
+   */
+  @isTest
+  static void testRecipeHandOverRediscoversTheTypeInStartAndCompletesTheTask() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new OI_FakeMetadataScanner(7, false)
+    );
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Running';
+    insert run;
+    OI_Scan_Task__c task = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'ApexClass',
+      Status__c = 'Running'
+    );
+    insert task;
+
+    Test.startTest();
+    Database.executeBatch(
+      new OI_ScanComponentIngestBatchable(
+        run.Id,
+        task.Id,
+        'ApexClass',
+        new List<String>()
+      ),
+      60
+    );
+    Test.stopTest();
+
+    OI_Scan_Task__c completedTask = [
+      SELECT Status__c, Records_Scanned__c, Error_Message__c
+      FROM OI_Scan_Task__c
+      WHERE Id = :task.Id
+    ];
+    System.assertEquals(
+      'Succeeded',
+      completedTask.Status__c,
+      'Error_Message__c: ' + completedTask.Error_Message__c
+    );
+    System.assertEquals(
+      7,
+      completedTask.Records_Scanned__c,
+      'Every re-discovered component must be ingested.'
+    );
+  }
+
+  @isTest
+  static void testRecipeHandOverFailsTheTaskInsteadOfStallingWhenRediscoveryThrows() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Running';
+    insert run;
+    OI_Scan_Task__c task = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'Definitely_Not_A_Configured_Type',
+      Status__c = 'Running'
+    );
+    insert task;
+
+    Test.startTest();
+    Database.executeBatch(
+      new OI_ScanComponentIngestBatchable(
+        run.Id,
+        task.Id,
+        'Definitely_Not_A_Configured_Type',
+        new List<String>()
+      ),
+      60
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      'Failed',
+      [SELECT Status__c FROM OI_Scan_Task__c WHERE Id = :task.Id].Status__c,
+      'A re-discovery failure must fail the task so the run can advance.'
+    );
+    System.assertNotEquals(
+      'Running',
+      [SELECT Status__c FROM OI_Scan_Run__c WHERE Id = :run.Id].Status__c,
+      'The run must never be left stuck at Running.'
+    );
+  }
 }

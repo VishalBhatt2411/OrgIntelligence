@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Object_Api_Name__c</fullName>
+    <label>Object Api Name</label>
+    <type>Text</type>
+    <length>255</length>
+    <required>true</required>
+    <description
+  >SObject API name, case-insensitive, e.g. Account or Invoice__c. Objects that do not exist in the org are ignored.</description>
+</CustomField>

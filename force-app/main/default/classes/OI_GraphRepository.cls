@@ -8,10 +8,10 @@
  *                    concurrency translation (§15) — the two correctness-critical behaviors
  *                    this layer exists to provide.
  * Dependencies: OI_IGraphStorageProvider (Custom Object + Big Object providers, injected).
- * Limitations: This sprint ships getCurrentVersions, getCurrentKeysByType, commitVersion,
- *              and touchLiveness at full strength — archiveSupersededVersions is a
- *              documented seam only (Roadmap Phase 5, GraphRepository.md §9); nothing in
- *              this sprint calls it. No business logic beyond what §2 specifies —
+ * Limitations: Archival (ADR-0031) is split into archiveSupersededVersions and
+ *              purgeArchivedVersions because Big Object insertImmediate and sObject DML
+ *              must run in separate transactions; OI_GraphArchivalBatch sequences the two.
+ *              No business logic beyond what §2 specifies —
  *              OI_GraphBuilder (not built this sprint per Sprint 7 scope) owns the
  *              three-way version decision this Repository's contract supports.
  */
@@ -113,13 +113,49 @@ public without sharing class OI_GraphRepository {
   }
 
   /**
-   * Moves non-current version rows past the retention window to the Big Object provider
-   * (GraphRepository.md §2, §9). Not exercised this sprint — the scheduled archival job
-   * (OI_GraphArchivalBatch) that calls this is Roadmap Phase 5 work.
+   * The archival scope for one flavor (GraphRepository.md §9, ADR-0031): non-current rows
+   * last modified at or before the cutoff. Reads the selectors directly, like the count
+   * methods below — a Batch Apex query locator is inherently a Custom Object concern.
    */
-  public Integer archiveSupersededVersions(Datetime cutoff) {
-    throw new OI_ServiceException(
-      'archiveSupersededVersions is called by the scheduled OI_GraphArchivalBatch job (Roadmap Phase 5) — not built this sprint.'
+  public Database.QueryLocator locateSupersededVersions(
+    Datetime cutoff,
+    Boolean isEdgeFlavor
+  ) {
+    return isEdgeFlavor == true
+      ? new OI_EdgeSelector().queryLocatorSupersededBefore(cutoff)
+      : new OI_NodeSelector().queryLocatorSupersededBefore(cutoff);
+  }
+
+  /**
+   * Copies the given superseded versions to the Big Object archive (GraphRepository.md §2,
+   * §9). Writes only — the live rows are removed later by purgeArchivedVersions in a
+   * separate transaction. Idempotent: the archive's index is the version key, so re-archiving
+   * a version overwrites it rather than duplicating it. Returns the number archived.
+   */
+  public Integer archiveSupersededVersions(
+    Set<String> versionKeys,
+    Boolean isEdgeFlavor
+  ) {
+    List<OI_VersionRecord> records = customObjectProvider.readSupersededByVersionKeys(
+      versionKeys,
+      isEdgeFlavor
+    );
+    for (OI_VersionRecord record : records) {
+      bigObjectProvider.writeVersion(record, true);
+    }
+    return records.size();
+  }
+
+  /** Removes already-archived superseded versions from the Custom Object provider. Returns the number removed. */
+  public Integer purgeArchivedVersions(
+    Set<String> versionKeys,
+    Boolean isEdgeFlavor
+  ) {
+    return customObjectProvider.moveToArchive(
+      customObjectProvider.readSupersededByVersionKeys(
+        versionKeys,
+        isEdgeFlavor
+      )
     );
   }
 

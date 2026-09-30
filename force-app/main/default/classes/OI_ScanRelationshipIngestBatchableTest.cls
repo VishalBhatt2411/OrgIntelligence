@@ -279,4 +279,148 @@ private class OI_ScanRelationshipIngestBatchableTest {
       [SELECT Status__c FROM OI_Scan_Run__c WHERE Id = :run.Id].Status__c
     );
   }
+
+  /** Emits two components linked by one relationship, so the relationship phase has real endpoints to join. */
+  private class LinkedPairScanner implements OI_IMetadataScanner {
+    public OI_DiscoveryBatch scan(OI_ScanContext context) {
+      String parentKey = OI_ComponentKeyUtil.build('FakeKind', null, 'Parent');
+      String childKey = OI_ComponentKeyUtil.build('FakeKind', null, 'Child');
+      return new OI_DiscoveryBatch(
+        context.scanTaskId,
+        'FakeKind',
+        new List<OI_DiscoveredComponent>{
+          new OI_DiscoveredComponent(
+            parentKey,
+            'FakeKind',
+            'Parent',
+            null,
+            'Fake',
+            new Map<String, Object>(),
+            'p',
+            null,
+            null
+          ),
+          new OI_DiscoveredComponent(
+            childKey,
+            'FakeKind',
+            'Child',
+            null,
+            'Fake',
+            new Map<String, Object>(),
+            'c',
+            null,
+            null
+          )
+        },
+        new List<OI_DiscoveredRelationship>{
+          new OI_DiscoveredRelationship(
+            'rk1',
+            'FAKE_RELATES_TO',
+            parentKey,
+            childKey,
+            new Map<String, Object>()
+          )
+        },
+        false,
+        0
+      );
+    }
+  }
+
+  /** The by-recipe hand-over must re-discover relationships in start() rather than receive them as serialized instance state. */
+  @isTest
+  static void testRecipeHandOverRediscoversRelationshipsInStartAndPersistsTheEdge() {
+    OI_ScanOrchestratorQueueable.testScannerOverrides.put(
+      'ApexClass',
+      new LinkedPairScanner()
+    );
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Running';
+    insert run;
+    OI_Scan_Task__c task = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'ApexClass',
+      Status__c = 'Running'
+    );
+    insert task;
+    Set<String> observedNodeKeys = new OI_MutationGenerator()
+      .translateAndIngest(
+        new LinkedPairScanner()
+          .scan(new OI_ScanContext(task.Id, 100, null, null))
+      );
+
+    Test.startTest();
+    Database.executeBatch(
+      new OI_ScanRelationshipIngestBatchable(
+        run.Id,
+        task.Id,
+        'ApexClass',
+        false,
+        observedNodeKeys,
+        new List<String>()
+      ),
+      60
+    );
+    Test.stopTest();
+
+    OI_Scan_Task__c completedTask = [
+      SELECT Status__c, Records_Scanned__c, Error_Message__c
+      FROM OI_Scan_Task__c
+      WHERE Id = :task.Id
+    ];
+    System.assertEquals(
+      'Succeeded',
+      completedTask.Status__c,
+      'Error_Message__c: ' + completedTask.Error_Message__c
+    );
+    System.assertEquals(
+      1,
+      [
+        SELECT COUNT()
+        FROM OI_Graph_Edge__c
+        WHERE
+          Edge_Type__c = 'SalesforceMetadata.FAKE_RELATES_TO'
+          AND Is_Current__c = TRUE
+      ],
+      'The re-discovered relationship must be ingested as a current edge.'
+    );
+  }
+
+  @isTest
+  static void testRecipeHandOverFailsTheTaskInsteadOfStallingWhenRelationshipRediscoveryThrows() {
+    OI_Scan_Run__c run = OI_TestDataFactory.newScanRun();
+    run.Status__c = 'Running';
+    insert run;
+    OI_Scan_Task__c task = new OI_Scan_Task__c(
+      Scan_Run__c = run.Id,
+      Metadata_Type__c = 'Definitely_Not_A_Configured_Type',
+      Status__c = 'Running'
+    );
+    insert task;
+
+    Test.startTest();
+    Database.executeBatch(
+      new OI_ScanRelationshipIngestBatchable(
+        run.Id,
+        task.Id,
+        'Definitely_Not_A_Configured_Type',
+        false,
+        new Set<String>(),
+        new List<String>()
+      ),
+      60
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      'Failed',
+      [SELECT Status__c FROM OI_Scan_Task__c WHERE Id = :task.Id].Status__c,
+      'A re-discovery failure must fail the task so the run can advance.'
+    );
+    System.assertNotEquals(
+      'Running',
+      [SELECT Status__c FROM OI_Scan_Run__c WHERE Id = :run.Id].Status__c,
+      'The run must never be left stuck at Running.'
+    );
+  }
 }

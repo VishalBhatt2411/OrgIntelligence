@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Scan_Customized_Standard_Objects__c</fullName>
+    <label>Scan Customized Standard Objects</label>
+    <type>Checkbox</type>
+    <defaultValue>true</defaultValue>
+    <description
+  >When checked, the metadata scan includes any standard object that carries at least one custom field from this org, in addition to custom objects and the OI_Scan_Object_Scope__mdt core list (ADR-0031).</description>
+</CustomField>

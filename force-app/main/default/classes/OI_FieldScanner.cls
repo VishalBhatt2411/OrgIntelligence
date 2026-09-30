@@ -1,8 +1,16 @@
 /**
- * Purpose: Discovers fields on every in-scope SObject as Discovery Model components
- *          (MetadataScanner.md §6) — componentKind "CustomField" — plus the HAS_FIELD
- *          structural relationship and any LOOKUP_TO/MASTER_DETAIL_TO relationships a
- *          reference field genuinely exposes (Sprint 8 objective §5/§6).
+ * Purpose: Discovers the relationship-bearing fields on every in-scope SObject as
+ *          Discovery Model components (MetadataScanner.md §6) — componentKind
+ *          "CustomField" — plus the HAS_FIELD structural relationship and the
+ *          LOOKUP_TO/MASTER_DETAIL_TO relationships each one genuinely exposes (Sprint 8
+ *          objective §5/§6).
+ * Persistence scope (ADR-0031): only a reference field (Lookup/Master-Detail) with at least
+ *          one in-scope target object is persisted, because those are the only fields that
+ *          carry graph structure. Every other field is served live from Describe by
+ *          OI_GraphController.getFieldSummaries, so it costs no data storage. A reference
+ *          field keeps its full referenceTo list in its attributes, but an edge is emitted
+ *          only to an in-scope target, so no edge ever dangles. Fields from another
+ *          namespace are skipped unless managed-package scanning is enabled.
  * Responsibilities: Implement OI_IMetadataScanner.scan() using Schema Describe, mirroring
  *                    OI_ObjectScanner's object-scope filter exactly (OI_ObjectScopeFilter)
  *                    so a field never exists for an object that has no corresponding
@@ -133,6 +141,19 @@ public class OI_FieldScanner implements OI_IMetadataScanner {
         );
         continue;
       }
+      if (
+        fieldDescribe.getType() != Schema.DisplayType.REFERENCE ||
+        !OI_ObjectScopeFilter.isFieldNamespaceInScope(fieldDescribe.getName())
+      ) {
+        continue;
+      }
+      List<Schema.SObjectType> referenceTo = fieldDescribe.getReferenceTo();
+      List<Schema.DescribeSObjectResult> inScopeTargets = inScopeTargetsOf(
+        referenceTo
+      );
+      if (inScopeTargets.isEmpty()) {
+        continue;
+      }
       String fullyQualifiedName = objectApiName + '.' + fieldDescribe.getName();
       String fieldNamespace = fieldDescribe.isCustom()
         ? OI_ComponentKeyUtil.extractNamespaceFromApiName(
@@ -145,7 +166,6 @@ public class OI_FieldScanner implements OI_IMetadataScanner {
         fullyQualifiedName
       );
 
-      List<Schema.SObjectType> referenceTo = fieldDescribe.getReferenceTo();
       Map<String, Object> attributes = new Map<String, Object>{
         'label' => fieldDescribe.getLabel(),
         'type' => String.valueOf(fieldDescribe.getType()),
@@ -160,19 +180,18 @@ public class OI_FieldScanner implements OI_IMetadataScanner {
         'createable' => fieldDescribe.isCreateable(),
         'updateable' => fieldDescribe.isUpdateable()
       };
-      if (!referenceTo.isEmpty()) {
-        List<String> referencedObjectNames = new List<String>();
-        for (Schema.SObjectType referencedType : referenceTo) {
-          referencedObjectNames.add(referencedType.getDescribe().getName());
-        }
-        attributes.put('referenceTo', referencedObjectNames);
-        attributes.put('relationshipName', fieldDescribe.getRelationshipName());
-        /** Same non-null-getRelationshipOrder() mechanism this scanner already uses to choose MASTER_DETAIL_TO vs LOOKUP_TO below — stored on the field's own attributes too, so a consumer (Intelligence Panel's Relationships section) can tell the two apart without a second query against the graph's edge rows. */
-        attributes.put(
-          'masterDetail',
-          fieldDescribe.getRelationshipOrder() != null
-        );
+      /** The full target list, including out-of-scope targets that get no edge — so the field's own detail still shows every object it can point at. */
+      List<String> referencedObjectNames = new List<String>();
+      for (Schema.SObjectType referencedType : referenceTo) {
+        referencedObjectNames.add(referencedType.getDescribe().getName());
       }
+      attributes.put('referenceTo', referencedObjectNames);
+      attributes.put('relationshipName', fieldDescribe.getRelationshipName());
+      /** Same non-null-getRelationshipOrder() mechanism this scanner already uses to choose MASTER_DETAIL_TO vs LOOKUP_TO below — stored on the field's own attributes too, so a consumer (Intelligence Panel's Relationships section) can tell the two apart without a second query against the graph's edge rows. */
+      attributes.put(
+        'masterDetail',
+        fieldDescribe.getRelationshipOrder() != null
+      );
 
       components.add(
         new OI_DiscoveredComponent(
@@ -208,28 +227,39 @@ public class OI_FieldScanner implements OI_IMetadataScanner {
         )
       );
 
-      if (fieldDescribe.getType() == Schema.DisplayType.REFERENCE) {
-        addReferenceRelationships(
-          fieldDescribe,
-          fieldComponentKey,
-          referenceTo,
-          relationships
-        );
+      addReferenceRelationships(
+        fieldDescribe,
+        fieldComponentKey,
+        inScopeTargets,
+        relationships
+      );
+    }
+  }
+
+  /** The subset of a reference field's targets the shared scope policy persists — edges go only to objects that will have a node. */
+  private List<Schema.DescribeSObjectResult> inScopeTargetsOf(
+    List<Schema.SObjectType> referenceTo
+  ) {
+    List<Schema.DescribeSObjectResult> inScope = new List<Schema.DescribeSObjectResult>();
+    for (Schema.SObjectType referencedType : referenceTo) {
+      Schema.DescribeSObjectResult referencedDescribe = referencedType.getDescribe();
+      if (OI_ObjectScopeFilter.isInScope(referencedDescribe)) {
+        inScope.add(referencedDescribe);
       }
     }
+    return inScope;
   }
 
   private void addReferenceRelationships(
     Schema.DescribeFieldResult fieldDescribe,
     String fieldComponentKey,
-    List<Schema.SObjectType> referenceTo,
+    List<Schema.DescribeSObjectResult> inScopeTargets,
     List<OI_DiscoveredRelationship> relationships
   ) {
     String relationshipKind = fieldDescribe.getRelationshipOrder() != null
       ? 'MASTER_DETAIL_TO'
       : 'LOOKUP_TO';
-    for (Schema.SObjectType referencedType : referenceTo) {
-      Schema.DescribeSObjectResult referencedDescribe = referencedType.getDescribe();
+    for (Schema.DescribeSObjectResult referencedDescribe : inScopeTargets) {
       String referencedApiName = referencedDescribe.getName();
       String referencedNamespace = referencedDescribe.isCustom()
         ? OI_ComponentKeyUtil.extractNamespaceFromApiName(referencedApiName)

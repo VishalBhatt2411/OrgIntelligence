@@ -12,17 +12,22 @@
  * Limitations: translateAndIngest's observed-nodeKey bookkeeping only derives keys from
  *              components (MetadataScanner.md §15) — a relationships-only ingest never
  *              contributes new keys, so observedNodeKeys is carried through unchanged
- *              rather than re-accumulated here.
+ *              rather than re-accumulated here. Supports the same by-value / by-recipe
+ *              hand-over modes as OI_ScanComponentIngestBatchable (see there): by recipe,
+ *              start() re-discovers the type and keeps only the relationship count.
  */
-public without sharing class OI_ScanRelationshipIngestBatchable implements Database.Batchable<OI_DiscoveredRelationship>, Database.Stateful {
+public without sharing class OI_ScanRelationshipIngestBatchable implements Database.Batchable<OI_DiscoveredRelationship>, Database.Stateful, Database.AllowsCallouts {
   /** Mirrors OI_ScanComponentIngestBatchable.PROGRESS_REPORT_INTERVAL — see that class for the rationale. */
   private static final Integer PROGRESS_REPORT_INTERVAL = 5;
 
   private final Id scanRunId;
   private final Id scanTaskId;
   private final String metadataTypeApiName;
+  /** Null in by-recipe mode — re-discovered in start() and never held as instance state. */
   private final List<OI_DiscoveredRelationship> relationships;
+  private final Boolean rediscover;
   private final Boolean isFullSnapshot;
+  private Integer totalRelationships = 0;
   private final Set<String> observedNodeKeys;
   private final List<String> remainingMetadataTypes;
 
@@ -46,6 +51,27 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
     this.scanTaskId = scanTaskId;
     this.metadataTypeApiName = metadataTypeApiName;
     this.relationships = relationships;
+    this.rediscover = false;
+    this.isFullSnapshot = isFullSnapshot;
+    this.observedNodeKeys = observedNodeKeys;
+    this.remainingMetadataTypes = remainingMetadataTypes;
+    this.totalRelationships = relationships.size();
+  }
+
+  /** By-recipe hand-over: start() re-runs the type's Scanner, so no payload is serialized with this instance. */
+  public OI_ScanRelationshipIngestBatchable(
+    Id scanRunId,
+    Id scanTaskId,
+    String metadataTypeApiName,
+    Boolean isFullSnapshot,
+    Set<String> observedNodeKeys,
+    List<String> remainingMetadataTypes
+  ) {
+    this.scanRunId = scanRunId;
+    this.scanTaskId = scanTaskId;
+    this.metadataTypeApiName = metadataTypeApiName;
+    this.relationships = null;
+    this.rediscover = true;
     this.isFullSnapshot = isFullSnapshot;
     this.observedNodeKeys = observedNodeKeys;
     this.remainingMetadataTypes = remainingMetadataTypes;
@@ -54,7 +80,23 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
   public Iterable<OI_DiscoveredRelationship> start(
     Database.BatchableContext bc
   ) {
-    return relationships;
+    if (!rediscover) {
+      return relationships;
+    }
+    try {
+      List<OI_DiscoveredRelationship> discovered = OI_ScanOrchestratorQueueable.discover(
+          scanTaskId,
+          metadataTypeApiName
+        )
+        .relationships;
+      totalRelationships = discovered.size();
+      return discovered;
+    } catch (Exception e) {
+      // Surfaced in finish() via failTaskAndAdvance, so the run never stalls at Running.
+      hadFailure = true;
+      failure = e;
+      return new List<OI_DiscoveredRelationship>();
+    }
   }
 
   public void execute(
@@ -87,7 +129,7 @@ public without sharing class OI_ScanRelationshipIngestBatchable implements Datab
           scanRunId,
           metadataTypeApiName,
           relationshipsProcessed,
-          relationships.size()
+          totalRelationships
         );
       }
     } catch (Exception e) {

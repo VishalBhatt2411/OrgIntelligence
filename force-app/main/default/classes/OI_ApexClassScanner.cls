@@ -38,167 +38,233 @@
  *              not built, this sprint).
  */
 public inherited sharing class OI_ApexClassScanner implements OI_IMetadataScanner {
-    private static final String COMPONENT_KIND = 'ApexClass';
-    private static final String REFERENCES_RELATIONSHIP_KIND = 'REFERENCES';
-    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile('[A-Za-z_][A-Za-z0-9_]*');
-    /**
-     * Non-code regions stripped before identifier tokenizing, in one alternation so a single
-     * pass consumes whichever construct opens FIRST — the ordering property that makes this
-     * correct rather than merely approximate (see stripNonCodeRegions).
-     *   /\*...*\/   block comment, DOTALL so it spans lines
-     *   //...       line comment, to end of line
-     *   '...'       Apex string literal, honoring \' escapes
-     * Apex has no character literal, no raw/multiline string, and no regex literal, so these
-     * three cases are exhaustive for this language — a claim worth stating explicitly, since it
-     * is exactly what makes a regex approach sufficient here where it would not be in, say,
-     * JavaScript.
-     */
-    private static final Pattern NON_CODE_REGION_PATTERN = Pattern.compile('(?s)/\\*.*?\\*/|//[^\\n]*|\'(?:\\\\.|[^\'\\\\])*\'');
+  private static final String COMPONENT_KIND = 'ApexClass';
+  private static final String REFERENCES_RELATIONSHIP_KIND = 'REFERENCES';
+  private static final Pattern IDENTIFIER_PATTERN = Pattern.compile(
+    '[A-Za-z_][A-Za-z0-9_]*'
+  );
+  /**
+   * Non-code regions stripped before identifier tokenizing, in one alternation so a single
+   * pass consumes whichever construct opens FIRST — the ordering property that makes this
+   * correct rather than merely approximate (see stripNonCodeRegions).
+   *   /\*...*\/   block comment, DOTALL so it spans lines
+   *   //...       line comment, to end of line
+   *   '...'       Apex string literal, honoring \' escapes
+   * Apex has no character literal, no raw/multiline string, and no regex literal, so these
+   * three cases are exhaustive for this language — a claim worth stating explicitly, since it
+   * is exactly what makes a regex approach sufficient here where it would not be in, say,
+   * JavaScript.
+   */
+  private static final Pattern NON_CODE_REGION_PATTERN = Pattern.compile(
+    '(?s)/\\*.*?\\*/|//[^\\n]*|\'(?:\\\\.|[^\'\\\\])*\''
+  );
 
-    public OI_DiscoveryBatch scan(OI_ScanContext context) {
-        Boolean bodyAccessible = true;
-        List<ApexClass> apexClasses;
-        try {
-            apexClasses = [
-                SELECT Name, NamespacePrefix, ApiVersion, Status, IsValid, LengthWithoutComments, BodyCrc, Body
-                FROM ApexClass
-            ];
-        } catch (System.QueryException noAuthorApexAccess) {
-            bodyAccessible = false;
-            apexClasses = [SELECT Name, NamespacePrefix, ApiVersion, Status, IsValid, LengthWithoutComments, BodyCrc FROM ApexClass];
-        }
+  public OI_DiscoveryBatch scan(OI_ScanContext context) {
+    Boolean bodyAccessible = true;
+    List<ApexClass> apexClasses;
+    try {
+      apexClasses = [
+        SELECT
+          Name,
+          NamespacePrefix,
+          ApiVersion,
+          Status,
+          IsValid,
+          LengthWithoutComments,
+          BodyCrc,
+          Body
+        FROM ApexClass
+      ];
+    } catch (System.QueryException noAuthorApexAccess) {
+      bodyAccessible = false;
+      apexClasses = [
+        SELECT
+          Name,
+          NamespacePrefix,
+          ApiVersion,
+          Status,
+          IsValid,
+          LengthWithoutComments,
+          BodyCrc
+        FROM ApexClass
+      ];
+    }
+    apexClasses = filterInScope(apexClasses);
 
-        List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
-        Map<String, String> componentKeyByClassName = new Map<String, String>();
-        for (ApexClass apexClass : apexClasses) {
-            OI_DiscoveredComponent component = toComponent(apexClass);
-            components.add(component);
-            componentKeyByClassName.put(apexClass.Name, component.componentKey);
-        }
-
-        List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
-        if (bodyAccessible) {
-            for (ApexClass apexClass : apexClasses) {
-                relationships.addAll(extractReferences(apexClass, componentKeyByClassName));
-            }
-        }
-
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1, buildCoverage(bodyAccessible, relationships.size()));
+    List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
+    Map<String, String> componentKeyByClassName = new Map<String, String>();
+    for (ApexClass apexClass : apexClasses) {
+      OI_DiscoveredComponent component = toComponent(apexClass);
+      components.add(component);
+      componentKeyByClassName.put(apexClass.Name, component.componentKey);
     }
 
-    /**
-     * DEGRADED when Body was unreadable — the one case where this Scanner should have produced
-     * references and could not, and the exact silent failure that let a real org report 122
-     * scanned classes with zero dependency edges and no warning anywhere (see OI_ScanCoverage).
-     * Otherwise PARTIAL, never COMPLETE: even with full Body access this remains a bare-
-     * identifier heuristic that cannot see dynamic Apex or interface indirection, so claiming
-     * COMPLETE would overstate what the data supports.
-     */
-    private OI_ScanCoverage buildCoverage(Boolean bodyAccessible, Integer relationshipsDiscovered) {
-        if (bodyAccessible != true) {
-            return OI_ScanCoverage.degraded(
-                relationshipsDiscovered,
-                'Apex source (ApexClass.Body) was not readable by the scanning user, so no class-to-class references could be extracted. ' +
-                'Grant the "Author Apex" system permission to the user running scans, then rescan.'
-            );
-        }
-        return OI_ScanCoverage.partial(
-            relationshipsDiscovered,
-            'Class-to-class references are matched by name against Apex source. Dynamic Apex (Type.forName), ' +
-            'interface indirection, and namespaced names that collide with local class names are not detected.'
+    List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
+    if (bodyAccessible) {
+      for (ApexClass apexClass : apexClasses) {
+        relationships.addAll(
+          extractReferences(apexClass, componentKeyByClassName)
         );
+      }
     }
 
-    /**
-     * One REFERENCES relationship per distinct other known class named as a bare identifier
-     * in this class's Body — deduplicated per source class (a class referenced ten times
-     * still produces exactly one edge), self-references excluded (not a meaningful
-     * dependency), and never emitted when knownClassNames has nothing to check the token
-     * against besides the class's own name.
-     */
-    private List<OI_DiscoveredRelationship> extractReferences(ApexClass apexClass, Map<String, String> componentKeyByClassName) {
-        List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
-        if (String.isBlank(apexClass.Body)) {
-            return found;
-        }
-        String fromComponentKey = componentKeyByClassName.get(apexClass.Name);
-        Set<String> referencedClassNames = new Set<String>();
-        Matcher tokenMatcher = IDENTIFIER_PATTERN.matcher(stripNonCodeRegions(apexClass.Body));
-        while (tokenMatcher.find()) {
-            String token = tokenMatcher.group();
-            if (token != apexClass.Name && componentKeyByClassName.containsKey(token)) {
-                referencedClassNames.add(token);
-            }
-        }
-        for (String referencedClassName : referencedClassNames) {
-            String toComponentKey = componentKeyByClassName.get(referencedClassName);
-            found.add(
-                new OI_DiscoveredRelationship(
-                    fromComponentKey + '::' + REFERENCES_RELATIONSHIP_KIND + '::' + toComponentKey,
-                    REFERENCES_RELATIONSHIP_KIND,
-                    fromComponentKey,
-                    toComponentKey,
-                    new Map<String, Object>()
-                )
-            );
-        }
-        return found;
-    }
+    return new OI_DiscoveryBatch(
+      context.scanTaskId,
+      COMPONENT_KIND,
+      components,
+      relationships,
+      true,
+      1,
+      buildCoverage(bodyAccessible, relationships.size())
+    );
+  }
 
-    /**
-     * Blanks out comments and string literals before identifier tokenizing, so a class name
-     * that appears only in prose or in a message string cannot masquerade as a dependency.
-     *
-     * Why this matters more than it might look: this codebase's own convention is heavy
-     * doc-comment headers that name collaborating classes explicitly ("Dependencies:
-     * OI_ComponentKeyUtil, OI_ChecksumUtil"), and error messages that embed a class name for
-     * diagnostics. Tokenizing the raw Body therefore manufactured edges from documentation —
-     * meaning the more carefully a class was documented, the more phantom dependencies it
-     * appeared to have. Impact Analysis then reported components that genuinely could not break.
-     *
-     * The single-alternation pass is what keeps this correct at the boundaries, and both
-     * directions matter: a `//` sequence inside a string literal ("http://x") must NOT start a
-     * comment, and an apostrophe inside a comment ("don't") must NOT open a string literal.
-     * A regex that removed comments first and strings second (or vice versa) gets one of those
-     * two cases wrong; matching whichever construct opens first gets both right, because the
-     * alternation always consumes the opener nearest the current scan position.
-     *
-     * Replaces each region with a single space rather than deleting it, so two identifiers
-     * separated only by a comment (`foo/*x*\/bar`) cannot be fused into one spurious token.
-     *
-     * Remaining limitation, unchanged: this addresses false positives from non-code regions
-     * only. The other documented heuristic weaknesses — dynamic Apex, interface indirection,
-     * and namespaced-name collisions — are properties of matching bare identifiers at all, and
-     * still require a real Tooling API dependency integration to fix.
-     */
-    @TestVisible
-    private static String stripNonCodeRegions(String body) {
-        if (String.isBlank(body)) {
-            return body;
-        }
-        return NON_CODE_REGION_PATTERN.matcher(body).replaceAll(' ');
+  /** Drops managed-package classes unless the scope policy includes them (ADR-0031 §1). */
+  private List<ApexClass> filterInScope(List<ApexClass> apexClasses) {
+    List<ApexClass> inScope = new List<ApexClass>();
+    for (ApexClass apexClass : apexClasses) {
+      if (OI_ObjectScopeFilter.isNamespaceInScope(apexClass.NamespacePrefix)) {
+        inScope.add(apexClass);
+      }
     }
+    return inScope;
+  }
 
-    private OI_DiscoveredComponent toComponent(ApexClass apexClass) {
-        String namespace = String.isBlank(apexClass.NamespacePrefix) ? null : apexClass.NamespacePrefix;
-        String fullyQualifiedName = String.isBlank(namespace) ? apexClass.Name : namespace + '.' + apexClass.Name;
-        Map<String, Object> attributes = new Map<String, Object>{
-            'apiVersion' => apexClass.ApiVersion,
-            'status' => apexClass.Status,
-            'isValid' => apexClass.IsValid,
-            'lengthWithoutComments' => apexClass.LengthWithoutComments,
-            'bodyCrc' => apexClass.BodyCrc
-        };
-        return new OI_DiscoveredComponent(
-            OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
-            COMPONENT_KIND,
-            fullyQualifiedName,
-            namespace,
-            'SOQL',
-            attributes,
-            OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, fullyQualifiedName, attributes),
-            null,
-            null
-        );
+  /**
+   * DEGRADED when Body was unreadable — the one case where this Scanner should have produced
+   * references and could not, and the exact silent failure that let a real org report 122
+   * scanned classes with zero dependency edges and no warning anywhere (see OI_ScanCoverage).
+   * Otherwise PARTIAL, never COMPLETE: even with full Body access this remains a bare-
+   * identifier heuristic that cannot see dynamic Apex or interface indirection, so claiming
+   * COMPLETE would overstate what the data supports.
+   */
+  private OI_ScanCoverage buildCoverage(
+    Boolean bodyAccessible,
+    Integer relationshipsDiscovered
+  ) {
+    if (bodyAccessible != true) {
+      return OI_ScanCoverage.degraded(
+        relationshipsDiscovered,
+        'Apex source (ApexClass.Body) was not readable by the scanning user, so no class-to-class references could be extracted. ' +
+        'Grant the "Author Apex" system permission to the user running scans, then rescan.'
+      );
     }
+    return OI_ScanCoverage.partial(
+      relationshipsDiscovered,
+      'Class-to-class references are matched by name against Apex source. Dynamic Apex (Type.forName), ' +
+      'interface indirection, and namespaced names that collide with local class names are not detected.'
+    );
+  }
+
+  /**
+   * One REFERENCES relationship per distinct other known class named as a bare identifier
+   * in this class's Body — deduplicated per source class (a class referenced ten times
+   * still produces exactly one edge), self-references excluded (not a meaningful
+   * dependency), and never emitted when knownClassNames has nothing to check the token
+   * against besides the class's own name.
+   */
+  private List<OI_DiscoveredRelationship> extractReferences(
+    ApexClass apexClass,
+    Map<String, String> componentKeyByClassName
+  ) {
+    List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
+    if (String.isBlank(apexClass.Body)) {
+      return found;
+    }
+    String fromComponentKey = componentKeyByClassName.get(apexClass.Name);
+    Set<String> referencedClassNames = new Set<String>();
+    Matcher tokenMatcher = IDENTIFIER_PATTERN.matcher(
+      stripNonCodeRegions(apexClass.Body)
+    );
+    while (tokenMatcher.find()) {
+      String token = tokenMatcher.group();
+      if (
+        token != apexClass.Name && componentKeyByClassName.containsKey(token)
+      ) {
+        referencedClassNames.add(token);
+      }
+    }
+    for (String referencedClassName : referencedClassNames) {
+      String toComponentKey = componentKeyByClassName.get(referencedClassName);
+      found.add(
+        new OI_DiscoveredRelationship(
+          fromComponentKey +
+            '::' +
+            REFERENCES_RELATIONSHIP_KIND +
+            '::' +
+            toComponentKey,
+          REFERENCES_RELATIONSHIP_KIND,
+          fromComponentKey,
+          toComponentKey,
+          new Map<String, Object>()
+        )
+      );
+    }
+    return found;
+  }
+
+  /**
+   * Blanks out comments and string literals before identifier tokenizing, so a class name
+   * that appears only in prose or in a message string cannot masquerade as a dependency.
+   *
+   * Why this matters more than it might look: this codebase's own convention is heavy
+   * doc-comment headers that name collaborating classes explicitly ("Dependencies:
+   * OI_ComponentKeyUtil, OI_ChecksumUtil"), and error messages that embed a class name for
+   * diagnostics. Tokenizing the raw Body therefore manufactured edges from documentation —
+   * meaning the more carefully a class was documented, the more phantom dependencies it
+   * appeared to have. Impact Analysis then reported components that genuinely could not break.
+   *
+   * The single-alternation pass is what keeps this correct at the boundaries, and both
+   * directions matter: a `//` sequence inside a string literal ("http://x") must NOT start a
+   * comment, and an apostrophe inside a comment ("don't") must NOT open a string literal.
+   * A regex that removed comments first and strings second (or vice versa) gets one of those
+   * two cases wrong; matching whichever construct opens first gets both right, because the
+   * alternation always consumes the opener nearest the current scan position.
+   *
+   * Replaces each region with a single space rather than deleting it, so two identifiers
+   * separated only by a comment (`foo/*x*\/bar`) cannot be fused into one spurious token.
+   *
+   * Remaining limitation, unchanged: this addresses false positives from non-code regions
+   * only. The other documented heuristic weaknesses — dynamic Apex, interface indirection,
+   * and namespaced-name collisions — are properties of matching bare identifiers at all, and
+   * still require a real Tooling API dependency integration to fix.
+   */
+  @TestVisible
+  private static String stripNonCodeRegions(String body) {
+    if (String.isBlank(body)) {
+      return body;
+    }
+    return NON_CODE_REGION_PATTERN.matcher(body).replaceAll(' ');
+  }
+
+  private OI_DiscoveredComponent toComponent(ApexClass apexClass) {
+    String namespace = String.isBlank(apexClass.NamespacePrefix)
+      ? null
+      : apexClass.NamespacePrefix;
+    String fullyQualifiedName = String.isBlank(namespace)
+      ? apexClass.Name
+      : namespace + '.' + apexClass.Name;
+    Map<String, Object> attributes = new Map<String, Object>{
+      'apiVersion' => apexClass.ApiVersion,
+      'status' => apexClass.Status,
+      'isValid' => apexClass.IsValid,
+      'lengthWithoutComments' => apexClass.LengthWithoutComments,
+      'bodyCrc' => apexClass.BodyCrc
+    };
+    return new OI_DiscoveredComponent(
+      OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
+      COMPONENT_KIND,
+      fullyQualifiedName,
+      namespace,
+      'SOQL',
+      attributes,
+      OI_ChecksumUtil.computeChecksum(
+        COMPONENT_KIND,
+        fullyQualifiedName,
+        attributes
+      ),
+      null,
+      null
+    );
+  }
 }

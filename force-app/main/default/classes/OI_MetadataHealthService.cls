@@ -198,7 +198,7 @@ public with sharing class OI_MetadataHealthService {
     );
 
     Map<String, Integer> customFieldCountByObjectKey = countCustomFieldsByObjectKey(
-      objectKeys
+      objects
     );
     Map<String, Integer> degreeByKey = graphEngine.countCurrentEdgesByTargetKeysGroupedByKey(
       objectKeys,
@@ -216,19 +216,34 @@ public with sharing class OI_MetadataHealthService {
   }
 
   /**
-   * Counts only fields whose API name ends in "__c" per owning object — a hard platform
-   * invariant for every custom field regardless of which object it lives on (unlike an
-   * OBJECT's own "__c" suffix, which is ambiguous between this org's own custom object and a
-   * managed package's, a field's is not: Salesforce enforces it, no exceptions), so this needs
-   * no EntityDefinition round trip. Reads Field nodes directly by Parent_Key__c rather than a
-   * two-hop edge-then-node join (see OI_NodeSelector.selectCurrentFieldNodesByParentKeys doc).
+   * Custom field count per object. Since ADR-0031 the scan persists only relationship fields,
+   * so the count comes from the object node's own scan-time customFieldCount attribute
+   * (counted from live Describe by OI_ObjectScanner). An object scanned before that attribute
+   * existed falls back to counting its persisted field nodes whose API name ends in "__c" — a
+   * hard platform invariant for every custom field on any object, read directly by
+   * Parent_Key__c (see OI_NodeSelector.selectCurrentFieldNodesByParentKeys doc).
    */
   private Map<String, Integer> countCustomFieldsByObjectKey(
-    Set<String> objectKeys
+    List<OI_Graph_Node__c> objects
   ) {
     Map<String, Integer> counts = new Map<String, Integer>();
+    Set<String> keysWithoutAttribute = new Set<String>();
+    for (OI_Graph_Node__c obj : objects) {
+      Integer scannedCount = OI_JsonUtil.readInteger(
+        obj.Attributes_Json__c,
+        'customFieldCount'
+      );
+      if (scannedCount == null) {
+        keysWithoutAttribute.add(obj.Node_Key__c);
+      } else {
+        counts.put(obj.Node_Key__c, scannedCount);
+      }
+    }
+    if (keysWithoutAttribute.isEmpty()) {
+      return counts;
+    }
     List<OI_Graph_Node__c> fieldNodes = graphEngine.selectCurrentFieldNodesByParentKeys(
-      objectKeys,
+      keysWithoutAttribute,
       FIELD_TYPE_KEY,
       FIELD_ROW_CEILING
     );

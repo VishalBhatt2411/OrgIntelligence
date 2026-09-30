@@ -51,218 +51,337 @@
  *              same documented state as OI_ApexClassScanner.
  */
 public inherited sharing class OI_ApexTriggerScanner implements OI_IMetadataScanner {
-    private static final String COMPONENT_KIND = 'ApexTrigger';
-    private static final String OBJECT_COMPONENT_KIND = 'CustomObject';
-    private static final String APEX_CLASS_COMPONENT_KIND = 'ApexClass';
-    private static final String EXECUTES_ON_RELATIONSHIP_KIND = 'EXECUTES_ON';
-    private static final String REFERENCES_RELATIONSHIP_KIND = 'REFERENCES';
-    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile('[A-Za-z_][A-Za-z0-9_]*');
-    /** Matches the mandatory `trigger <Name> on <Object>` header. CASE_INSENSITIVE because Apex keywords are; \s+ rather than a single space since the declaration may wrap across lines. */
-    private static final Pattern TRIGGER_DECLARATION_PATTERN = Pattern.compile('(?i)\\btrigger\\s+[A-Za-z0-9_]+\\s+on\\s+([A-Za-z0-9_]+)');
+  private static final String COMPONENT_KIND = 'ApexTrigger';
+  private static final String OBJECT_COMPONENT_KIND = 'CustomObject';
+  private static final String APEX_CLASS_COMPONENT_KIND = 'ApexClass';
+  private static final String EXECUTES_ON_RELATIONSHIP_KIND = 'EXECUTES_ON';
+  private static final String REFERENCES_RELATIONSHIP_KIND = 'REFERENCES';
+  private static final Pattern IDENTIFIER_PATTERN = Pattern.compile(
+    '[A-Za-z_][A-Za-z0-9_]*'
+  );
+  /** Matches the mandatory `trigger <Name> on <Object>` header. CASE_INSENSITIVE because Apex keywords are; \s+ rather than a single space since the declaration may wrap across lines. */
+  private static final Pattern TRIGGER_DECLARATION_PATTERN = Pattern.compile(
+    '(?i)\\btrigger\\s+[A-Za-z0-9_]+\\s+on\\s+([A-Za-z0-9_]+)'
+  );
 
-    public OI_DiscoveryBatch scan(OI_ScanContext context) {
-        Boolean bodyAccessible = true;
-        List<ApexTrigger> triggers;
-        try {
-            triggers = [
-                SELECT Name, NamespacePrefix, ApiVersion, Status, IsValid, TableEnumOrId, LengthWithoutComments, BodyCrc, Body,
-                    UsageBeforeInsert, UsageAfterInsert, UsageBeforeUpdate, UsageAfterUpdate, UsageBeforeDelete, UsageAfterDelete, UsageAfterUndelete
-                FROM ApexTrigger
-            ];
-        } catch (System.QueryException noAuthorApexAccess) {
-            bodyAccessible = false;
-            triggers = [
-                SELECT Name, NamespacePrefix, ApiVersion, Status, IsValid, TableEnumOrId, LengthWithoutComments, BodyCrc,
-                    UsageBeforeInsert, UsageAfterInsert, UsageBeforeUpdate, UsageAfterUpdate, UsageBeforeDelete, UsageAfterDelete, UsageAfterUndelete
-                FROM ApexTrigger
-            ];
-        }
+  public OI_DiscoveryBatch scan(OI_ScanContext context) {
+    Boolean bodyAccessible = true;
+    List<ApexTrigger> triggers;
+    try {
+      triggers = [
+        SELECT
+          Name,
+          NamespacePrefix,
+          ApiVersion,
+          Status,
+          IsValid,
+          TableEnumOrId,
+          LengthWithoutComments,
+          BodyCrc,
+          Body,
+          UsageBeforeInsert,
+          UsageAfterInsert,
+          UsageBeforeUpdate,
+          UsageAfterUpdate,
+          UsageBeforeDelete,
+          UsageAfterDelete,
+          UsageAfterUndelete
+        FROM ApexTrigger
+      ];
+    } catch (System.QueryException noAuthorApexAccess) {
+      bodyAccessible = false;
+      triggers = [
+        SELECT
+          Name,
+          NamespacePrefix,
+          ApiVersion,
+          Status,
+          IsValid,
+          TableEnumOrId,
+          LengthWithoutComments,
+          BodyCrc,
+          UsageBeforeInsert,
+          UsageAfterInsert,
+          UsageBeforeUpdate,
+          UsageAfterUpdate,
+          UsageBeforeDelete,
+          UsageAfterDelete,
+          UsageAfterUndelete
+        FROM ApexTrigger
+      ];
+    }
+    triggers = filterInScope(triggers);
 
-        List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
-        Map<String, String> componentKeyByTriggerName = new Map<String, String>();
-        for (ApexTrigger apexTrigger : triggers) {
-            OI_DiscoveredComponent component = toComponent(apexTrigger);
-            components.add(component);
-            componentKeyByTriggerName.put(apexTrigger.Name, component.componentKey);
-        }
-
-        Map<String, String> componentKeyByClassName = buildApexClassComponentKeys();
-
-        List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
-        for (ApexTrigger apexTrigger : triggers) {
-            String fromComponentKey = componentKeyByTriggerName.get(apexTrigger.Name);
-            OI_DiscoveredRelationship executesOn = buildExecutesOnRelationship(apexTrigger, fromComponentKey);
-            if (executesOn != null) {
-                relationships.add(executesOn);
-            }
-            if (bodyAccessible) {
-                relationships.addAll(extractClassReferences(apexTrigger, fromComponentKey, componentKeyByClassName));
-            }
-        }
-
-        return new OI_DiscoveryBatch(context.scanTaskId, COMPONENT_KIND, components, relationships, true, 1, buildCoverage(bodyAccessible, relationships.size()));
+    List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
+    Map<String, String> componentKeyByTriggerName = new Map<String, String>();
+    for (ApexTrigger apexTrigger : triggers) {
+      OI_DiscoveredComponent component = toComponent(apexTrigger);
+      components.add(component);
+      componentKeyByTriggerName.put(apexTrigger.Name, component.componentKey);
     }
 
-    /**
-     * DEGRADED only when trigger source was unreadable, which costs the class-reference half of
-     * this Scanner's output. The EXECUTES_ON half never degrades — it comes from declared
-     * configuration, not source parsing — so a body failure is a genuine partial loss rather
-     * than a total one, and the reason says so.
-     */
-    private OI_ScanCoverage buildCoverage(Boolean bodyAccessible, Integer relationshipsDiscovered) {
-        if (bodyAccessible != true) {
-            return OI_ScanCoverage.degraded(
-                relationshipsDiscovered,
-                'Trigger source (ApexTrigger.Body) was not readable by the scanning user, so trigger-to-class references ' +
-                'could not be extracted. The object each trigger fires on is still detected exactly. ' +
-                'Grant the "Author Apex" system permission to the user running scans, then rescan.'
-            );
-        }
-        return OI_ScanCoverage.partial(
-            relationshipsDiscovered,
-            'The object each trigger fires on is detected exactly. Trigger-to-class references are matched by name ' +
-            'against trigger source and will not detect dynamic Apex or interface indirection. Triggers on Platform Events ' +
-            'and other object types this platform does not model produce no object relationship, by design.'
-        );
-    }
+    Map<String, String> componentKeyByClassName = buildApexClassComponentKeys();
 
-    /**
-     * The exact, declared trigger -> object dependency (see this class's own doc comment on
-     * why this edge is categorically more trustworthy than a REFERENCES edge). Returns null —
-     * no edge — when the object cannot be resolved to a real object in this org by either
-     * path, rather than emitting a guess.
-     */
-    @TestVisible
-    private OI_DiscoveredRelationship buildExecutesOnRelationship(ApexTrigger apexTrigger, String fromComponentKey) {
-        String objectApiName = resolveObjectApiName(apexTrigger);
-        if (String.isBlank(objectApiName) || String.isBlank(fromComponentKey)) {
-            return null;
-        }
-        String objectNamespace = OI_ComponentKeyUtil.extractNamespaceFromApiName(objectApiName);
-        String toComponentKey = OI_ComponentKeyUtil.build(OBJECT_COMPONENT_KIND, objectNamespace, objectApiName);
-        return new OI_DiscoveredRelationship(
-            fromComponentKey + '::' + EXECUTES_ON_RELATIONSHIP_KIND + '::' + toComponentKey,
-            EXECUTES_ON_RELATIONSHIP_KIND,
+    List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
+    for (ApexTrigger apexTrigger : triggers) {
+      String fromComponentKey = componentKeyByTriggerName.get(apexTrigger.Name);
+      OI_DiscoveredRelationship executesOn = buildExecutesOnRelationship(
+        apexTrigger,
+        fromComponentKey
+      );
+      if (executesOn != null) {
+        relationships.add(executesOn);
+      }
+      if (bodyAccessible) {
+        relationships.addAll(
+          extractClassReferences(
+            apexTrigger,
             fromComponentKey,
+            componentKeyByClassName
+          )
+        );
+      }
+    }
+
+    return new OI_DiscoveryBatch(
+      context.scanTaskId,
+      COMPONENT_KIND,
+      components,
+      relationships,
+      true,
+      1,
+      buildCoverage(bodyAccessible, relationships.size())
+    );
+  }
+
+  /**
+   * DEGRADED only when trigger source was unreadable, which costs the class-reference half of
+   * this Scanner's output. The EXECUTES_ON half never degrades — it comes from declared
+   * configuration, not source parsing — so a body failure is a genuine partial loss rather
+   * than a total one, and the reason says so.
+   */
+  private OI_ScanCoverage buildCoverage(
+    Boolean bodyAccessible,
+    Integer relationshipsDiscovered
+  ) {
+    if (bodyAccessible != true) {
+      return OI_ScanCoverage.degraded(
+        relationshipsDiscovered,
+        'Trigger source (ApexTrigger.Body) was not readable by the scanning user, so trigger-to-class references ' +
+          'could not be extracted. The object each trigger fires on is still detected exactly. ' +
+          'Grant the "Author Apex" system permission to the user running scans, then rescan.'
+      );
+    }
+    return OI_ScanCoverage.partial(
+      relationshipsDiscovered,
+      'The object each trigger fires on is detected exactly. Trigger-to-class references are matched by name ' +
+        'against trigger source and will not detect dynamic Apex or interface indirection. Triggers on Platform Events ' +
+        'and other object types this platform does not model produce no object relationship, by design.'
+    );
+  }
+
+  /**
+   * The exact, declared trigger -> object dependency (see this class's own doc comment on
+   * why this edge is categorically more trustworthy than a REFERENCES edge). Returns null —
+   * no edge — when the object cannot be resolved to a real object in this org by either
+   * path, rather than emitting a guess.
+   */
+  @TestVisible
+  private OI_DiscoveredRelationship buildExecutesOnRelationship(
+    ApexTrigger apexTrigger,
+    String fromComponentKey
+  ) {
+    String objectApiName = resolveObjectApiName(apexTrigger);
+    if (String.isBlank(objectApiName) || String.isBlank(fromComponentKey)) {
+      return null;
+    }
+    String objectNamespace = OI_ComponentKeyUtil.extractNamespaceFromApiName(
+      objectApiName
+    );
+    String toComponentKey = OI_ComponentKeyUtil.build(
+      OBJECT_COMPONENT_KIND,
+      objectNamespace,
+      objectApiName
+    );
+    return new OI_DiscoveredRelationship(
+      fromComponentKey +
+        '::' +
+        EXECUTES_ON_RELATIONSHIP_KIND +
+        '::' +
+        toComponentKey,
+      EXECUTES_ON_RELATIONSHIP_KIND,
+      fromComponentKey,
+      toComponentKey,
+      new Map<String, Object>{
+        'triggerEvents' => describeTriggerEvents(apexTrigger)
+      }
+    );
+  }
+
+  /** Declaration first, TableEnumOrId second — both validated against the global describe. See the class doc comment for why that order, and why an unresolvable object yields no edge. */
+  @TestVisible
+  private String resolveObjectApiName(ApexTrigger apexTrigger) {
+    if (String.isNotBlank(apexTrigger.Body)) {
+      Matcher declarationMatcher = TRIGGER_DECLARATION_PATTERN.matcher(
+        apexTrigger.Body
+      );
+      if (declarationMatcher.find()) {
+        String declared = canonicalObjectName(declarationMatcher.group(1));
+        if (declared != null) {
+          return declared;
+        }
+      }
+    }
+    return canonicalObjectName(apexTrigger.TableEnumOrId);
+  }
+
+  /** Delegates to the shared resolver every object-referencing Scanner uses — see OI_ScannerObjectResolver for the casing and dangling-edge reasoning this centralizes. */
+  private String canonicalObjectName(String candidate) {
+    return OI_ScannerObjectResolver.canonicalInScopeName(candidate);
+  }
+
+  /** Same heuristic, same caveats, as OI_ApexClassScanner.extractReferences — deduplicated per trigger, and a trigger can never reference itself (different componentKind namespace entirely). */
+  private List<OI_DiscoveredRelationship> extractClassReferences(
+    ApexTrigger apexTrigger,
+    String fromComponentKey,
+    Map<String, String> componentKeyByClassName
+  ) {
+    List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
+    if (
+      String.isBlank(apexTrigger.Body) ||
+      String.isBlank(fromComponentKey) ||
+      componentKeyByClassName.isEmpty()
+    ) {
+      return found;
+    }
+    Set<String> referencedClassNames = new Set<String>();
+    Matcher tokenMatcher = IDENTIFIER_PATTERN.matcher(apexTrigger.Body);
+    while (tokenMatcher.find()) {
+      String token = tokenMatcher.group();
+      if (componentKeyByClassName.containsKey(token)) {
+        referencedClassNames.add(token);
+      }
+    }
+    for (String referencedClassName : referencedClassNames) {
+      String toComponentKey = componentKeyByClassName.get(referencedClassName);
+      found.add(
+        new OI_DiscoveredRelationship(
+          fromComponentKey +
+            '::' +
+            REFERENCES_RELATIONSHIP_KIND +
+            '::' +
             toComponentKey,
-            new Map<String, Object>{ 'triggerEvents' => describeTriggerEvents(apexTrigger) }
-        );
+          REFERENCES_RELATIONSHIP_KIND,
+          fromComponentKey,
+          toComponentKey,
+          new Map<String, Object>()
+        )
+      );
     }
+    return found;
+  }
 
-    /** Declaration first, TableEnumOrId second — both validated against the global describe. See the class doc comment for why that order, and why an unresolvable object yields no edge. */
-    @TestVisible
-    private String resolveObjectApiName(ApexTrigger apexTrigger) {
-        if (String.isNotBlank(apexTrigger.Body)) {
-            Matcher declarationMatcher = TRIGGER_DECLARATION_PATTERN.matcher(apexTrigger.Body);
-            if (declarationMatcher.find()) {
-                String declared = canonicalObjectName(declarationMatcher.group(1));
-                if (declared != null) {
-                    return declared;
-                }
-            }
-        }
-        return canonicalObjectName(apexTrigger.TableEnumOrId);
+  /** Drops managed-package triggers unless the scope policy includes them (ADR-0031 §1). */
+  private List<ApexTrigger> filterInScope(List<ApexTrigger> triggers) {
+    List<ApexTrigger> inScope = new List<ApexTrigger>();
+    for (ApexTrigger apexTrigger : triggers) {
+      if (
+        OI_ObjectScopeFilter.isNamespaceInScope(apexTrigger.NamespacePrefix)
+      ) {
+        inScope.add(apexTrigger);
+      }
     }
+    return inScope;
+  }
 
-    /** Delegates to the shared resolver every object-referencing Scanner uses — see OI_ScannerObjectResolver for the casing and dangling-edge reasoning this centralizes. */
-    private String canonicalObjectName(String candidate) {
-        return OI_ScannerObjectResolver.canonicalInScopeName(candidate);
+  /**
+   * Class names are needed only to recognize which identifier tokens in a trigger body are
+   * real Apex classes — Body is deliberately NOT selected here (this scanner never needs
+   * class bodies, only their names), keeping the query cheap and avoiding a second reason to
+   * require "Author Apex" beyond the trigger bodies themselves.
+   */
+  private Map<String, String> buildApexClassComponentKeys() {
+    Map<String, String> componentKeyByClassName = new Map<String, String>();
+    for (ApexClass apexClass : [SELECT Name, NamespacePrefix FROM ApexClass]) {
+      // Only classes that are themselves persisted may be edge targets, so no REFERENCES edge dangles.
+      if (!OI_ObjectScopeFilter.isNamespaceInScope(apexClass.NamespacePrefix)) {
+        continue;
+      }
+      String namespace = String.isBlank(apexClass.NamespacePrefix)
+        ? null
+        : apexClass.NamespacePrefix;
+      String fullyQualifiedName = namespace == null
+        ? apexClass.Name
+        : namespace + '.' + apexClass.Name;
+      componentKeyByClassName.put(
+        apexClass.Name,
+        OI_ComponentKeyUtil.build(
+          APEX_CLASS_COMPONENT_KIND,
+          namespace,
+          fullyQualifiedName
+        )
+      );
     }
+    return componentKeyByClassName;
+  }
 
-    /** Same heuristic, same caveats, as OI_ApexClassScanner.extractReferences — deduplicated per trigger, and a trigger can never reference itself (different componentKind namespace entirely). */
-    private List<OI_DiscoveredRelationship> extractClassReferences(ApexTrigger apexTrigger, String fromComponentKey, Map<String, String> componentKeyByClassName) {
-        List<OI_DiscoveredRelationship> found = new List<OI_DiscoveredRelationship>();
-        if (String.isBlank(apexTrigger.Body) || String.isBlank(fromComponentKey) || componentKeyByClassName.isEmpty()) {
-            return found;
-        }
-        Set<String> referencedClassNames = new Set<String>();
-        Matcher tokenMatcher = IDENTIFIER_PATTERN.matcher(apexTrigger.Body);
-        while (tokenMatcher.find()) {
-            String token = tokenMatcher.group();
-            if (componentKeyByClassName.containsKey(token)) {
-                referencedClassNames.add(token);
-            }
-        }
-        for (String referencedClassName : referencedClassNames) {
-            String toComponentKey = componentKeyByClassName.get(referencedClassName);
-            found.add(
-                new OI_DiscoveredRelationship(
-                    fromComponentKey + '::' + REFERENCES_RELATIONSHIP_KIND + '::' + toComponentKey,
-                    REFERENCES_RELATIONSHIP_KIND,
-                    fromComponentKey,
-                    toComponentKey,
-                    new Map<String, Object>()
-                )
-            );
-        }
-        return found;
+  /** The trigger's declared events as a compact, display-ready list (e.g. "before insert", "after update") — carried on the EXECUTES_ON edge so the UI can answer "fires on WHAT operation" without re-reading the trigger. */
+  private List<String> describeTriggerEvents(ApexTrigger apexTrigger) {
+    List<String> events = new List<String>();
+    if (apexTrigger.UsageBeforeInsert == true) {
+      events.add('before insert');
     }
+    if (apexTrigger.UsageAfterInsert == true) {
+      events.add('after insert');
+    }
+    if (apexTrigger.UsageBeforeUpdate == true) {
+      events.add('before update');
+    }
+    if (apexTrigger.UsageAfterUpdate == true) {
+      events.add('after update');
+    }
+    if (apexTrigger.UsageBeforeDelete == true) {
+      events.add('before delete');
+    }
+    if (apexTrigger.UsageAfterDelete == true) {
+      events.add('after delete');
+    }
+    if (apexTrigger.UsageAfterUndelete == true) {
+      events.add('after undelete');
+    }
+    return events;
+  }
 
-    /**
-     * Class names are needed only to recognize which identifier tokens in a trigger body are
-     * real Apex classes — Body is deliberately NOT selected here (this scanner never needs
-     * class bodies, only their names), keeping the query cheap and avoiding a second reason to
-     * require "Author Apex" beyond the trigger bodies themselves.
-     */
-    private Map<String, String> buildApexClassComponentKeys() {
-        Map<String, String> componentKeyByClassName = new Map<String, String>();
-        for (ApexClass apexClass : [SELECT Name, NamespacePrefix FROM ApexClass]) {
-            String namespace = String.isBlank(apexClass.NamespacePrefix) ? null : apexClass.NamespacePrefix;
-            String fullyQualifiedName = namespace == null ? apexClass.Name : namespace + '.' + apexClass.Name;
-            componentKeyByClassName.put(apexClass.Name, OI_ComponentKeyUtil.build(APEX_CLASS_COMPONENT_KIND, namespace, fullyQualifiedName));
-        }
-        return componentKeyByClassName;
-    }
-
-    /** The trigger's declared events as a compact, display-ready list (e.g. "before insert", "after update") — carried on the EXECUTES_ON edge so the UI can answer "fires on WHAT operation" without re-reading the trigger. */
-    private List<String> describeTriggerEvents(ApexTrigger apexTrigger) {
-        List<String> events = new List<String>();
-        if (apexTrigger.UsageBeforeInsert == true) {
-            events.add('before insert');
-        }
-        if (apexTrigger.UsageAfterInsert == true) {
-            events.add('after insert');
-        }
-        if (apexTrigger.UsageBeforeUpdate == true) {
-            events.add('before update');
-        }
-        if (apexTrigger.UsageAfterUpdate == true) {
-            events.add('after update');
-        }
-        if (apexTrigger.UsageBeforeDelete == true) {
-            events.add('before delete');
-        }
-        if (apexTrigger.UsageAfterDelete == true) {
-            events.add('after delete');
-        }
-        if (apexTrigger.UsageAfterUndelete == true) {
-            events.add('after undelete');
-        }
-        return events;
-    }
-
-    private OI_DiscoveredComponent toComponent(ApexTrigger apexTrigger) {
-        String namespace = String.isBlank(apexTrigger.NamespacePrefix) ? null : apexTrigger.NamespacePrefix;
-        String fullyQualifiedName = namespace == null ? apexTrigger.Name : namespace + '.' + apexTrigger.Name;
-        Map<String, Object> attributes = new Map<String, Object>{
-            'apiVersion' => apexTrigger.ApiVersion,
-            'status' => apexTrigger.Status,
-            'isValid' => apexTrigger.IsValid,
-            'objectApiName' => resolveObjectApiName(apexTrigger),
-            'triggerEvents' => describeTriggerEvents(apexTrigger),
-            'lengthWithoutComments' => apexTrigger.LengthWithoutComments,
-            'bodyCrc' => apexTrigger.BodyCrc
-        };
-        return new OI_DiscoveredComponent(
-            OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
-            COMPONENT_KIND,
-            fullyQualifiedName,
-            namespace,
-            'SOQL',
-            attributes,
-            OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, fullyQualifiedName, attributes),
-            null,
-            null
-        );
-    }
+  private OI_DiscoveredComponent toComponent(ApexTrigger apexTrigger) {
+    String namespace = String.isBlank(apexTrigger.NamespacePrefix)
+      ? null
+      : apexTrigger.NamespacePrefix;
+    String fullyQualifiedName = namespace == null
+      ? apexTrigger.Name
+      : namespace + '.' + apexTrigger.Name;
+    Map<String, Object> attributes = new Map<String, Object>{
+      'apiVersion' => apexTrigger.ApiVersion,
+      'status' => apexTrigger.Status,
+      'isValid' => apexTrigger.IsValid,
+      'objectApiName' => resolveObjectApiName(apexTrigger),
+      'triggerEvents' => describeTriggerEvents(apexTrigger),
+      'lengthWithoutComments' => apexTrigger.LengthWithoutComments,
+      'bodyCrc' => apexTrigger.BodyCrc
+    };
+    return new OI_DiscoveredComponent(
+      OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
+      COMPONENT_KIND,
+      fullyQualifiedName,
+      namespace,
+      'SOQL',
+      attributes,
+      OI_ChecksumUtil.computeChecksum(
+        COMPONENT_KIND,
+        fullyQualifiedName,
+        attributes
+      ),
+      null,
+      null
+    );
+  }
 }

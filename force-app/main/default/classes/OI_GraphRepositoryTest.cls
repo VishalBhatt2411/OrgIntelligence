@@ -158,13 +158,62 @@ private class OI_GraphRepositoryTest {
   }
 
   @isTest
-  static void testArchiveSupersededVersionsNotImplementedThisSprint() {
-    try {
-      new OI_GraphRepository().archiveSupersededVersions(Datetime.now());
-      System.assert(false);
-    } catch (OI_ServiceException e) {
-      System.assert(true);
-    }
+  static void testArchiveSupersededVersionsWritesOnlyNonCurrentVersionsToTheArchive() {
+    OI_FakeGraphStorageProvider live = new OI_FakeGraphStorageProvider();
+    OI_FakeGraphStorageProvider archive = new OI_FakeGraphStorageProvider();
+    live.writeVersion(archivalRecord('n1', 'n1::v1', false), true);
+    live.writeVersion(archivalRecord('n1', 'n1::v2', true), true);
+
+    Integer archived = new OI_GraphRepository(live, archive)
+      .archiveSupersededVersions(new Set<String>{ 'n1::v1', 'n1::v2' }, false);
+
+    System.assertEquals(
+      1,
+      archived,
+      'The current version must never be archived.'
+    );
+    System.assert(archive.versionsByVersionKey.containsKey('n1::v1'));
+    System.assert(!archive.versionsByVersionKey.containsKey('n1::v2'));
+  }
+
+  @isTest
+  static void testPurgeArchivedVersionsRemovesOnlyNonCurrentVersions() {
+    OI_FakeGraphStorageProvider live = new OI_FakeGraphStorageProvider();
+    live.writeVersion(archivalRecord('n1', 'n1::v1', false), true);
+    live.writeVersion(archivalRecord('n1', 'n1::v2', true), true);
+
+    Integer purged = new OI_GraphRepository(
+        live,
+        new OI_FakeGraphStorageProvider()
+      )
+      .purgeArchivedVersions(new Set<String>{ 'n1::v1', 'n1::v2' }, false);
+
+    System.assertEquals(1, purged);
+  }
+
+  private static OI_VersionRecord archivalRecord(
+    String key,
+    String versionKey,
+    Boolean isCurrent
+  ) {
+    return new OI_VersionRecord(
+      key,
+      versionKey,
+      1,
+      'Test.NodeType',
+      'Label',
+      null,
+      null,
+      new Map<String, Object>(),
+      'c1',
+      'Active',
+      null,
+      null,
+      null,
+      isCurrent,
+      null,
+      null
+    );
   }
 
   /**

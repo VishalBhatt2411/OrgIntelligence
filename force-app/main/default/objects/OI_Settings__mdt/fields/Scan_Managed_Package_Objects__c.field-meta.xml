@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Scan_Managed_Package_Objects__c</fullName>
+    <label>Scan Managed Package Objects</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description
+  >When checked, the metadata scan also persists objects, fields, Apex classes, triggers and flows from installed managed packages (other namespaces). Off by default to keep graph storage small (ADR-0031).</description>
+</CustomField>

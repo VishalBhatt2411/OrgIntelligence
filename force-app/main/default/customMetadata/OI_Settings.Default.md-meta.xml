@@ -71,11 +71,23 @@
         <value xsi:type="xsd:double">150</value>
     </values>
     <values>
+        <field>Graph_Version_Retention_Days__c</field>
+        <value xsi:type="xsd:double">1</value>
+    </values>
+    <values>
         <field>Hierarchy_History_Retention_Days__c</field>
         <value xsi:type="xsd:double">365</value>
     </values>
     <values>
         <field>Max_Org_Health_Live_Rows__c</field>
         <value xsi:type="xsd:double">50</value>
+    </values>
+    <values>
+        <field>Scan_Managed_Package_Objects__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Scan_Customized_Standard_Objects__c</field>
+        <value xsi:type="xsd:boolean">true</value>
     </values>
 </CustomMetadata>

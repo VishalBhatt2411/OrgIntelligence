@@ -470,6 +470,64 @@ private class OI_MetadataHealthServiceTest {
     System.assertEquals('mh_kpi_low', drilldown.rows[1].key);
   }
 
+  /** ADR-0031: the scan persists only relationship fields, so the object's own customFieldCount attribute is the count — not its handful of persisted field nodes. */
+  @isTest
+  static void testScannedCustomFieldCountAttributeDrivesTheFieldCountPenalty() {
+    insertObjectWithFields('mh_attr_heavy', 'Account', 0, true, 1);
+    OI_Graph_Node__c obj = [
+      SELECT Id
+      FROM OI_Graph_Node__c
+      WHERE Node_Key__c = 'mh_attr_heavy'
+    ];
+    obj.Attributes_Json__c = '{"fieldCount":260,"customFieldCount":200}';
+    update obj;
+
+    OI_OrgHealthFindingCandidate fieldCountCandidate;
+    for (
+      OI_OrgHealthFindingCandidate candidate : new OI_MetadataHealthService()
+        .getFindingCandidates()
+    ) {
+      if (
+        candidate.componentKey == 'mh_attr_heavy' &&
+        candidate.ruleId == 'MetadataHealth.HighFieldCount'
+      ) {
+        fieldCountCandidate = candidate;
+      }
+    }
+    System.assertNotEquals(
+      null,
+      fieldCountCandidate,
+      'The scanned attribute (200) must win over the single persisted __c field node.'
+    );
+    System.assertEquals('200 custom fields', fieldCountCandidate.measuredValue);
+  }
+
+  /** An object scanned before ADR-0031 has no attribute, so its persisted field nodes are still counted. */
+  @isTest
+  static void testObjectWithoutTheAttributeFallsBackToPersistedFieldNodes() {
+    insertObjectWithFields('mh_legacy_heavy', 'Account', 0, true, 200);
+    insertObjectWithFields('mh_attr_light', 'Contact', 0, true, 0);
+    OI_Graph_Node__c obj = [
+      SELECT Id
+      FROM OI_Graph_Node__c
+      WHERE Node_Key__c = 'mh_attr_light'
+    ];
+    obj.Attributes_Json__c = '{"customFieldCount":3}';
+    update obj;
+
+    Set<String> flagged = new Set<String>();
+    for (
+      OI_OrgHealthFindingCandidate candidate : new OI_MetadataHealthService()
+        .getFindingCandidates()
+    ) {
+      if (candidate.ruleId == 'MetadataHealth.HighFieldCount') {
+        flagged.add(candidate.componentKey);
+      }
+    }
+    System.assert(flagged.contains('mh_legacy_heavy'));
+    System.assert(!flagged.contains('mh_attr_light'));
+  }
+
   private static void insertObject(
     String objectKey,
     String apiName,

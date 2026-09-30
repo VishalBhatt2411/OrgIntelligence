@@ -42,6 +42,10 @@
     </customMetadataTypeAccesses>
     <customMetadataTypeAccesses>
         <enabled>true</enabled>
+        <name>OI_Scan_Object_Scope__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
         <name>OI_Health_Severity_Descriptor__mdt</name>
     </customMetadataTypeAccesses>
     <customPermissions>
@@ -377,6 +381,26 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>OI_Scan_Task__c.Retry_Attempt_Count__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Scan_Task__c.Coverage_Status__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Scan_Task__c.Coverage_Detail__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Scan_Task__c.Relationships_Discovered__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>OI_Scan_Task__c.Relationships_Skipped__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

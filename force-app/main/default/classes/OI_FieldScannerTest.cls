@@ -1,45 +1,38 @@
 /**
- * Purpose: Verifies OI_FieldScanner discovers fields with a correct parentComponentKey,
- *          emits HAS_FIELD relationships for every field, and correctly distinguishes
- *          Lookup from Master-Detail reference relationships (Sprint 8 objective §5/§6).
+ * Purpose: Verifies OI_FieldScanner persists only relationship-bearing fields (ADR-0031)
+ *          with a correct parentComponentKey and HAS_FIELD relationship, emits edges only
+ *          to in-scope targets, and correctly distinguishes Lookup from Master-Detail
+ *          reference relationships (Sprint 8 objective §5/§6).
  */
 @isTest
 private class OI_FieldScannerTest {
   @isTest
-  static void testAccountNameFieldHasCorrectParentAndHasFieldRelationship() {
-    OI_FieldScanner scanner = new OI_FieldScanner();
-    /** Scoped to just Account — this test only asserts on Account.Name, so there's no need to pay the CPU cost of describing every object in the org (this org's total object count, shared with an unrelated project, now pushes an unscoped scan() over the synchronous Apex CPU time limit; confirmed by reproducing the failure with an unscoped context). The unscoped/full-org code path has its own coverage elsewhere (integration-level scan tests). */
-    OI_DiscoveryBatch batch = scanner.scan(
-      new OI_ScanContext(
-        null,
-        100,
-        null,
-        'Describe',
-        new Set<String>{ 'Account' }
-      )
-    );
+  static void testAccountOwnerFieldHasCorrectParentAndHasFieldRelationship() {
+    useAccountAndUserPolicy();
+    /** Scoped to just Account — describing every object in this shared org pushes an unscoped scan() over the synchronous CPU limit; the unscoped path has its own coverage below. */
+    OI_DiscoveryBatch batch = new OI_FieldScanner().scan(accountOnlyContext());
 
     System.assertEquals('CustomField', batch.componentKind);
     System.assertEquals(true, batch.isFullSnapshot);
 
-    OI_DiscoveredComponent nameField = findByName(batch, 'Account.Name');
+    OI_DiscoveredComponent ownerField = findByName(batch, 'Account.OwnerId');
     System.assertNotEquals(
       null,
-      nameField,
-      'Expected Account.Name to be discovered.'
+      ownerField,
+      'Expected Account.OwnerId (a lookup to the in-scope User object) to be discovered.'
     );
     String expectedParentKey = OI_ComponentKeyUtil.build(
       'CustomObject',
       null,
       'Account'
     );
-    System.assertEquals(expectedParentKey, nameField.parentComponentKey);
+    System.assertEquals(expectedParentKey, ownerField.parentComponentKey);
 
     Boolean foundHasField = false;
     for (OI_DiscoveredRelationship relationship : batch.relationships) {
       if (
         relationship.relationshipKind == 'HAS_FIELD' &&
-        relationship.toComponentKey == nameField.componentKey
+        relationship.toComponentKey == ownerField.componentKey
       ) {
         foundHasField = true;
         System.assertEquals(expectedParentKey, relationship.fromComponentKey);
@@ -47,16 +40,58 @@ private class OI_FieldScannerTest {
     }
     System.assert(
       foundHasField,
-      'Expected a HAS_FIELD relationship from Account to Account.Name.'
+      'Expected a HAS_FIELD relationship from Account to Account.OwnerId.'
     );
+  }
+
+  /** Plain data fields are served live from Describe, never persisted — the storage saving ADR-0031 exists for. */
+  @isTest
+  static void testNonReferenceFieldIsNotPersisted() {
+    useAccountAndUserPolicy();
+    OI_DiscoveryBatch batch = new OI_FieldScanner().scan(accountOnlyContext());
+
+    System.assertEquals(null, findByName(batch, 'Account.Name'));
+    System.assertEquals(null, findByName(batch, 'Account.Industry'));
+    for (OI_DiscoveredComponent component : batch.components) {
+      System.assertEquals(
+        'REFERENCE',
+        String.valueOf(component.rawAttributes.get('type')),
+        'Only reference fields may be persisted: ' +
+        component.fullyQualifiedName
+      );
+    }
+  }
+
+  /** A lookup whose only target is out of scope has no graph structure to carry, so neither the field nor a dangling edge is emitted. */
+  @isTest
+  static void testReferenceFieldToOutOfScopeTargetIsNotPersisted() {
+    OI_ObjectScopeFilter.ScopePolicy policy = new OI_ObjectScopeFilter.ScopePolicy();
+    policy.includeCustomizedStandardObjects = false;
+    policy.alwaysInclude.add('account');
+    policy.alwaysExclude.add('user');
+    OI_ObjectScopeFilter.policyOverride = policy;
+
+    OI_DiscoveryBatch batch = new OI_FieldScanner().scan(accountOnlyContext());
+
+    System.assertEquals(
+      null,
+      findByName(batch, 'Account.OwnerId'),
+      'Account.OwnerId targets only User, which this policy excludes.'
+    );
+    String userKey = OI_ComponentKeyUtil.build('CustomObject', null, 'User');
+    for (OI_DiscoveredRelationship relationship : batch.relationships) {
+      System.assertNotEquals(
+        userKey,
+        relationship.toComponentKey,
+        'No edge may point at an out-of-scope object.'
+      );
+    }
   }
 
   @isTest
   static void testLookupFieldEmitsLookupToRelationship() {
-    OI_FieldScanner scanner = new OI_FieldScanner();
-    OI_DiscoveryBatch batch = scanner.scan(
-      new OI_ScanContext(null, 100, null, 'Describe')
-    );
+    useAccountAndUserPolicy();
+    OI_DiscoveryBatch batch = new OI_FieldScanner().scan(accountOnlyContext());
 
     OI_DiscoveredComponent ownerField = findByName(batch, 'Account.OwnerId');
     System.assertNotEquals(null, ownerField);
@@ -147,7 +182,7 @@ private class OI_FieldScannerTest {
 
   /**
    * Scopes both scans to just Account via OI_ScanContext.scopedApiNames — the only
-   * assertion this test makes is about Account.Name, so there's no need to pay for a
+   * assertion this test makes is about Account.OwnerId, so there's no need to pay for a
    * full org-wide Describe twice in one transaction. This isn't only an optimization:
    * a real org's total schema size (every installed managed package's objects/fields
    * included) is outside this test's control, and a org with a large enough schema can
@@ -157,27 +192,41 @@ private class OI_FieldScannerTest {
    */
   @isTest
   static void testChecksumIsDeterministicAcrossRepeatedScans() {
+    useAccountAndUserPolicy();
     OI_FieldScanner scanner = new OI_FieldScanner();
-    OI_ScanContext accountOnlyScope = new OI_ScanContext(
-      null,
-      100,
-      null,
-      'Describe',
-      new Set<String>{ 'Account' }
-    );
+    OI_ScanContext accountOnlyScope = accountOnlyContext();
 
     OI_DiscoveryBatch firstBatch = scanner.scan(accountOnlyScope);
-    OI_DiscoveredComponent first = findByName(firstBatch, 'Account.Name');
+    OI_DiscoveredComponent first = findByName(firstBatch, 'Account.OwnerId');
     String firstComponentKey = first.componentKey;
     String firstChecksum = first.rawChecksum;
     firstBatch = null;
     first = null;
 
     OI_DiscoveryBatch secondBatch = scanner.scan(accountOnlyScope);
-    OI_DiscoveredComponent second = findByName(secondBatch, 'Account.Name');
+    OI_DiscoveredComponent second = findByName(secondBatch, 'Account.OwnerId');
 
     System.assertEquals(firstComponentKey, second.componentKey);
     System.assertEquals(firstChecksum, second.rawChecksum);
+  }
+
+  /** Pins the scope policy so these tests do not depend on the shipped OI_Scan_Object_Scope__mdt records or this org's customisations. */
+  private static void useAccountAndUserPolicy() {
+    OI_ObjectScopeFilter.ScopePolicy policy = new OI_ObjectScopeFilter.ScopePolicy();
+    policy.includeCustomizedStandardObjects = false;
+    policy.alwaysInclude.add('account');
+    policy.alwaysInclude.add('user');
+    OI_ObjectScopeFilter.policyOverride = policy;
+  }
+
+  private static OI_ScanContext accountOnlyContext() {
+    return new OI_ScanContext(
+      null,
+      100,
+      null,
+      'Describe',
+      new Set<String>{ 'Account' }
+    );
   }
 
   private static OI_DiscoveredComponent findByName(

@@ -24,12 +24,14 @@
  * Dependencies: OI_Metadata_Type_Config__mdt, OI_Scan_Run__c, OI_Scan_Task__c,
  *               OI_Scan_Progress__e, OI_IMetadataScanner, OI_MutationGenerator,
  *               OI_ScanComponentIngestBatchable, OI_ScanRelationshipIngestBatchable,
- *               OI_ScanRetireDetectionBatchable, OI_LoggerService, OI_SecurityService.
+ *               OI_ScanRetireDetectionBatchable, OI_GraphArchivalBatch, OI_LoggerService,
+ *               OI_SecurityService.
  * Limitations: Per-type cadence (Min_Rescan_Interval_Minutes__c) and incremental
  *              watermarking are not applied — every hop runs a full scan for every enabled
  *              type (Phase 3 scope, not Sprint 9). Records_Changed__c on OI_Scan_Task__c
- *              and Edge_Count__c on OI_Scan_Run__c are not populated — no data path exists
- *              yet for either (documented since Sprint 8; still true). Cancellation is
+ *              is not populated — no data path exists for it yet. Edge_Count__c on
+ *              OI_Scan_Run__c is derived from the tasks' coverage tallies and stays blank
+ *              when those fields are not visible to the running user. Cancellation is
  *              cooperative and checked once at the start of each hop — a hop already
  *              mid-execution runs to completion before the check on the next hop takes
  *              effect, matching API.md §2.4's own "best-effort" framing exactly.
@@ -101,6 +103,10 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
    * this seam lets Orchestrator lifecycle tests stay fast without duplicating that
    * coverage.
    */
+  /** Test seam: orchestrator lifecycle tests must not start the archival batch chain. */
+  @TestVisible
+  private static Boolean launchArchivalAfterRun = !Test.isRunningTest();
+
   @TestVisible
   private static Map<String, OI_IMetadataScanner> testScannerOverrides = new Map<String, OI_IMetadataScanner>();
 
@@ -354,17 +360,7 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
     );
 
     try {
-      OI_Metadata_Type_Config__mdt config = loadConfig(metadataTypeApiName);
-      OI_IMetadataScanner scanner = resolveScanner(
-        metadataTypeApiName,
-        config.Scanner_Class__c
-      );
-      Integer batchSize = config.Batch_Size__c == null
-        ? 100
-        : Integer.valueOf(config.Batch_Size__c);
-      OI_DiscoveryBatch batch = scanner.scan(
-        new OI_ScanContext(task.Id, batchSize, null, config.Preferred_Api__c)
-      );
+      OI_DiscoveryBatch batch = discover(task.Id, metadataTypeApiName);
       /** Recorded before ingestion, so a Scanner's own honest account of what it could and could not extract survives even if a later ingest hop fails. */
       recordCoverage(task.Id, batch.coverage);
 
@@ -381,14 +377,17 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
         return;
       }
 
+      /**
+       * The batch is handed over by recipe, not by value: a type as large as a
+       * ~1,000-object org's CustomField set serializes past the Batch Apex instance-state
+       * limit ("Batchable instance is too big"), so the batchable re-runs discover() in its
+       * own start() instead. Costs one extra Describe/SOQL pass per large type.
+       */
       Database.executeBatch(
         new OI_ScanComponentIngestBatchable(
           scanRunId,
           task.Id,
           metadataTypeApiName,
-          batch.components,
-          batch.relationships,
-          batch.isFullSnapshot,
           remainingTypesAfterThis
         ),
         CHUNK_SIZE
@@ -802,7 +801,29 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
     advanceToNextType(scanRunId, remainingTypes);
   }
 
-  private OI_IMetadataScanner resolveScanner(
+  /**
+   * Runs the configured Scanner for one type once. Public so OI_ScanComponentIngestBatchable
+   * and OI_ScanRelationshipIngestBatchable can re-discover a large type inside their own
+   * start() rather than carrying its full payload as serialized instance state.
+   */
+  public static OI_DiscoveryBatch discover(
+    Id scanTaskId,
+    String metadataTypeApiName
+  ) {
+    OI_Metadata_Type_Config__mdt config = loadConfig(metadataTypeApiName);
+    OI_IMetadataScanner scanner = resolveScanner(
+      metadataTypeApiName,
+      config.Scanner_Class__c
+    );
+    Integer batchSize = config.Batch_Size__c == null
+      ? 100
+      : Integer.valueOf(config.Batch_Size__c);
+    return scanner.scan(
+      new OI_ScanContext(scanTaskId, batchSize, null, config.Preferred_Api__c)
+    );
+  }
+
+  private static OI_IMetadataScanner resolveScanner(
     String metadataTypeApiName,
     String scannerClassName
   ) {
@@ -820,7 +841,9 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
     return (OI_IMetadataScanner) scannerType.newInstance();
   }
 
-  private OI_Metadata_Type_Config__mdt loadConfig(String metadataTypeApiName) {
+  private static OI_Metadata_Type_Config__mdt loadConfig(
+    String metadataTypeApiName
+  ) {
     List<OI_Metadata_Type_Config__mdt> configs = [
       SELECT Scanner_Class__c, Batch_Size__c, Preferred_Api__c
       FROM OI_Metadata_Type_Config__mdt
@@ -883,6 +906,9 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
       Status__c = finalStatus,
       Completed_At__c = Datetime.now(),
       Node_Count__c = totalScanned,
+      Edge_Count__c = OI_ScanCoverageFields.sumPersistedRelationships(
+        scanRunId
+      ),
       Error_Count__c = errorCount
     );
     publishProgress(
@@ -891,6 +917,28 @@ public without sharing class OI_ScanOrchestratorQueueable implements Queueable, 
       null,
       anyFailed ? 'Scan completed with errors.' : 'Scan completed.'
     );
+    launchGraphArchival(scanRunId);
+  }
+
+  /**
+   * Starts the superseded-version archival chain (ADR-0031) once the run is recorded as
+   * complete. Best-effort: archival failing to start never changes the run's outcome.
+   */
+  private static void launchGraphArchival(Id scanRunId) {
+    if (!launchArchivalAfterRun) {
+      return;
+    }
+    try {
+      OI_GraphArchivalBatch.launch();
+    } catch (Exception launchException) {
+      new OI_LoggerService()
+        .warn(
+          'Graph archival could not start after the scan: ' +
+          launchException.getMessage(),
+          'OI_ScanOrchestratorQueueable',
+          scanRunId
+        );
+    }
   }
 
   private static List<OI_Metadata_Type_Config__mdt> loadEnabledConfigs(

@@ -6,15 +6,11 @@
  *                    OI_GraphCache directly, ADR-0013) -> map to a DTO -> return, or
  *                    translate to a sanitized AuraHandledException (CodingStandards.md §6),
  *                    matching OI_ScanController's own established pattern exactly.
- *                    getFieldSummaries (Hierarchy Visualizer field-browser sprint) is the one
- *                    method here that knows a Salesforce-specific typeKey literal
- *                    (HAS_FIELD_EDGE_TYPE_KEY) — a deliberate, narrow exception matching the
- *                    same precedent oiGraphExplorer.js's Field analyze mode already
- *                    established client-side, not a drift from ADR-0013 (OI_GraphEngine
- *                    itself stays fully generic; only the Controller-level constant is
- *                    domain-specific).
+ *                    getFieldSummaries delegates to OI_FieldSummaryService, which owns
+ *                    the one Salesforce-specific concern here (HAS_FIELD membership joined
+ *                    to live Describe, ADR-0031).
  * Dependencies: OI_GraphEngine, OI_SecurityService, OI_GraphFragmentDTO, OI_NodeDetailDTO,
- *               OI_FieldSummaryDTO, OI_RelationshipFieldDetailService,
+ *               OI_FieldSummaryDTO, OI_FieldSummaryService, OI_RelationshipFieldDetailService,
  *               OI_RelationshipFieldDetailDTO, OI_TargetObjectRecordCountsDTO,
  *               OI_ObjectSharingSettingsService, OI_ObjectSharingSettingsDTO.
  * Limitations: getMiniMapSummary (API.md §2.1) is not implemented — mini-map is deferred
@@ -27,17 +23,6 @@
  *              never a server-side traversal change.
  */
 public with sharing class OI_GraphController {
-  /**
-   * The one Salesforce-metadata-domain constant this otherwise-generic Controller knows
-   * about — matching the exact precedent oiGraphExplorer.js's own HAS_FIELD_EDGE_TYPE_KEY
-   * constant already sets for this same "list an object's own fields" concern (Sprint,
-   * Field analyze mode's object field picker). OI_GraphEngine.getMembersByEdgeType stays
-   * fully generic; this Controller is the boundary where "field membership means
-   * SalesforceMetadata.HAS_FIELD" is allowed to be known, exactly as it already is on the
-   * client side.
-   */
-  private static final String HAS_FIELD_EDGE_TYPE_KEY = 'SalesforceMetadata.HAS_FIELD';
-
   @AuraEnabled(cacheable=true)
   public static OI_GraphFragmentDTO getGraphFragment(
     String nodeKey,
@@ -157,9 +142,8 @@ public with sharing class OI_GraphController {
   /**
    * Bulk field metadata for one object's own fields (never another object's fields that
    * merely reference it) — backs oiNodeDetailPanel's field browser (Show All/Custom/
-   * Standard, field type). One query for the membership edges, one bulk query for the
-   * field nodes themselves (OI_GraphEngine.getMembersByEdgeType) — never N getNodeDetail
-   * round trips for an object with dozens of fields.
+   * Standard, field type). Since ADR-0031 the full list comes from live Describe, joined to
+   * the persisted relationship-field nodes (OI_FieldSummaryService) — still one round trip.
    */
   @AuraEnabled(cacheable=true)
   public static List<OI_FieldSummaryDTO> getFieldSummaries(
@@ -167,13 +151,7 @@ public with sharing class OI_GraphController {
   ) {
     try {
       OI_SecurityService.assertPermission('OI_View_Graph');
-      List<OI_VersionRecord> fieldVersions = new OI_GraphEngine()
-        .getMembersByEdgeType(objectNodeKey, HAS_FIELD_EDGE_TYPE_KEY);
-      List<OI_FieldSummaryDTO> summaries = new List<OI_FieldSummaryDTO>();
-      for (OI_VersionRecord fieldVersion : fieldVersions) {
-        summaries.add(new OI_FieldSummaryDTO(fieldVersion));
-      }
-      return summaries;
+      return new OI_FieldSummaryService().getFieldSummaries(objectNodeKey);
     } catch (Exception e) {
       throw translate(e);
     }

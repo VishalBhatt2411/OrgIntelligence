@@ -180,6 +180,37 @@ public with sharing class OI_EdgeSelector {
   }
 
   /** Bulk lookup of the current version row for each edge key in the set. */
+  /**
+   * Archival scope (ADR-0002/ADR-0031): non-current version rows last modified at or before
+   * the cutoff. Keys only — the batch re-reads each chunk's full rows by version key, so the
+   * locator stays cheap. Is_Current__c = false is the hard guard: a current row is never
+   * archived or purged, whatever the cutoff.
+   */
+  public Database.QueryLocator queryLocatorSupersededBefore(Datetime cutoff) {
+    return Database.getQueryLocator(
+      [
+        SELECT Id, Edge_Version_Key__c
+        FROM OI_Graph_Edge__c
+        WHERE Is_Current__c = FALSE AND SystemModstamp <= :cutoff
+        ORDER BY Edge_Version_Key__c
+      ]
+    );
+  }
+
+  /** Non-current rows by version key, full detail — the archival batch's per-chunk read. */
+  public List<OI_Graph_Edge__c> selectSupersededByVersionKeys(
+    Set<String> versionKeys
+  ) {
+    if (versionKeys == null || versionKeys.isEmpty()) {
+      return new List<OI_Graph_Edge__c>();
+    }
+    String query =
+      'SELECT ' +
+      String.join(DETAIL_FIELDS, ', ') +
+      ' FROM OI_Graph_Edge__c WHERE Edge_Version_Key__c IN :versionKeys AND Is_Current__c = false';
+    return Database.query(query);
+  }
+
   public List<OI_Graph_Edge__c> selectCurrentByKeys(Set<String> edgeKeys) {
     if (edgeKeys == null || edgeKeys.isEmpty()) {
       return new List<OI_Graph_Edge__c>();

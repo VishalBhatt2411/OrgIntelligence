@@ -40,78 +40,108 @@
  *              every other scanner in this package.
  */
 public inherited sharing class OI_FlowScanner implements OI_IMetadataScanner {
-    private static final String COMPONENT_KIND = 'Flow';
-    private static final String EXECUTES_ON_RELATIONSHIP_KIND = 'EXECUTES_ON';
+  private static final String COMPONENT_KIND = 'Flow';
+  private static final String EXECUTES_ON_RELATIONSHIP_KIND = 'EXECUTES_ON';
 
-    public OI_DiscoveryBatch scan(OI_ScanContext context) {
-        List<FlowDefinitionView> flows = [
-            SELECT ApiName, Label, Description, ProcessType, TriggerType, TriggerObjectOrEventId, IsActive, VersionNumber, NamespacePrefix, ManageableState
-            FROM FlowDefinitionView
-        ];
+  public OI_DiscoveryBatch scan(OI_ScanContext context) {
+    List<FlowDefinitionView> flows = [
+      SELECT
+        ApiName,
+        Label,
+        Description,
+        ProcessType,
+        TriggerType,
+        TriggerObjectOrEventId,
+        IsActive,
+        VersionNumber,
+        NamespacePrefix,
+        ManageableState
+      FROM FlowDefinitionView
+    ];
 
-        List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
-        List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
+    List<OI_DiscoveredComponent> components = new List<OI_DiscoveredComponent>();
+    List<OI_DiscoveredRelationship> relationships = new List<OI_DiscoveredRelationship>();
 
-        for (FlowDefinitionView flow : flows) {
-            OI_DiscoveredComponent component = toComponent(flow);
-            components.add(component);
+    for (FlowDefinitionView flow : flows) {
+      // Managed-package flows are skipped unless the scope policy includes them (ADR-0031 §1).
+      if (!OI_ObjectScopeFilter.isNamespaceInScope(flow.NamespacePrefix)) {
+        continue;
+      }
+      OI_DiscoveredComponent component = toComponent(flow);
+      components.add(component);
 
-            String toComponentKey = OI_ScannerObjectResolver.toObjectComponentKey(flow.TriggerObjectOrEventId);
-            if (toComponentKey != null) {
-                relationships.add(
-                    new OI_DiscoveredRelationship(
-                        component.componentKey + '::' + EXECUTES_ON_RELATIONSHIP_KIND + '::' + toComponentKey,
-                        EXECUTES_ON_RELATIONSHIP_KIND,
-                        component.componentKey,
-                        toComponentKey,
-                        new Map<String, Object>{ 'triggerType' => flow.TriggerType }
-                    )
-                );
-            }
-        }
-
-        return new OI_DiscoveryBatch(
-            context.scanTaskId,
-            COMPONENT_KIND,
-            components,
-            relationships,
-            true,
-            1,
-            /** PARTIAL by design, not DEGRADED: the trigger-object edge this Scanner does emit is exact, and the internals it cannot see are a permanent boundary of FlowDefinitionView rather than a failure a retry or a permission change would fix. Stating that distinction matters — an admin should not go hunting for a misconfiguration that does not exist. */
-            OI_ScanCoverage.partial(
-                relationships.size(),
-                'Only the object a record-triggered Flow fires on is detected. What a Flow reads or updates internally — ' +
-                'its field references, Apex invocations, and subflow calls — requires the Flow metadata definition, which is not ' +
-                'reachable without Tooling API access. Screen, scheduled, and autolaunched Flows have no trigger object and ' +
-                'correctly produce no relationship.'
-            )
+      String toComponentKey = OI_ScannerObjectResolver.toObjectComponentKey(
+        flow.TriggerObjectOrEventId
+      );
+      if (toComponentKey != null) {
+        relationships.add(
+          new OI_DiscoveredRelationship(
+            component.componentKey +
+              '::' +
+              EXECUTES_ON_RELATIONSHIP_KIND +
+              '::' +
+              toComponentKey,
+            EXECUTES_ON_RELATIONSHIP_KIND,
+            component.componentKey,
+            toComponentKey,
+            new Map<String, Object>{ 'triggerType' => flow.TriggerType }
+          )
         );
+      }
     }
 
-    private OI_DiscoveredComponent toComponent(FlowDefinitionView flow) {
-        String namespace = String.isBlank(flow.NamespacePrefix) ? null : flow.NamespacePrefix;
-        String fullyQualifiedName = namespace == null ? flow.ApiName : namespace + '.' + flow.ApiName;
-        Map<String, Object> attributes = new Map<String, Object>{
-            'label' => flow.Label,
-            'description' => flow.Description,
-            'processType' => flow.ProcessType,
-            'triggerType' => flow.TriggerType,
-            'isActive' => flow.IsActive,
-            'versionNumber' => flow.VersionNumber,
-            'manageableState' => flow.ManageableState,
-            /** The resolved, in-scope trigger object (null for non-record-triggered Flows, and for a custom object whose Id could not be resolved — see Limitations). Stored resolved rather than raw so the Detail Panel never displays an opaque durable Id to a user. */
-            'triggerObjectApiName' => OI_ScannerObjectResolver.canonicalInScopeName(flow.TriggerObjectOrEventId)
-        };
-        return new OI_DiscoveredComponent(
-            OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
-            COMPONENT_KIND,
-            fullyQualifiedName,
-            namespace,
-            'SOQL',
-            attributes,
-            OI_ChecksumUtil.computeChecksum(COMPONENT_KIND, fullyQualifiedName, attributes),
-            null,
-            null
-        );
-    }
+    return new OI_DiscoveryBatch(
+      context.scanTaskId,
+      COMPONENT_KIND,
+      components,
+      relationships,
+      true,
+      1,
+      /** PARTIAL by design, not DEGRADED: the trigger-object edge this Scanner does emit is exact, and the internals it cannot see are a permanent boundary of FlowDefinitionView rather than a failure a retry or a permission change would fix. Stating that distinction matters — an admin should not go hunting for a misconfiguration that does not exist. */
+      OI_ScanCoverage.partial(
+        relationships.size(),
+        'Only the object a record-triggered Flow fires on is detected. What a Flow reads or updates internally — ' +
+          'its field references, Apex invocations, and subflow calls — requires the Flow metadata definition, which is not ' +
+          'reachable without Tooling API access. Screen, scheduled, and autolaunched Flows have no trigger object and ' +
+          'correctly produce no relationship.'
+      )
+    );
+  }
+
+  private OI_DiscoveredComponent toComponent(FlowDefinitionView flow) {
+    String namespace = String.isBlank(flow.NamespacePrefix)
+      ? null
+      : flow.NamespacePrefix;
+    String fullyQualifiedName = namespace == null
+      ? flow.ApiName
+      : namespace + '.' + flow.ApiName;
+    Map<String, Object> attributes = new Map<String, Object>{
+      'label' => flow.Label,
+      'description' => flow.Description,
+      'processType' => flow.ProcessType,
+      'triggerType' => flow.TriggerType,
+      'isActive' => flow.IsActive,
+      'versionNumber' => flow.VersionNumber,
+      'manageableState' => flow.ManageableState,
+      /** The resolved, in-scope trigger object (null for non-record-triggered Flows, and for a custom object whose Id could not be resolved — see Limitations). Stored resolved rather than raw so the Detail Panel never displays an opaque durable Id to a user. */
+      'triggerObjectApiName' => OI_ScannerObjectResolver.canonicalInScopeName(
+        flow.TriggerObjectOrEventId
+      )
+    };
+    return new OI_DiscoveredComponent(
+      OI_ComponentKeyUtil.build(COMPONENT_KIND, namespace, fullyQualifiedName),
+      COMPONENT_KIND,
+      fullyQualifiedName,
+      namespace,
+      'SOQL',
+      attributes,
+      OI_ChecksumUtil.computeChecksum(
+        COMPONENT_KIND,
+        fullyQualifiedName,
+        attributes
+      ),
+      null,
+      null
+    );
+  }
 }

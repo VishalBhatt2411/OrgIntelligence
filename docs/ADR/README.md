@@ -36,6 +36,7 @@ Index of ADRs for the Salesforce Org Intelligence Platform. Each record captures
 | [0028](0028-unified-cross-surface-design-token-system.md)               | Unified Cross-Surface Design Token System                                                | Accepted — reconciles 0025, 0026             |
 | [0029](0029-tooling-api-self-callout-via-named-credential.md)           | Tooling API Self-Callout Authenticated via a Packaged Named Credential                   | Accepted                                     |
 | [0030](0030-tech-debt-ai-provider-switch-to-gemini.md)                  | Tech Debt "Explain with AI" Switched from Anthropic to Google Gemini (Free Tier)         | Accepted (dev org — revisit pre-AppExchange) |
+| [0031](0031-scan-scope-and-storage-light-graph-persistence.md)          | Scan Scope Policy and Storage-Light Graph Persistence                                    | Accepted                                     |
 
 ## When to add a new ADR
 

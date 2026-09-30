@@ -48,6 +48,11 @@ public with sharing class OI_PermissionSetSelector {
     ];
   }
 
+  /** Live count of standalone Permission Sets — profile shadow rows excluded, since those are Profiles, not Permission Sets. */
+  public Integer countStandalonePermissionSets() {
+    return [SELECT COUNT() FROM PermissionSet WHERE IsOwnedByProfile = FALSE];
+  }
+
   /** One assignee count per Permission Set Id — a bounded aggregate, never a per-row count. */
   public Map<Id, Integer> countAssigneesByPermissionSetIds(
     Set<Id> permissionSetIds

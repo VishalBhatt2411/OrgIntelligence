@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Graph_Version_Retention_Days__c</fullName>
+    <label>Graph Version Retention Days</label>
+    <type>Number</type>
+    <precision>4</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <description
+  >Days a superseded (non-current) graph node/edge version stays in data storage before OI_GraphArchivalBatch moves it to the Big Object archive (ADR-0031). 0 archives every superseded version after each scan; blank or negative uses 1.</description>
+</CustomField>

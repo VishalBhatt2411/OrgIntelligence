@@ -52,7 +52,88 @@ private class OI_OrgOverviewServiceTest {
       'A node type with zero current rows must report 0, not null.'
     );
     System.assertEquals(0, dto.flowCount);
-    System.assertEquals(0, dto.permissionSetCount);
+    System.assertEquals(
+      [SELECT COUNT() FROM PermissionSet WHERE IsOwnedByProfile = FALSE],
+      dto.permissionSetCount,
+      'With no PermissionSet nodes in the graph, the KPI must fall back to the live standalone count, not report 0.'
+    );
+  }
+
+  /** Once PermissionSet nodes are persisted, the graph count is authoritative and no live fallback applies. */
+  @isTest
+  static void testPermissionSetCountPrefersPersistedNodes() {
+    insert new OI_Graph_Node__c(
+      Node_Key__c = 'ps1',
+      Node_Version_Key__c = 'ps1::v1',
+      Version_Number__c = 1,
+      Node_Type__c = 'SalesforceMetadata.PermissionSet',
+      State__c = 'Active',
+      Is_Current__c = true
+    );
+
+    System.assertEquals(
+      1,
+      new OI_OrgOverviewService().getOrgOverview().permissionSetCount
+    );
+  }
+
+  /** ADR-0031: only relationship fields are persisted, so the Fields KPI sums each object's scanned fieldCount. */
+  @isTest
+  static void testFieldCountSumsScannedObjectAttributesInsteadOfFieldNodes() {
+    insert new List<OI_Graph_Node__c>{
+      objectNode('o1', '{"fieldCount":40,"customFieldCount":5}'),
+      objectNode('o2', '{"fieldCount":12,"customFieldCount":12}'),
+      new OI_Graph_Node__c(
+        Node_Key__c = 'f1',
+        Node_Version_Key__c = 'f1::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'SalesforceMetadata.CustomField',
+        State__c = 'Active',
+        Is_Current__c = true
+      )
+    };
+
+    System.assertEquals(
+      52,
+      new OI_OrgOverviewService().getOrgOverview().fieldCount
+    );
+  }
+
+  @isTest
+  static void testFieldCountFallsBackToFieldNodesWhenAnyObjectPredatesTheAttribute() {
+    insert new List<OI_Graph_Node__c>{
+      objectNode('o1', '{"fieldCount":40}'),
+      objectNode('o2', null),
+      new OI_Graph_Node__c(
+        Node_Key__c = 'f1',
+        Node_Version_Key__c = 'f1::v1',
+        Version_Number__c = 1,
+        Node_Type__c = 'SalesforceMetadata.CustomField',
+        State__c = 'Active',
+        Is_Current__c = true
+      )
+    };
+
+    System.assertEquals(
+      1,
+      new OI_OrgOverviewService().getOrgOverview().fieldCount,
+      'A partial sum would undercount, so a mixed graph reports the persisted field-node count.'
+    );
+  }
+
+  private static OI_Graph_Node__c objectNode(
+    String key,
+    String attributesJson
+  ) {
+    return new OI_Graph_Node__c(
+      Node_Key__c = key,
+      Node_Version_Key__c = key + '::v1',
+      Version_Number__c = 1,
+      Node_Type__c = 'SalesforceMetadata.CustomObject',
+      Attributes_Json__c = attributesJson,
+      State__c = 'Active',
+      Is_Current__c = true
+    );
   }
 
   @isTest

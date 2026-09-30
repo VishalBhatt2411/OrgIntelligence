@@ -58,6 +58,9 @@ public with sharing class OI_NodeSelector {
    * caller's ceiling IS the bound, and a result at exactly that size is reported honestly
    * via the caller's own coverage note, never silently completed with a second page —
    * Tier 2 by definition trades exhaustiveness for staying synchronous and bounded.
+   * Projects Attributes_Json__c so a caller can read scan-time aggregates (an object's
+   * fieldCount/customFieldCount, ADR-0031) without a second query; the row ceiling keeps
+   * the heap cost bounded.
    */
   public List<OI_Graph_Node__c> selectCurrentByTypeBounded(
     String typeKey,
@@ -65,7 +68,7 @@ public with sharing class OI_NodeSelector {
   ) {
     Integer effectiveCeiling = ceiling == null || ceiling <= 0 ? 500 : ceiling;
     String query =
-      'SELECT Node_Key__c, Label__c FROM OI_Graph_Node__c ' +
+      'SELECT Node_Key__c, Label__c, Attributes_Json__c FROM OI_Graph_Node__c ' +
       'WHERE Node_Type__c = :typeKey AND Is_Current__c = true AND State__c = \'Active\' ' +
       'ORDER BY Node_Key__c ASC LIMIT :effectiveCeiling';
     return Database.query(query);
@@ -131,6 +134,37 @@ public with sharing class OI_NodeSelector {
    * current version are simply absent from the result — not an error
    * (GraphRepository.md §2).
    */
+  /**
+   * Archival scope (ADR-0002/ADR-0031): non-current version rows last modified at or before
+   * the cutoff. Keys only — the batch re-reads each chunk's full rows by version key, so the
+   * locator stays cheap. Is_Current__c = false is the hard guard: a current row is never
+   * archived or purged, whatever the cutoff.
+   */
+  public Database.QueryLocator queryLocatorSupersededBefore(Datetime cutoff) {
+    return Database.getQueryLocator(
+      [
+        SELECT Id, Node_Version_Key__c
+        FROM OI_Graph_Node__c
+        WHERE Is_Current__c = FALSE AND SystemModstamp <= :cutoff
+        ORDER BY Node_Version_Key__c
+      ]
+    );
+  }
+
+  /** Non-current rows by version key, full detail — the archival batch's per-chunk read. */
+  public List<OI_Graph_Node__c> selectSupersededByVersionKeys(
+    Set<String> versionKeys
+  ) {
+    if (versionKeys == null || versionKeys.isEmpty()) {
+      return new List<OI_Graph_Node__c>();
+    }
+    String query =
+      'SELECT ' +
+      String.join(DETAIL_FIELDS, ', ') +
+      ' FROM OI_Graph_Node__c WHERE Node_Version_Key__c IN :versionKeys AND Is_Current__c = false';
+    return Database.query(query);
+  }
+
   public List<OI_Graph_Node__c> selectCurrentByKeys(Set<String> nodeKeys) {
     if (nodeKeys == null || nodeKeys.isEmpty()) {
       return new List<OI_Graph_Node__c>();
