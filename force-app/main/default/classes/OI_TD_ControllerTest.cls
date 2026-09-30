@@ -40,18 +40,9 @@ private class OI_TD_ControllerTest {
   @isTest
   static void appShellMethods() {
     OI_TD_Controller.AppContext ctx = OI_TD_Controller.getAppContext();
-    System.assertEquals(UserInfo.getUserName(), ctx.username);
     System.assert(ctx.canRunScan);
     System.assert(ctx.canManageFindings);
     System.assert(ctx.canManageSettings);
-
-    OI_TD_Controller.OrgInfoDTO info = OI_TD_Controller.getOrgInfo();
-    System.assertNotEquals(null, info.name);
-    System.assert(
-      info.advancedDetailsUrl.endsWith(
-        '/lightning/setup/CompanyProfileInfo/home'
-      )
-    );
 
     System.assertEquals(
       'off',
@@ -78,6 +69,43 @@ private class OI_TD_ControllerTest {
 
     List<OI_TD_Controller.HistoryPoint> history = OI_TD_Controller.getHealthHistory();
     System.assertEquals(1, history.size());
+  }
+
+  @isTest
+  static void scansReportSectionsThatFailed() {
+    OI_TD_Scan__c s = scan();
+    s.Section_Results__c = JSON.serialize(
+      new List<OI_TD_ScanState.SectionResult>{
+        new OI_TD_ScanState.SectionResult('objects', 0, 'API unreachable'),
+        new OI_TD_ScanState.SectionResult('apex_classes', 12, null),
+        new OI_TD_ScanState.SectionResult('lwc', 0, 'API unreachable')
+      }
+    );
+    update s;
+
+    List<OI_TD_Controller.SectionIssue> failed = OI_TD_Controller.getScans()[0]
+      .failedSections;
+    System.assertEquals(
+      2,
+      failed.size(),
+      'Only sections with an error are reported.'
+    );
+    System.assertEquals('objects', failed[0].category);
+    System.assertEquals('API unreachable', failed[0].error);
+    System.assertEquals('lwc', failed[1].category);
+  }
+
+  @isTest
+  static void failedSectionsToleratesMissingAndUnreadableResults() {
+    System.assertEquals(0, OI_TD_Controller.failedSections(null).size());
+    System.assertEquals(0, OI_TD_Controller.failedSections('not json').size());
+    System.assertEquals(
+      0,
+      OI_TD_Controller.failedSections(
+          '[{"category":"flows","itemCount":3,"error":null}]'
+        )
+        .size()
+    );
   }
 
   @isTest
@@ -488,6 +516,12 @@ private class OI_TD_ControllerTest {
   }
 
   @isTest
+  static void reportPdfIsReturnedAsBase64() {
+    String pdf = OI_TD_Controller.getReportPdf(scan().Id);
+    System.assertEquals('%PDF-test', EncodingUtil.base64Decode(pdf).toString());
+  }
+
+  @isTest
   static void reportDataOrdersFindingsBySeverity() {
     OI_TD_Controller.ReportDTO r = OI_TD_Controller.getReportData(scan().Id);
     System.assertEquals(88, r.overall);
@@ -534,7 +568,6 @@ private class OI_TD_ControllerTest {
     System.runAs(u) {
       List<String> calls = new List<String>{
         'getAppContext',
-        'getOrgInfo',
         'getSchedule',
         'updateSchedule',
         'getScans',
@@ -551,7 +584,8 @@ private class OI_TD_ControllerTest {
         'getComponentAccess',
         'explainComponent',
         'getSetupLink',
-        'getReportData'
+        'getReportData',
+        'getReportPdf'
       };
       for (String call : calls) {
         try {
@@ -568,8 +602,6 @@ private class OI_TD_ControllerTest {
   private static void invoke(String call, Id scanId, Id findingId) {
     if (call == 'getAppContext')
       OI_TD_Controller.getAppContext();
-    else if (call == 'getOrgInfo')
-      OI_TD_Controller.getOrgInfo();
     else if (call == 'getSchedule')
       OI_TD_Controller.getSchedule();
     else if (call == 'updateSchedule')
@@ -604,5 +636,7 @@ private class OI_TD_ControllerTest {
       OI_TD_Controller.getSetupLink(scanId, 'SfObject', 'Invoice__c');
     else if (call == 'getReportData')
       OI_TD_Controller.getReportData(scanId);
+    else if (call == 'getReportPdf')
+      OI_TD_Controller.getReportPdf(scanId);
   }
 }

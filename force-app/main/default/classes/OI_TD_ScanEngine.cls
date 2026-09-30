@@ -83,7 +83,6 @@ public with sharing class OI_TD_ScanEngine {
   private static final Integer SHARD_CHARS = 100000;
   private static final Integer HAY_CHARS = 100000;
   private static final Long WALL_BUDGET_MS = 55000;
-  private static final Integer KEEP_SCANS = 10;
   private static final List<String> RISKY_PERMS = new List<String>{
     'AuthorApex',
     'ManageUsers',
@@ -1067,6 +1066,10 @@ public with sharing class OI_TD_ScanEngine {
         st.refIdxBySfId.put(refId, refIdxValue);
       }
       addUnique(st.dependentsBySfId.get(refId), compIdx);
+      if (!st.dependentIdsBySfId.containsKey(refId)) {
+        st.dependentIdsBySfId.put(refId, new Set<String>());
+      }
+      st.dependentIdsBySfId.get(refId).add(compId);
       if (!st.referencesBySfId.containsKey(compId)) {
         st.referencesBySfId.put(compId, new List<Integer>());
       }
@@ -1625,7 +1628,7 @@ public with sharing class OI_TD_ScanEngine {
       OI_TD_Rules.NewFinding god = OI_TD_Rules.godComponent(
         ref[1],
         ref[0],
-        st.dependentsBySfId.get(refId).size()
+        st.dependentIdsBySfId.get(refId).size()
       );
       if (god != null) {
         arch.add(god);
@@ -1745,41 +1748,8 @@ public with sharing class OI_TD_ScanEngine {
       WHERE Scan__c = :scanId AND Kind__c LIKE 'hay:%'
       LIMIT 5000
     ];
-    pruneOldScanData();
     st.stage = S_DONE;
     return false;
-  }
-
-  /**
-   * Component inventories are only kept for the most recent scans (findings and scores are kept for all).
-   * Runs inside OI_TD_ScanBatch, where SOQL OFFSET is not allowed — so the newest KEEP_SCANS rows are
-   * skipped in Apex instead.
-   */
-  @TestVisible
-  private static void pruneOldScanData() {
-    Integer window = KEEP_SCANS + 200;
-    List<OI_TD_Scan__c> recent = [
-      SELECT Id
-      FROM OI_TD_Scan__c
-      ORDER BY Started_At__c DESC
-      LIMIT :window
-    ];
-    Set<Id> older = new Set<Id>();
-    for (Integer i = KEEP_SCANS; i < recent.size(); i++) {
-      older.add(recent[i].Id);
-    }
-    if (older.isEmpty()) {
-      return;
-    }
-    List<OI_TD_Scan_Data__c> rows = [
-      SELECT Id
-      FROM OI_TD_Scan_Data__c
-      WHERE Scan__c IN :older
-      LIMIT 5000
-    ];
-    if (!rows.isEmpty()) {
-      delete rows;
-    }
   }
 
   // =====================================================================

@@ -2,10 +2,11 @@
  * Purpose: Starts Tech Debt scans and owns the recurring-scan schedule.
  * Responsibilities: Create the OI_TD_Scan__c row and launch OI_TD_ScanBatch (one scan at a time,
  *                    with self-healing of scans whose batch chain died); read/update the org-level
- *                    schedule (OI_TD_Settings__c) and keep the hourly OI_TD_ScheduledScan job in step.
+ *                    schedule (OI_TD_Settings__c) and keep the OI_TD_ScheduledScan jobs (a check every
+ *                    15 minutes, like the reference app) in step.
  * Dependencies: OI_TD_ScanBatch, OI_TD_ScanState, OI_TD_ScheduledScan, OI_TD_Settings__c.
- * Limitations: Schedules are org-wide (one connected org — this one), like the reference app's
- *              per-connection schedule.
+ * Limitations: Schedules are org-wide, like the reference app's per-org schedule. Salesforce cron
+ *              has no "every 15 minutes", so four hourly jobs run at :00, :15, :30 and :45.
  */
 public with sharing class OI_TD_ScanService {
   public static final String TRIGGER_MANUAL = 'manual';
@@ -17,7 +18,12 @@ public with sharing class OI_TD_ScanService {
     'monthly'
   };
   public static final String JOB_NAME = 'OI Tech Debt scheduled scan';
-  private static final String HOURLY_CRON = '0 0 * * * ?';
+  private static final List<Integer> CHECK_MINUTES = new List<Integer>{
+    0,
+    15,
+    30,
+    45
+  };
   private static final Set<String> ACTIVE_JOB_STATUSES = new Set<String>{
     'Holding',
     'Queued',
@@ -118,15 +124,21 @@ public with sharing class OI_TD_ScanService {
     s.Frequency__c = frequency;
     s.Next_Scan_At__c = nextScanAtFor(frequency, System.now());
     if (frequency == 'off') {
-      abortJob(s.Scheduled_Job_Id__c);
-      s.Scheduled_Job_Id__c = null;
-    } else if (!jobIsScheduled(s.Scheduled_Job_Id__c)) {
       abortExistingByName();
-      s.Scheduled_Job_Id__c = System.schedule(
-        JOB_NAME,
-        HOURLY_CRON,
-        new OI_TD_ScheduledScan()
-      );
+      s.Scheduled_Job_Id__c = null;
+    } else if (activeJobCount() != CHECK_MINUTES.size()) {
+      abortExistingByName();
+      s.Scheduled_Job_Id__c = null;
+      for (Integer minute : CHECK_MINUTES) {
+        Id jobId = System.schedule(
+          JOB_NAME + ' :' + String.valueOf(minute).leftPad(2, '0'),
+          '0 ' + minute + ' * * * ?',
+          new OI_TD_ScheduledScan()
+        );
+        if (s.Scheduled_Job_Id__c == null) {
+          s.Scheduled_Job_Id__c = jobId;
+        }
+      }
     }
     upsert s;
     return getSchedule();
@@ -142,7 +154,11 @@ public with sharing class OI_TD_ScanService {
     return null;
   }
 
-  /** Called by the hourly job: starts a scan when one is due and moves the next run forward. */
+  /**
+   * Called every 15 minutes: starts a scan when one is due and moves the next run forward.
+   * While another scan is still running the due time is left alone, so the next check retries
+   * instead of silently skipping this run.
+   */
   public static void runDueScan() {
     OI_TD_Settings__c s = OI_TD_Settings__c.getOrgDefaults();
     if (
@@ -151,6 +167,9 @@ public with sharing class OI_TD_ScanService {
       s.Next_Scan_At__c == null ||
       s.Next_Scan_At__c > System.now()
     ) {
+      return;
+    }
+    if (isScanRunning()) {
       return;
     }
     try {
@@ -165,31 +184,37 @@ public with sharing class OI_TD_ScanService {
     upsert s;
   }
 
-  private static Boolean jobIsScheduled(String jobId) {
-    if (String.isBlank(jobId)) {
-      return false;
-    }
+  private static Boolean isScanRunning() {
+    healStaleScans();
     return ![
         SELECT Id
-        FROM CronTrigger
-        WHERE Id = :jobId AND State NOT IN ('DELETED', 'COMPLETE', 'ERROR')
+        FROM OI_TD_Scan__c
+        WHERE Status__c = :OI_TD_ScanEngine.STATUS_RUNNING
         LIMIT 1
       ]
       .isEmpty();
   }
 
-  private static void abortJob(String jobId) {
-    if (String.isNotBlank(jobId) && jobIsScheduled(jobId)) {
-      System.abortJob(jobId);
-    }
+  private static Integer activeJobCount() {
+    String pattern = JOB_NAME + '%';
+    return [
+      SELECT COUNT()
+      FROM CronTrigger
+      WHERE
+        CronJobDetail.Name LIKE :pattern
+        AND State NOT IN ('DELETED', 'COMPLETE', 'ERROR')
+    ];
   }
 
   private static void abortExistingByName() {
+    String pattern = JOB_NAME + '%';
     for (CronTrigger ct : [
       SELECT Id
       FROM CronTrigger
-      WHERE CronJobDetail.Name = :JOB_NAME
-      LIMIT 5
+      WHERE
+        CronJobDetail.Name LIKE :pattern
+        AND State NOT IN ('DELETED', 'COMPLETE', 'ERROR')
+      LIMIT 20
     ]) {
       System.abortJob(ct.Id);
     }

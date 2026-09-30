@@ -171,6 +171,8 @@ public with sharing class OI_TD_ScanState {
   public List<List<String>> refs = new List<List<String>>();
   public Map<String, Integer> refIndex = new Map<String, Integer>();
   public Map<String, List<Integer>> dependentsBySfId = new Map<String, List<Integer>>();
+  /** Distinct MetadataComponentIds depending on each referenced Id (the god_component count). */
+  public Map<String, Set<String>> dependentIdsBySfId = new Map<String, Set<String>>();
   public Map<String, List<Integer>> referencesBySfId = new Map<String, List<Integer>>();
   public Map<String, Integer> refIdxBySfId = new Map<String, Integer>();
   public List<String> depRefOrder = new List<String>();

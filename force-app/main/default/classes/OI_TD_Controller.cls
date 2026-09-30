@@ -52,8 +52,6 @@ public with sharing class OI_TD_Controller {
 
   public class AppContext {
     @AuraEnabled
-    public String username;
-    @AuraEnabled
     public Boolean canRunScan;
     @AuraEnabled
     public Boolean canManageFindings;
@@ -80,6 +78,16 @@ public with sharing class OI_TD_Controller {
     public Integer totalFindings;
     @AuraEnabled
     public String triggeredBy;
+    /** Sections the scan could not read (a completed scan can still be partial); empty when every section succeeded. */
+    @AuraEnabled
+    public List<SectionIssue> failedSections;
+  }
+
+  public class SectionIssue {
+    @AuraEnabled
+    public String category;
+    @AuraEnabled
+    public String error;
   }
 
   public class HealthDTO {
@@ -138,15 +146,6 @@ public with sharing class OI_TD_Controller {
     public Integer overall;
   }
 
-  public class OrgInfoDTO {
-    @AuraEnabled
-    public String name;
-    @AuraEnabled
-    public String edition;
-    @AuraEnabled
-    public String advancedDetailsUrl;
-  }
-
   public class AccessGrant {
     @AuraEnabled
     public String name;
@@ -197,31 +196,10 @@ public with sharing class OI_TD_Controller {
     try {
       OI_SecurityService.assertPermission(PERM_VIEW);
       AppContext ctx = new AppContext();
-      ctx.username = UserInfo.getUserName();
       ctx.canRunScan = OI_SecurityService.hasPermission(PERM_RUN);
       ctx.canManageFindings = OI_SecurityService.hasPermission(PERM_MANAGE);
       ctx.canManageSettings = OI_SecurityService.hasPermission(PERM_SETTINGS);
       return ctx;
-    } catch (Exception e) {
-      throw translate(e);
-    }
-  }
-
-  @AuraEnabled
-  public static OrgInfoDTO getOrgInfo() {
-    try {
-      OI_SecurityService.assertPermission(PERM_VIEW);
-      OrgInfoDTO info = new OrgInfoDTO();
-      List<Organization> orgs = [
-        SELECT Name, OrganizationType
-        FROM Organization
-        LIMIT 1
-      ];
-      info.name = orgs.isEmpty() ? null : orgs[0].Name;
-      info.edition = orgs.isEmpty() ? null : orgs[0].OrganizationType;
-      info.advancedDetailsUrl =
-        orgDomain() + '/lightning/setup/CompanyProfileInfo/home';
-      return info;
     } catch (Exception e) {
       throw translate(e);
     }
@@ -270,7 +248,8 @@ public with sharing class OI_TD_Controller {
           Error__c,
           Overall_Score__c,
           Total_Findings__c,
-          Triggered_By__c
+          Triggered_By__c,
+          Section_Results__c
         FROM OI_TD_Scan__c
         ORDER BY Started_At__c DESC
         LIMIT 500
@@ -289,6 +268,7 @@ public with sharing class OI_TD_Controller {
           ? null
           : s.Total_Findings__c.intValue();
         d.triggeredBy = s.Triggered_By__c;
+        d.failedSections = failedSections(s.Section_Results__c);
         out.add(d);
       }
       return out;
@@ -1003,6 +983,27 @@ public with sharing class OI_TD_Controller {
   // Report export
   // =====================================================================
 
+  /**
+   * The PDF export as base64, rendered from the OI_TD_Report Visualforce page, so the tab can save
+   * it as tech-debt-report.pdf (the reference app's download) instead of opening a new tab.
+   * getContentAsPDF is not supported in tests, so tests get a placeholder body.
+   */
+  @AuraEnabled
+  public static String getReportPdf(Id scanId) {
+    try {
+      OI_SecurityService.assertPermission(PERM_VIEW);
+      requireScan(scanId);
+      PageReference page = Page.OI_TD_Report;
+      page.getParameters().put('scanId', scanId);
+      Blob pdf = Test.isRunningTest()
+        ? Blob.valueOf('%PDF-test')
+        : page.getContentAsPDF();
+      return EncodingUtil.base64Encode(pdf);
+    } catch (Exception e) {
+      throw translate(e);
+    }
+  }
+
   /** Data for the Excel export (the PDF is rendered by the OI_TD_Report Visualforce page). */
   @AuraEnabled
   public static ReportDTO getReportData(Id scanId) {
@@ -1138,6 +1139,35 @@ public with sharing class OI_TD_Controller {
       LIMIT 20000
     ]) {
       out.add(toDto(f));
+    }
+    return out;
+  }
+
+  /** Reads the sections that recorded an error from Section_Results__c (OI_TD_ScanState.SectionResult JSON); unreadable JSON yields none rather than failing the scan list. */
+  @TestVisible
+  private static List<SectionIssue> failedSections(String sectionResultsJson) {
+    List<SectionIssue> out = new List<SectionIssue>();
+    if (String.isBlank(sectionResultsJson)) {
+      return out;
+    }
+    try {
+      for (
+        Object raw : (List<Object>) JSON.deserializeUntyped(sectionResultsJson)
+      ) {
+        Map<String, Object> section = (Map<String, Object>) raw;
+        String error = (String) section.get('error');
+        if (String.isNotBlank(error)) {
+          SectionIssue issue = new SectionIssue();
+          issue.category = (String) section.get('category');
+          issue.error = error.left(500);
+          out.add(issue);
+        }
+      }
+    } catch (Exception e) {
+      System.debug(
+        LoggingLevel.WARN,
+        'OI_TD_Controller: unreadable Section_Results__c — ' + e.getMessage()
+      );
     }
     return out;
   }
@@ -1305,6 +1335,8 @@ public with sharing class OI_TD_Controller {
       e instanceof OI_IntegrationException
     ) {
       message = e.getMessage();
+    } else if (OI_StorageLimitUtil.isStorageLimitFailure(e)) {
+      message = OI_StorageLimitUtil.STORAGE_FULL_MESSAGE;
     } else {
       message = 'Something went wrong in Tech Debt. Please try again.';
     }

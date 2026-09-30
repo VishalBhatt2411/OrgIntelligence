@@ -2,7 +2,6 @@ import { LightningElement } from "lwc";
 import { loadStyle } from "lightning/platformResourceLoader";
 import FONTS from "@salesforce/resourceUrl/OI_TD_Fonts";
 import getAppContext from "@salesforce/apex/OI_TD_Controller.getAppContext";
-import getOrgInfo from "@salesforce/apex/OI_TD_Controller.getOrgInfo";
 import getSchedule from "@salesforce/apex/OI_TD_Controller.getSchedule";
 import updateSchedule from "@salesforce/apex/OI_TD_Controller.updateSchedule";
 import getScans from "@salesforce/apex/OI_TD_Controller.getScans";
@@ -35,13 +34,16 @@ const FREQUENCIES = [
 
 /**
  * Tech Debt shell — the Salesforce port of the reference app's App.tsx: dark sidebar with the
- * Monitor/Workspace nav and org menu, sticky top bar with breadcrumb, global search and Run Scan,
- * the scanning screen, the old-scan banner and the four pages. Scans run asynchronously
- * (Queueable/Batch), so the shell polls getScans while the latest scan is running.
+ * Monitor/Workspace nav, sticky top bar with breadcrumb, global search and Run Scan, the scanning
+ * screen, the old-scan banner and the four pages. The app lives inside the org it scans, so the
+ * reference app's connected-org menu (org info, logout) is not carried over; Scan Schedule is a
+ * Workspace nav item instead. Scans run asynchronously (Batch), so the shell polls getScans while
+ * the latest scan is running. Only a scan started from this tab blocks it with the scanning screen
+ * (like the reference app's pending Run Scan request); a scheduled scan or one started elsewhere
+ * shows a progress banner instead.
  */
 export default class OiTdApp extends LightningElement {
   ctx = {
-    username: "",
     canRunScan: false,
     canManageFindings: false,
     canManageSettings: false
@@ -63,9 +65,6 @@ export default class OiTdApp extends LightningElement {
   componentsSearch;
 
   drawerOpen = false;
-  orgMenuOpen = false;
-  orgInfoOpen = false;
-  orgInfo;
   scheduleOpen = false;
   schedule;
   scheduleSaving = false;
@@ -77,6 +76,7 @@ export default class OiTdApp extends LightningElement {
   _toastTimer;
   _pollTimer;
   _watchingScanId = null;
+  _startedScanId = null;
   _keyHandler;
 
   // ------------------------------------------------------------------ lifecycle
@@ -133,8 +133,10 @@ export default class OiTdApp extends LightningElement {
       latest.id === this._watchingScanId
     ) {
       this._watchingScanId = null;
+      const startedHere = latest.id === this._startedScanId;
       if (latest.status === "completed") {
-        this.viewedScanId = null;
+        // A scan run from this tab jumps to its results; a background one leaves the view alone.
+        if (startedHere) this.viewedScanId = null;
         this.showToast("Scan complete", "success");
       } else {
         this.showToast(
@@ -143,6 +145,7 @@ export default class OiTdApp extends LightningElement {
         );
       }
     }
+    if (!latest || latest.status !== "running") this._startedScanId = null;
     this.loadScanData();
   }
 
@@ -161,9 +164,11 @@ export default class OiTdApp extends LightningElement {
   }
 
   get isScanning() {
-    return (
-      this.starting || (this.latestScan && this.latestScan.status === "running")
-    );
+    return this.starting || this.latestRunning;
+  }
+
+  get latestRunning() {
+    return !!this.latestScan && this.latestScan.status === "running";
   }
 
   loadScanData() {
@@ -210,6 +215,7 @@ export default class OiTdApp extends LightningElement {
     startScan()
       .then((scanId) => {
         this._watchingScanId = scanId;
+        this._startedScanId = scanId;
         return this.refreshScans();
       })
       .catch((e) => this.showToast(errorMessage(e) || "Scan failed", "error"))
@@ -230,16 +236,53 @@ export default class OiTdApp extends LightningElement {
   // ------------------------------------------------------------------ view state
 
   get showScanning() {
-    return this.isScanning;
+    return (
+      this.starting ||
+      (this.latestRunning && this.latestScan.id === this._startedScanId)
+    );
+  }
+  get showBackgroundScan() {
+    return this.latestRunning && !this.showScanning;
+  }
+  get backgroundScanText() {
+    const s = this.latestScan;
+    const kind = s.triggeredBy === "scheduled" ? "A scheduled scan" : "A scan";
+    const stage = s.currentStage ? " (" + s.currentStage + ")" : "";
+    return (
+      kind + " is running" + stage + ". Results will refresh when it finishes."
+    );
+  }
+  get showFailedBanner() {
+    const s = this.latestScan;
+    return (
+      !this.showScanning && !this.scansLoading && !!s && s.status === "failed"
+    );
+  }
+  get failedText() {
+    const s = this.latestScan;
+    let text =
+      "The latest scan (" +
+      fmtDateTime(s.startedAt) +
+      ") failed" +
+      (s.error ? ": " + s.error : ".");
+    const lc = this.latestCompleted;
+    if (lc) text += " Showing results from " + fmtDateTime(lc.startedAt) + ".";
+    return text;
+  }
+  get showFailedHistoryLink() {
+    return !this.isHistory;
+  }
+  handleOpenHistory() {
+    this.selectTab("history");
   }
   get showInitialLoading() {
-    return !this.isScanning && this.scansLoading;
+    return !this.showScanning && this.scansLoading;
   }
   get showNoScans() {
-    return !this.isScanning && !this.scansLoading && !this.activeScanId;
+    return !this.showScanning && !this.scansLoading && !this.activeScanId;
   }
   get showPages() {
-    return !this.isScanning && !this.scansLoading && !!this.activeScanId;
+    return !this.showScanning && !this.scansLoading && !!this.activeScanId;
   }
   get showOldBanner() {
     const lc = this.latestCompleted;
@@ -291,7 +334,7 @@ export default class OiTdApp extends LightningElement {
   get workspaceItems() {
     return [
       this.decorateNav({ key: "history", label: "Scan history", count: null }),
-      this.decorateNav({ key: "settings", label: "Settings", count: null })
+      this.decorateNav({ key: "schedule", label: "Scan schedule", count: null })
     ];
   }
 
@@ -308,8 +351,8 @@ export default class OiTdApp extends LightningElement {
   handleNav(event) {
     const key = event.currentTarget.dataset.key;
     this.drawerOpen = false;
-    if (key === "settings") {
-      this.showToast("Settings isn't built yet", "info");
+    if (key === "schedule") {
+      this.handleSchedule();
       return;
     }
     this.selectTab(key);
@@ -374,49 +417,9 @@ export default class OiTdApp extends LightningElement {
     return this.drawerOpen ? "sidebar sidebar-open" : "sidebar";
   }
 
-  // ------------------------------------------------------------------ org menu + dialogs
-
-  get avatarLetter() {
-    const u = this.ctx.username || "";
-    return u ? u.charAt(0).toUpperCase() : "?";
-  }
-
-  toggleOrgMenu() {
-    this.orgMenuOpen = !this.orgMenuOpen;
-  }
-  closeOrgMenu() {
-    this.orgMenuOpen = false;
-  }
-
-  handleOrgInfo() {
-    this.orgMenuOpen = false;
-    this.orgInfoOpen = true;
-    getOrgInfo()
-      .then((info) => {
-        this.orgInfo = info;
-      })
-      .catch((e) => this.showToast(errorMessage(e), "error"));
-  }
-  closeOrgInfo() {
-    this.orgInfoOpen = false;
-  }
-  get orgName() {
-    return (this.orgInfo && this.orgInfo.name) || "—";
-  }
-  get orgEdition() {
-    return (this.orgInfo && this.orgInfo.edition) || "—";
-  }
-  get advancedDisabled() {
-    return !(this.orgInfo && this.orgInfo.advancedDetailsUrl);
-  }
-  handleAdvanced() {
-    if (this.orgInfo && this.orgInfo.advancedDetailsUrl) {
-      window.open(this.orgInfo.advancedDetailsUrl, "_blank", "noopener");
-    }
-  }
+  // ------------------------------------------------------------------ schedule dialog
 
   handleSchedule() {
-    this.orgMenuOpen = false;
     this.scheduleOpen = true;
     getSchedule()
       .then((s) => {
@@ -436,6 +439,8 @@ export default class OiTdApp extends LightningElement {
     return FREQUENCIES.map((f) => ({
       ...f,
       disabled,
+      // The filled style alone marks the active frequency; aria-pressed gives screen readers the same state.
+      pressed: f.value === current ? "true" : "false",
       btnClass:
         f.value === current
           ? "btn btn-small btn-contained"
@@ -467,11 +472,6 @@ export default class OiTdApp extends LightningElement {
       });
   }
 
-  handleLogout() {
-    this.orgMenuOpen = false;
-    window.location.assign("/secur/logout.jsp");
-  }
-
   stop(event) {
     event.stopPropagation();
   }
@@ -494,8 +494,7 @@ export default class OiTdApp extends LightningElement {
   }
   handleSearchKey(event) {
     if (event.key === "Escape") {
-      this.searchOpen = false;
-      event.target.blur();
+      this.resetSearch();
     }
   }
 
@@ -569,10 +568,6 @@ export default class OiTdApp extends LightningElement {
       input.value = "";
       input.blur();
     }
-  }
-
-  handleExportReport() {
-    this.showToast("Export isn't built yet", "info");
   }
 
   // ------------------------------------------------------------------ toast

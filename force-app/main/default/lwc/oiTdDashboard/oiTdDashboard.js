@@ -3,6 +3,7 @@ import getHealth from "@salesforce/apex/OI_TD_Controller.getHealth";
 import getHealthHistory from "@salesforce/apex/OI_TD_Controller.getHealthHistory";
 import getDiff from "@salesforce/apex/OI_TD_Controller.getDiff";
 import getReportData from "@salesforce/apex/OI_TD_Controller.getReportData";
+import getReportPdf from "@salesforce/apex/OI_TD_Controller.getReportPdf";
 import {
   RISK_PILL,
   SCORE_STATUS,
@@ -582,24 +583,29 @@ export default class OiTdDashboard extends LightningElement {
   }
 
   handlePdf() {
-    this.exportOpen = false;
-    window.open(
-      `/apex/OI_TD_Report?scanId=${encodeURIComponent(this._scanId)}`,
-      "_blank"
+    this.runExport(() =>
+      getReportPdf({ scanId: this._scanId }).then((pdf) => {
+        downloadBase64("tech-debt-report.pdf", "application/pdf", pdf);
+      })
     );
   }
 
   handleExcel() {
-    this.exportOpen = false;
-    this.exporting = true;
-    getReportData({ scanId: this._scanId })
-      .then((report) => {
+    this.runExport(() =>
+      getReportData({ scanId: this._scanId }).then((report) => {
         downloadBase64(
           "tech-debt-report.xlsx",
           XLSX_MIME,
           buildReportXlsx(report)
         );
       })
+    );
+  }
+
+  runExport(work) {
+    this.exportOpen = false;
+    this.exporting = true;
+    work()
       .catch((e) => {
         this.dispatchEvent(
           new CustomEvent("toast", {

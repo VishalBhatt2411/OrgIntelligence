@@ -74,8 +74,10 @@ private class OI_TD_ScanServiceTest {
     System.assertNotEquals(null, daily.nextScanAt);
     Id jobId = OI_TD_Settings__c.getOrgDefaults().Scheduled_Job_Id__c;
     System.assertNotEquals(null, jobId);
+    // A check every 15 minutes: four hourly jobs at :00, :15, :30 and :45.
+    System.assertEquals(4, activeScheduleJobs());
 
-    // Changing frequency keeps the same hourly job.
+    // Changing frequency keeps the same jobs.
     OI_TD_ScanService.updateSchedule('monthly');
     System.assertEquals(
       jobId,
@@ -91,14 +93,40 @@ private class OI_TD_ScanServiceTest {
       null,
       OI_TD_Settings__c.getOrgDefaults().Scheduled_Job_Id__c
     );
-    System.assertEquals(
-      0,
-      [
-        SELECT COUNT()
-        FROM CronTrigger
-        WHERE Id = :jobId AND State NOT IN ('DELETED', 'COMPLETE')
-      ]
+    System.assertEquals(0, activeScheduleJobs());
+  }
+
+  private static Integer activeScheduleJobs() {
+    String pattern = OI_TD_ScanService.JOB_NAME + '%';
+    return [
+      SELECT COUNT()
+      FROM CronTrigger
+      WHERE
+        CronJobDetail.Name LIKE :pattern
+        AND State NOT IN ('DELETED', 'COMPLETE', 'ERROR')
+    ];
+  }
+
+  /** A due run that finds a scan still running is retried at the next check, not skipped. */
+  @isTest
+  static void dueScanWaitsWhileAnotherScanRuns() {
+    OI_TD_TestSupport.installEngineFakes();
+    Datetime due = System.now().addMinutes(-5);
+    insert new OI_TD_Settings__c(
+      SetupOwnerId = UserInfo.getOrganizationId(),
+      Frequency__c = 'daily',
+      Next_Scan_At__c = due
     );
+    Test.startTest();
+    OI_TD_ScanService.startScan(OI_TD_ScanService.TRIGGER_MANUAL);
+    OI_TD_ScanService.runDueScan();
+    System.assertEquals(
+      due,
+      OI_TD_Settings__c.getOrgDefaults().Next_Scan_At__c,
+      'The due time must not move while a scan is running.'
+    );
+    Test.stopTest();
+    System.assertEquals(1, [SELECT COUNT() FROM OI_TD_Scan__c]);
   }
 
   @isTest

@@ -177,56 +177,6 @@ private class OI_TD_ScanEngineTest {
     );
   }
 
-  /** Only the 10 newest scans keep their inventory; older ones lose it (their scores stay). */
-  @isTest
-  static void pruneOldScanDataKeepsOnlyTheNewestScansInventory() {
-    List<OI_TD_Scan__c> scans = new List<OI_TD_Scan__c>();
-    List<OI_TD_Scan_Data__c> data = new List<OI_TD_Scan_Data__c>();
-    for (Integer i = 0; i < 12; i++) {
-      OI_TD_Scan__c scan = OI_TD_TestSupport.insertScan(
-        OI_TD_ScanEngine.STATUS_COMPLETED,
-        System.now().addDays(-i),
-        80
-      );
-      scans.add(scan);
-      data.add(OI_TD_DataStore.pack(scan.Id, 'objects', 0, '[]'));
-    }
-    insert data;
-
-    Test.startTest();
-    OI_TD_ScanEngine.pruneOldScanData();
-    Test.stopTest();
-
-    for (Integer i = 0; i < scans.size(); i++) {
-      Integer rows = [
-        SELECT COUNT()
-        FROM OI_TD_Scan_Data__c
-        WHERE Scan__c = :scans[i].Id
-      ];
-      System.assertEquals(i < 10 ? 1 : 0, rows, 'scan ' + i + ' (0 = newest)');
-    }
-    System.assertEquals(
-      12,
-      [SELECT COUNT() FROM OI_TD_Scan__c],
-      'Scans themselves are never deleted.'
-    );
-  }
-
-  @isTest
-  static void pruneOldScanDataWithFewScansIsANoOp() {
-    OI_TD_Scan__c scan = OI_TD_TestSupport.insertScan(
-      OI_TD_ScanEngine.STATUS_COMPLETED,
-      System.now(),
-      80
-    );
-    insert OI_TD_DataStore.pack(scan.Id, 'objects', 0, '[]');
-    OI_TD_ScanEngine.pruneOldScanData();
-    System.assertEquals(
-      1,
-      [SELECT COUNT() FROM OI_TD_Scan_Data__c WHERE Scan__c = :scan.Id]
-    );
-  }
-
   @isTest
   static void stageLabelsAndTypeNames() {
     System.assertEquals(

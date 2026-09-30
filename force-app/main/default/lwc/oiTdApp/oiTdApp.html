@@ -67,38 +67,6 @@
           </button>
         </template>
       </div>
-
-      <div class="grow"></div>
-
-      <!-- Org menu -->
-      <div class="org-row">
-        <span class="avatar">{avatarLetter}</span>
-        <div class="grow">
-          <p class="body2 org-user nowrap">{ctx.username}</p>
-          <span class="caption org-connected">Connected org</span>
-        </div>
-        <button
-          class="icon-btn org-more"
-          aria-label="Org menu"
-          onclick={toggleOrgMenu}
-        >
-          ⋮
-        </button>
-        <template lwc:if={orgMenuOpen}>
-          <div class="menu-scrim" onclick={closeOrgMenu}></div>
-          <div class="menu org-menu" role="menu">
-            <button class="menu-item" role="menuitem" onclick={handleOrgInfo}>
-              Org Info
-            </button>
-            <button class="menu-item" role="menuitem" onclick={handleSchedule}>
-              Scan Schedule
-            </button>
-            <button class="menu-item" role="menuitem" onclick={handleLogout}>
-              Logout
-            </button>
-          </div>
-        </template>
-      </div>
     </nav>
 
     <!-- Main -->
@@ -108,10 +76,6 @@
           <span class="body2 muted">Monitor</span>
           <span class="body2 crumb-sep">/</span>
           <span class="body2 crumb-title">{pageTitle}</span>
-          <span class="org-pill">
-            <span class="dot pill-dot"></span>
-            <span class="caption">Production org</span>
-          </span>
         </div>
         <div class="row top-actions">
           <div class="gs">
@@ -176,12 +140,6 @@
             </template>
           </div>
           <button
-            class="btn btn-outlined export-btn"
-            onclick={handleExportReport}
-          >
-            Export report
-          </button>
-          <button
             class="btn btn-contained"
             disabled={runDisabled}
             onclick={handleRunScan}
@@ -193,6 +151,24 @@
           </button>
         </div>
       </header>
+
+      <template lwc:if={showBackgroundScan}>
+        <div class="state-banner info-banner" role="status">
+          <span class="spinner spinner-18 banner-spin"></span>
+          <span class="body2 info-text">{backgroundScanText}</span>
+        </div>
+      </template>
+
+      <template lwc:if={showFailedBanner}>
+        <div class="state-banner fail-banner" role="alert">
+          <span class="body2 fail-text">{failedText}</span>
+          <template lwc:if={showFailedHistoryLink}>
+            <button class="btn btn-small" onclick={handleOpenHistory}>
+              Scan history
+            </button>
+          </template>
+        </div>
+      </template>
 
       <template lwc:if={showOldBanner}>
         <div class="old-banner">
@@ -226,18 +202,34 @@
         <template lwc:elseif={showInitialLoading}>
           <p class="body1 p4">Loading...</p>
         </template>
+        <template lwc:elseif={isHistory}>
+          <c-oi-td-scan-history
+            scans={scans}
+            active-scan-id={activeScanId}
+            loading={scansLoading}
+            onviewscan={handleViewScan}
+          ></c-oi-td-scan-history>
+        </template>
         <template lwc:elseif={showNoScans}>
           <div class="no-scans">
             <div class="paper p5 no-scans-card">
               <p class="h6 gutter">No scans yet</p>
-              <p class="body1 muted">
-                Click <b>Run Scan</b> above to analyze the connected org and
-                generate your first health report.
-              </p>
+              <template lwc:if={showBackgroundScan}>
+                <p class="body1 muted">
+                  The first scan of this org is running. Your health report will
+                  appear here when it finishes.
+                </p>
+              </template>
+              <template lwc:else>
+                <p class="body1 muted">
+                  Click <b>Run Scan</b> above to analyze this org and generate
+                  your first health report.
+                </p>
+              </template>
             </div>
           </div>
         </template>
-        <template lwc:elseif={showPages}>
+        <template lwc:else>
           <template lwc:if={isDashboard}>
             <c-oi-td-dashboard
               scan-id={activeScanId}
@@ -264,45 +256,8 @@
             ></c-oi-td-components>
           </template>
         </template>
-        <template lwc:if={isHistory}>
-          <template lwc:if={showPages}>
-            <c-oi-td-scan-history
-              scans={scans}
-              active-scan-id={activeScanId}
-              loading={scansLoading}
-              onviewscan={handleViewScan}
-            ></c-oi-td-scan-history>
-          </template>
-        </template>
       </div>
     </div>
-
-    <!-- Org info dialog -->
-    <template lwc:if={orgInfoOpen}>
-      <div class="dialog-scrim" onclick={closeOrgInfo}>
-        <div class="dialog" role="dialog" aria-modal="true" onclick={stop}>
-          <div class="row-between dialog-title">
-            <p class="h6">Org Info</p>
-            <button class="icon-btn" aria-label="Close" onclick={closeOrgInfo}>
-              ✕
-            </button>
-          </div>
-          <div class="dialog-body">
-            <span class="overline muted">Organization Name</span>
-            <p class="body1 dialog-value">{orgName}</p>
-            <span class="overline muted">Organization Edition</span>
-            <p class="body1 dialog-value">{orgEdition}</p>
-            <button
-              class="btn btn-outlined"
-              disabled={advancedDisabled}
-              onclick={handleAdvanced}
-            >
-              Advanced Details
-            </button>
-          </div>
-        </div>
-      </div>
-    </template>
 
     <!-- Schedule dialog -->
     <template lwc:if={scheduleOpen}>
@@ -324,6 +279,7 @@
                   key={f.value}
                   class={f.btnClass}
                   data-value={f.value}
+                  aria-pressed={f.pressed}
                   disabled={f.disabled}
                   onclick={handleFrequency}
                 >
